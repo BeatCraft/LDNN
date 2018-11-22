@@ -61,23 +61,18 @@ def softmax(x):
 class Connection:
     # left and right are Node
     def __init__(self, left, right):
-        self._quantized = 1
-        
-        self.weight = 0
+        self._id = -1
+        self._product
+        #self._quantized = 1
+        #self.weight = 0
         self.weightIndex = 0
-        self.input = 0
-        self.output = 0
+        #self.input = 0
+        #self.output = 0
         self.left = left
         self.right = right
-        self.cache = 0
-        self.undoCache = 0
-        
-        self._id = -1
+    #self.cache = 0
+    #self.undoCache = 0
     
-    #    self._x = 0
-    #    self._y = 0
-    #    self._weight = 0
-    #    self._weight_index = 0
     def set_id(self, id):
         if id<0:
             return -1
@@ -86,15 +81,15 @@ class Connection:
     def get_id(self):
         return self._id
     
-    def setRandamWeight(self):
-        self.weight = random.random()
-        print self.weight
+    #def setRandamWeight(self):
+    #    self.weight = random.random()
+    #    print self.weight
     
-    def setWeight(self, v):
-        self.weight = v
+    #def setWeight(self, v):
+    #    self.weight = v
 
-    def getWeight(self):
-        return self.weight
+    #def getWeight(self):
+        #return self.weight
 
     def getWeightIndex(self):
         return self.weightIndex
@@ -102,14 +97,20 @@ class Connection:
     def setWeightIndex(self, index):
         if index>0 and index<lesserWeightsLen:
             self.weightIndex = index
-            self.weight = lesserWeights[self.weightIndex]
+        #self.weight = lesserWeights[self.weightIndex]
+        
         return self.weightIndex
 
-    def calcProduct(self):
+        #    def calcProduct(self):
+        #node = self.left
+        #y = node.getY()
+        #self.undoCache = self.cache
+        #self.cache = y * lesserWeights[self.weightIndex]
+
+    def calc_product(self):
         node = self.left
         y = node.getY()
-        self.undoCache = self.cache
-        self.cache = y * lesserWeights[self.weightIndex]
+        self._product = y * lesserWeights[self.weightIndex]
 #
 #
 #
@@ -124,7 +125,8 @@ class Node:
         self.bias = 0
         self.inputs = []
         self.outputs = []
-        self.cache = 0
+        #self.cache = 0
+        self._sum = 0
 
     def getInputs(self):
         return self.inputs
@@ -357,18 +359,18 @@ class Roster:
             for node in nodes:
                 sum += node.getY()
             
-            if sum==0.0:
-                print "FUCK : %f" % sum
-                
-                out = self.getLayerAt(3)
-                nodes = out.getNodes()
-                node = nodes[0]
-                connections = node.getInputs()
-                
-                for con in connections:
-                    print con.getWeight()
-        
-                exit()
+            #if sum==0.0:
+            #    print "FUCK : %f" % sum
+            #
+            #    out = self.getLayerAt(3)
+            #    nodes = out.getNodes()
+            #    node = nodes[0]
+            #    connections = node.getInputs()
+            #
+            #    for con in connections:
+            #        print con.getWeight()
+            #
+            #    exit()
                 #self.dump()
                 #return None
                 #sum = 0.01

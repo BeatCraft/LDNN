@@ -415,6 +415,77 @@ def train_algorhythm_5(r, minibatch, num_of_class):
 #
 #
 #
+def train_algorhythm_7(r, minibatch, num_of_class):
+    connections = r.getConnections()
+    print "connections=%d" % len(connections)
+    
+    inc_max = 100
+    dec_max = 100
+    cnt = 0
+    inc = 0
+    dec = 0
+    noc = 0
+    inc_list = []
+    dec_list = []
+
+    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
+    samples = random.sample(connections, len(connections))
+    
+    # dec loop
+    for con in samples:
+        if dec>=dec_max:
+            break
+        
+        p0 = con.getWeightIndex()
+        if p0==0:
+            noc = noc + 1
+            continue
+
+        p1 = con.setWeightIndex(p0-1)
+        next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+        if next_mse<base_mse: # OK
+            dec = dec + 1
+            dec_list.append(con)
+        else:
+            p1 = con.setWeightIndex(p0)
+            noc = noc + 1
+
+        con.setWeightIndex(p0)
+
+    for con in dec_list:
+        con.setWeightIndex(p0-1)
+
+    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
+    samples = random.sample(connections, len(connections))
+
+    # inc loop
+    for con in samples:
+        if inc>=inc_max:
+            break
+        
+        p0 = con.getWeightIndex()
+        if p0==core.lesserWeightsLen-1:
+            noc = noc + 1
+            continue
+
+        p1 = con.setWeightIndex(p0+1)
+        next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+        if next_mse<base_mse: # OK
+            inc = inc + 1
+            inc_list.append(con)
+        else:
+            p1 = con.setWeightIndex(p0)
+            noc = noc + 1
+
+        con.setWeightIndex(p0)
+
+    for con in inc_list:
+        con.setWeightIndex(p0+1)
+    
+    print "inc : %d, dec : %d, noc : %d, total : %d" % (inc, dec, noc, inc+dec+noc)
+#
+#
+#
 def train_algorhythm_6(r, minibatch, num_of_class):
     connections = r.getConnections()
     print "connections=%d" % len(connections)

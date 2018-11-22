@@ -423,11 +423,11 @@ def train_algorhythm_6(r, minibatch, num_of_class):
     noc = 0 # no change
     inc = 0
     dec = 0
-    inc_max = 10
-    dec_max = 10
     inc_list = []
     dec_list = []
-    samples_max = 100
+    samples_max = len(connections)/20 # 5%
+    inc_max = samples_max/5 # 1%
+    dec_max = samples_max/5
     
     base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
     samples = random.sample(connections, samples_max)
@@ -443,6 +443,7 @@ def train_algorhythm_6(r, minibatch, num_of_class):
             if next_mse<base_mse:
                 dec = dec + 1
                 base_mse = next_mse
+                print " - (%d > %d)" % (p0, p0-1)
             elif next_mse==base_mse:
                 con.setWeightIndex(p0)
                 noc = noc + 1
@@ -455,6 +456,7 @@ def train_algorhythm_6(r, minibatch, num_of_class):
             if next_mse<base_mse:
                 inc = inc + 1
                 base_mse = next_mse
+                print " + (%d > %d)" % (p0, p0+1)
             elif next_mse==base_mse:
                 con.setWeightIndex(p0)
                 noc = noc + 1
@@ -463,14 +465,15 @@ def train_algorhythm_6(r, minibatch, num_of_class):
                 next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
                 base_mse = next_mse
                 dec = dec + 1
+                print " - (%d > %d)" % (p0, p0-1)
 
     print "inc : %d, dec : %d, noc : %d, total : %d" % (inc, dec, noc, inc+dec+noc)
 #
 #
 #
 def process_minibatch(r, minibatch, num_of_class):
-    epoc = 10
-    algo = 4
+    epoc = 1
+    algo = 6
     for e in range(epoc):
         if algo == 1:
             train_algorhythm_1(r, minibatch, num_of_class)

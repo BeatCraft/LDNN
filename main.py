@@ -53,9 +53,6 @@ def setup_dnn(path):
         r.connectLayers(hiddenLayer_1, hiddenLayer_2)
         r.connectLayers(hiddenLayer_2, outputLayer)
 
-        
-        
-        
         util.pickle_save(path, r)
         return r
     return None
@@ -484,9 +481,9 @@ def process_minibatch(r, minibatch, num_of_class):
         elif algo == 4:
             train_algorhythm_4(r, minibatch, num_of_class)
         elif algo == 5:
-            train_algorhythm_4(r, minibatch, num_of_class)
+            train_algorhythm_5(r, minibatch, num_of_class)
         elif algo == 6:
-            train_algorhythm_4(r, minibatch, num_of_class)
+            train_algorhythm_6(r, minibatch, num_of_class)
 #
 #
 #

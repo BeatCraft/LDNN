@@ -17,8 +17,6 @@ from PIL import PngImagePlugin
 import zlib
 
 sys.setrecursionlimit(10000)
-
-
 #
 # constant values
 #
@@ -62,55 +60,39 @@ class Connection:
     # left and right are Node
     def __init__(self, left, right):
         self._id = -1
-        self._product
-        #self._quantized = 1
-        #self.weight = 0
-        self.weightIndex = 0
-        #self.input = 0
-        #self.output = 0
+        self._product = 0.0
+        self._weight_index = 0
+
         self.left = left
         self.right = right
-    #self.cache = 0
-    #self.undoCache = 0
     
     def set_id(self, id):
-        if id<0:
-            return -1
-        self._id = id
+        if id>=0:
+            self._id = id
     
     def get_id(self):
         return self._id
-    
-    #def setRandamWeight(self):
-    #    self.weight = random.random()
-    #    print self.weight
-    
-    #def setWeight(self, v):
-    #    self.weight = v
-
-    #def getWeight(self):
-        #return self.weight
 
     def getWeightIndex(self):
-        return self.weightIndex
+        return self._weight_index
 
     def setWeightIndex(self, index):
-        if index>0 and index<lesserWeightsLen:
-            self.weightIndex = index
-        #self.weight = lesserWeights[self.weightIndex]
-        
-        return self.weightIndex
-
-        #    def calcProduct(self):
-        #node = self.left
-        #y = node.getY()
-        #self.undoCache = self.cache
-        #self.cache = y * lesserWeights[self.weightIndex]
-
+        if index>=0 and index<lesserWeightsLen:
+            self._weight_index = index
+ 
+        return self._weight_index
+            
     def calc_product(self):
         node = self.left
         y = node.getY()
-        self._product = y * lesserWeights[self.weightIndex]
+        self._product = y * lesserWeights[self._weight_index]
+        return self._product
+
+    def get_product(self):
+        return self._product
+
+    def propagate(self):
+        return self.calc_product()
 #
 #
 #
@@ -120,13 +102,21 @@ class Node:
     # y is output value
     # weights are hold by Connections
     def __init__(self):
+        self._id = -1
+        self._sum = 0
+        
         self.x = 0
         self.y = 0
         self.bias = 0
         self.inputs = []
         self.outputs = []
-        #self.cache = 0
-        self._sum = 0
+
+    def set_id(self, id):
+        if id>=0:
+            self._id = id
+
+    def get_id(self):
+        return self._id
 
     def getInputs(self):
         return self.inputs
@@ -167,9 +157,7 @@ class Node:
         
         for i in range(num):
             input = self.inputs[i]
-            input.calcProduct()
-            p = input.cache
-            sum += p
+            sum += input.propagate()
 
         if flag==0:
             self.y = sum
@@ -177,27 +165,24 @@ class Node:
             self.y = relu(sum)
         elif flag==2:
             self.y = softmax(sum)
-
-#    def updateCache(self, undo=0):
-#        sum = 0
-#        num = len(self.inputs)
-#        for i in range(num):
-#            input = self.inputs[i]
-#            sum += input.cache
-#
-#        sum += self.bias
-#        h = relu(sum)
-#        self.y = h
-
 #
 #
 #
 class Layer:
     def __init__(self, i, type):
+        self._id = -1
+        
         self.index = i
         self.type = type # 0 : input, 1 : hidden, 2 : output
         self.nodes = []
 
+    def set_id(self, id):
+        if id>=0:
+            self._id = id
+
+    def get_id(self):
+        return self._id
+    
     def getType(self):
         return self.type
 
@@ -242,24 +227,6 @@ class Roster:
     def __init__(self):
         self.layers = []
         self.connections = []
-        #        self._weight_list = None
-        #self._weight_list_size = 0
-        #
-    #def set_weight_list(self, wl):
-    #    self._weight_list = wl
-    #    self._weight_list_size = len(self._weight_list)
-    #
-    #def get_weight_list(self):
-    #    return self._weight_list
-    #
-    #def BrainSunshineDrop(self, connection):
-    #    i = random.randrange(0, lesserWeightsLen-5, 1)
-    #    connection.setWeightIndex(i)
-    #
-    #def BrainSunshineDropAll(self):
-    #    for connection in self.connections:
-    #        w = connection.getWeight()
-    #        connection.setWeightIndex(w-1)
     
     def countLayers(self):
         return len(self.layers)

@@ -26,8 +26,12 @@ WEIGHT_SET_1 = [-1, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.007812
 
 WEIGHT_SET_2 = [-1, -0.72363462, -0.52364706, -0.37892914, -0.27420624, -0.19842513, -0.14358729, -0.10390474, -0.07518906, -0.05440941, -0.03937253, -0.02849133, -0.02061731, -0.0149194, -0.01079619, -0.0078125, 0, 0.72363462, 0.52364706, 0.37892914, 0.27420624, 0.19842513, 0.14358729, 0.10390474, 0.07518906, 0.05440941, 0.03937253, 0.02849133, 0.02061731, 0.0149194, 0.01079619, 0.0078125, 1]
 
-lesserWeights = WEIGHT_SET_0
+lesserWeights = WEIGHT_SET_1
 lesserWeightsLen = len(lesserWeights)
+WEIGHT_INDEX_ZERO = 8
+WEIGHT_INDEX_MAX = lesserWeightsLen-1
+WEIGHT_INDEX_MIN = 0
+WEIGHT_RANDOM_RANGE = 4
 #
 #
 #
@@ -259,7 +263,9 @@ class Roster:
     def connectNodes(self, leftNode, rightNode):
         c = Connection(leftNode, rightNode)
         #
+        #i = WEIGHT_INDEX_ZERO
         i = random.randrange(lesserWeightsLen)
+        #i = random.randrange(WEIGHT_INDEX_ZERO, WEIGHT_INDEX_ZERO+WEIGHT_RANDOM_RANGE, 1)
         #
         c.setWeightIndex(i)
         rightNode.addInputs(c)

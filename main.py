@@ -550,9 +550,90 @@ def train_algorhythm_6(r, minibatch, num_of_class):
 #
 #
 #
+def train_algorhythm_8(r, minibatch, num_of_class):
+    connections = r.getConnections()
+    print "connections=%d" % len(connections)
+    
+    inc_max = 100
+    dec_max = 100
+    cnt_max = 200
+    cnt = 0
+    inc = 0
+    dec = 0
+    noc = 0
+    zero = 0
+    inc_list = []
+    dec_list = []
+    zero_list = []
+    
+    
+    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
+    samples = random.sample(connections, len(connections)/10)
+    
+    # loop
+    for con in samples:
+        cnt = inc + dec + zero
+        if cnt>=cnt_max:
+            break
+        
+        p0 = con.getWeightIndex()
+        if p0==0 or p0==core.lesserWeightsLen-1:
+            p1 = con.setWeightIndex(core.WEIGHT_INDEX_ZERO)
+            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+            if next_mse<base_mse: # OK, zero reset
+                zero = zero + 1
+                zero_list.append(con)
+                print " zero reset"
+            else:
+                noc = noc + 1
+                print " noc (%d)" % (p0)
+
+            p1 = con.setWeightIndex(p0)
+            continue
+
+        
+        core.WEIGHT_INDEX_MAX
+        core.WEIGHT_INDEX_MIN
+        
+        p1 = con.setWeightIndex(core.WEIGHT_INDEX_MAX)#(p0+1)
+        next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+        if next_mse<base_mse: # OK, inc
+            inc = inc + 1
+            inc_list.append(con)
+            print " + %d" % (p0+1)
+        else:
+            p1 = con.setWeightIndex(core.WEIGHT_INDEX_MIN)#(p0-1)
+            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+            if next_mse<base_mse: # OK, dec
+                dec= dec + 1
+                dec_list.append(con)
+                print " + %d" % (p0-1)
+            else:
+                p1 = con.setWeightIndex(p0)
+                noc = noc + 1
+                print " noc (%d)" % (p0)
+
+        con.setWeightIndex(p0)
+
+
+    for con in inc_list:
+        p0 = con.getWeightIndex()
+        con.setWeightIndex(p0+1)
+
+    for con in dec_list:
+        p0 = con.getWeightIndex()
+        con.setWeightIndex(p0-1)
+    
+    for con in zero_list:
+        con.setWeightIndex(core.WEIGHT_INDEX_ZERO)
+
+    print "inc : %d, dec : %d, zero : %d, noc : %d, total : %d" % (inc, dec, zero, noc, inc+dec+noc+zero)
+#
+#
+#
 def process_minibatch(r, minibatch, num_of_class):
     epoc = 1
-    algo = 7
+    algo = 8
     for e in range(epoc):
         if algo == 1:
             train_algorhythm_1(r, minibatch, num_of_class)
@@ -568,6 +649,9 @@ def process_minibatch(r, minibatch, num_of_class):
             train_algorhythm_6(r, minibatch, num_of_class)
         elif algo == 7:
             train_algorhythm_7(r, minibatch, num_of_class)
+        elif algo == 8:
+            train_algorhythm_8(r, minibatch, num_of_class)
+            # remember to set initialy zero
 #
 #
 #

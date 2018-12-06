@@ -165,7 +165,7 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     print ">> self-test mode"
     start_time = time.time()
     
-    multi = 1
+    multi = 2
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
     stat = [0,0,0,0,0,0,0,0,0,0]
@@ -191,10 +191,10 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
 
         [job.join() for job in jobs]
     else:
-        with mp.Pool(processes=4) as pool:
-            print "test 0"
-            pool.map(target=test, args=(r, minibatch, num_of_class))
-            print "test 1"
+        #with mp.Pool(processes=2) as pool:
+        pool = mp.Pool(processes=2)
+        print "hoge"
+        #    pool.map(target=test, args=(r, minibatch, num_of_class,))
 
     print dist
     for d in dist:
@@ -477,11 +477,48 @@ def ziggling_connection(r, minibatch, num_of_class, con, clist, dif):
 #
 #
 #
+def train_algorhythm_10(r, minibatch, num_of_class):
+    connections = r.getConnections()
+    print "connections=%d" % len(connections)
+    
+    inc_max = 100 # len(connections)/100
+    dec_max = 100 # len(connections)/100
+    cnt = 0
+    inc = 0
+    dec = 0
+    noc = 0
+    zero = 0
+    zero_2 = 0
+    inc_list = []
+    dec_list = []
+    zero_list = []
+    zero_list_2 = []
+    
+    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
+    samples = random.sample(connections, len(connections)/10)
+    
+    # dec loop
+    for con in samples:
+        if dec>=dec_max:
+            break
+
+        ziggling_connection(r, minibatch, num_of_class, con, clist, -1)
+
+    # inc loop
+    for con in samples:
+        if inc>=incc_max:
+            break
+        
+        ziggling_connection(r, minibatch, num_of_class, con, clist, 1)
+#
+#
+#
 def process_minibatch(r, minibatch, num_of_class):
     epoc = 1
     algo = 9
+    
     for e in range(epoc):
-        elif algo == 7:
+        if algo == 7:
             train_algorhythm_7(r, minibatch, num_of_class)
         elif algo == 9:
             train_algorhythm_9(r, minibatch, num_of_class)

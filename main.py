@@ -14,8 +14,7 @@ from stat import *
 import random
 import copy
 import math
-
-import multiprocessing
+import multiprocessing as mp
 #
 #
 # LDNN Modules
@@ -126,45 +125,76 @@ def make_batch(num_of_class, iteration, size_of_minibatch, list_of_path):
 #
 #
 #
+def test(r, minibatch, num_of_class):
+  
+    dist = [0,0,0,0,0,0,0,0,0,0]
+    stat = [0,0,0,0,0,0,0,0,0,0]
+  
+    for i in range(len(minibatch)):
+        samplese = minibatch[i]
+
+        for label in range(len(samplese)):
+            sample = samplese[label]
+            data = util.loadData(sample)
+            r.setInputData(data)
+            r.propagate()
+            inf = r.getInferences(1)
+            if inf is None:
+                print "ERROR"
+                continue
+                
+            index = -1
+            mx = max(inf)
+            for k in range(num_of_class):
+                if inf[k] == mx:
+                    index = k
+        
+            dist[index] = dist[index] + 1
+#            if label==index:
+#                print "%d : %d : OK : %s" % (label, index, sample)
+#                stat[index] = stat[index] + 1
+#            else:
+#                print "%d : %d : NG : %s" % (label, index, sample)
+
+#   print "+"
+    return dist, stat
+#
+#
+#
 def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     print ">> self-test mode"
-
+    start_time = time.time()
+    
+    multi = 1
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
     stat = [0,0,0,0,0,0,0,0,0,0]
     
-    for minibatch in batch:
-        print "it : %d" % it
-        if it>=iteration:
-            break
-        it = it + 1
+    if multi==0:
+        for minibatch in batch:
+            if it>=iteration:
+                break
+            print "it : %d" % it
         
-        for i in range(len(minibatch)):
-            samplese = minibatch[i]
-            for label in range(len(samplese)):
-                sample = samplese[label]
-                data = util.loadData(sample)
-                r.setInputData(data)
-                r.propagate()
-                inf = r.getInferences(1)
-                if inf is None:
-                    print "ERROR"
-                    continue
-                
-                index = -1
-                mx = max(inf)
-                
-                for k in range(num_of_class):
-                    if inf[k] == mx:
-                        index = k
+            d, s = test(r, minibatch, num_of_class)
+            for j in range(len(dist)):
+                dist[j] = dist[j] + d[j]
+                stat[j] = stat[j] + s[j]
 
-                dist[index] = dist[index] + 1
-            
-                if label==index:
-                    print "%d : %d : OK : %s" % (label, index, sample)
-                    stat[index] = stat[index] + 1
-                else:
-                    print "%d : %d : NG : %s" % (label, index, sample)
+            it = it + 1
+    elif multi==1:
+        jobs = []
+        for minibatch in batch:
+            job = mp.Process(target=test, args=(r, minibatch, num_of_class))
+            jobs.append(job)
+            job.start()
+
+        [job.join() for job in jobs]
+    else:
+        with mp.Pool(processes=4) as pool:
+            print "test 0"
+            pool.map(target=test, args=(r, minibatch, num_of_class))
+            print "test 1"
 
     print dist
     for d in dist:
@@ -173,6 +203,10 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     print stat
     for s in stat:
         print s
+
+    elapsed_time = time.time() - start_time
+    t = format(elapsed_time, "0")
+    print "test time = %s" % (t)
 #
 #
 #

@@ -5,7 +5,7 @@ import os, sys, time, math
 from stat import *
 import random
 import copy
-import multiprocessing
+import multiprocessing as mp
 import pickle
 import numpy as np
 
@@ -57,6 +57,8 @@ def relu(x):
 #
 def softmax(x):
     return math.exp(x)
+#return np.exp(x)
+
 #
 #
 #
@@ -108,6 +110,8 @@ class Node:
     def __init__(self):
         self._id = -1
         self._sum = 0
+        self._input_filter_index = 0
+        self._output_filter_index = 0
         
         self.x = 0
         self.y = 0
@@ -115,6 +119,12 @@ class Node:
         self.inputs = []
         self.outputs = []
 
+    def set_output_filter(self, i):
+        self._output_filter_index = i
+
+    def set_input_filter(self, i):
+       self._input_filter_index = i
+           
     def set_id(self, id):
         if id>=0:
             self._id = id
@@ -155,20 +165,50 @@ class Node:
     def setBias(self, b):
         self.bias = b
 
-    def propagate(self, flag):
+    def propagate(self):
         sum = 0
         num = len(self.inputs)
         
-        for i in range(num):
-            input = self.inputs[i]
-            sum += input.propagate()
+        if num==0:
+            if self._input_filter_index==1:
+                if self.x>0:
+                    self.y = float(self.x)/255.0
+                else:
+                    self.y = 0.0
+        else:
+            for i in range(num):
+                input = self.inputs[i]
+                sum += input.propagate()
 
-        if flag==0:
-            self.y = sum
-        elif flag==1:
-            self.y = relu(sum)
-        elif flag==2:
-            self.y = softmax(sum)
+            if self._output_filter_index==0:
+                self.y = sum
+            elif self._output_filter_index==1:
+                self.y = relu(sum)
+            elif self._output_filter_index==2:
+                self.y = softmax(sum)
+
+
+def node_propagete(node):
+    sum = 0
+    num = len(node.inputs)
+        
+    if num==0:
+        if node._input_filter_index==1:
+            if node.x>0:
+                node.y = float(node.x)/255.0
+            else:
+                self.y = 0.0
+    else:
+        for i in range(num):
+            input = node.inputs[i]
+            sum += input.propagate()
+            
+            if node._output_filter_index==0:
+                node.y = sum
+            elif node._output_filter_index==1:
+                node.y = relu(sum)
+            elif node._output_filter_index==2:
+                node.y = softmax(sum)
 #
 #
 #
@@ -199,6 +239,16 @@ class Layer:
         return self.nodes
 
     def addNode(self, node):
+        # 2018-12-06 by lesser
+        # this part is temporaly implemented for multi-processing, shuod be re-desinged later
+        if self.type==0:
+            node.set_input_filter(1) # scaling
+            #set_output_filter(0) # default=0, no filter
+        elif self.type==1:
+            node.set_output_filter(1)
+        elif self.type==2:
+            node.set_output_filter(2)
+        #
         self.nodes.append(node)
         return self.countNodes()
 
@@ -215,15 +265,41 @@ class Layer:
             print "error"
             return
         
-        if self.type==0: # input
-            for node in self.nodes:
-                node.setY( float(node.getX())/255.0 )
-        elif self.type==1: # hidden
-            for node in self.nodes:
-                node.propagate(1)
-        elif self.type==2: # output
-            for node in self.nodes:
-                node.propagate(2)
+        for node in self.nodes:
+            node.propagate()
+
+        #with mp.Pool(processes=4) as pool:
+        #    pool.map(target=node_propagete, args=nodes)
+
+        #jobs = []
+        #for node in self.nodes:
+        #    job = mp.Process(target=node.propagate)
+        #    jobs.append(job)
+        #    job.start()
+        #
+        #[job.join() for job in jobs]
+
+
+        #with mp.Pool(processes=4) as pool:
+        #   pool.map(node.propagate)
+        #for node in self.nodes:
+        #   p = mp.Process(target=node.propagate)#, args=(node))
+        #   p.start()
+        #   p.join()
+                
+#pool.map(node.propagate())
+
+
+#        if self.type==0: # input
+#            for node in self.nodes:
+#                node.setY( float(node.getX())/255.0 )
+#        elif self.type==1: # hidden
+#            for node in self.nodes:
+#                node.propagate(1)
+#        elif self.type==2: # output
+#            for node in self.nodes:
+#                node.propagate(2)
+
 #
 #
 #
@@ -351,7 +427,11 @@ class Roster:
                 #    print node.getY()
                     
             for node in nodes:
-                ret.append(node.getY()/sum)
+                if node.getY()==0.0:
+                    ret.append(0.0)
+                else:
+                    ret.append(node.getY()/sum)
+                            
         else:
             for node in nodes:
                 ret.append(node.getY())

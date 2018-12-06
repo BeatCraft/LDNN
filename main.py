@@ -254,203 +254,6 @@ def evaluate_minibatch(r, minibatch, num_of_class):
 #
 #
 #
-def train_algorhythm_1(r, minibatch, num_of_class):
-    connections = r.getConnections()
-    print "connections=%d" % len(connections)
-    
-    cnt = 0
-    inc = 0
-    dec = 0
-    noc = 0
-    
-    samples = random.sample(connections, 10)
-    for con in samples:
-        base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-        #print "+ mae : %f, ret : %f" % (base_mse, base_ret)
-        
-        p0 = con.getWeightIndex()
-        p1 = con.setWeightIndex(p0+1) # increase
-        next_mse = 0.0
-        next_ret = 0.0
-        if p0!=p1: # OK to increase
-            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-            if next_mse<base_mse: # OK
-                inc = inc + 1
-                pass
-            else: # no effect by incfreasing, try to decrease
-                p1 = con.setWeightIndex(p0-1)
-                if p0==p1: # can't decrease, w is min.
-                    noc = noc + 1
-                #con.setWeightIndex(core.indexOfZero) # set to Zero
-                else: # OK to decrease
-                    next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-                    if next_mse<base_mse: # effective
-                        dec = dec + 1
-                    else: # no effect, set to Zero
-                        noc = noc + 1
-                        #con.setWeightIndex(core.indexOfZero)
-        else: # can't increase. w is max. try to decrease.
-            p1 = con.setWeightIndex(p0-1)
-            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-            if next_mse<base_mse: # decrease OK
-                dec = dec + 1
-            else: #set to Zero
-                noc = noc + 1
-                #con.setWeightIndex(core.indexOfZero)
-
-    print "inc : %d, dec : %d, noc : %d, total : %d" % (inc, dec, noc, inc+dec+noc)
-#
-#
-#
-def train_algorhythm_2(r, minibatch, num_of_class):
-    connections = r.getConnections()
-    
-    samples = random.sample(connections, 10)
-    for con in samples:
-        p0 = con.getWeightIndex()
-        index = -1
-        base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-        for i in range(core.lesserWeightsLen):
-            p1 = con.setWeightIndex(i)
-            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-            if next_mse<base_mse:
-                base_mse = next_mse
-                index = i
-        if index>-1:
-            con.setWeightIndex((p0+index)/2)
-            print "(%d + %d)/2 = %d" % (p0, index, (p0+index)/2)
-        else:
-            con.setWeightIndex(p0)
-            print "-"
-
-        
-        #if p0==i:
-        #    print "+ %02d | %f" % (i, base_mse)
-        #else:
-        #    print "- %02d | %f" % (i, base_mse)
-#
-#
-#
-def train_algorhythm_3(r, minibatch, num_of_class):
-    connections = r.getConnections()
-    
-    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    print "[ %f ]" % (base_mse)
-    
-    i = 0
-    for con in connections:
-        p0 = con.getWeightIndex()
-        p1 = con.setWeightIndex(0)
-        base_mse2, base_ret2 = evaluate_minibatch(r, minibatch, num_of_class)
-        print "[%04d] %02d : %f" % (i, p0, base_mse2)
-        i = i + 1
-        p0 = con.setWeightIndex(p0)
-#
-#
-#
-def train_algorhythm_4(r, minibatch, num_of_class):
-    connections = r.getConnections()
-    print "connections=%d" % len(connections)
-    
-    inc_max = 10
-    dec_max = 10
-    cnt = 0
-    inc = 0
-    dec = 0
-    noc = 0
-    
-    #base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    
-    samples = random.sample(connections, len(connections))
-    # dec loop
-    for con in samples:
-        if dec>=dec_max:
-            break
-        
-        p0 = con.getWeightIndex()
-        if p0==0:
-            noc = noc + 1
-            #print "    (%d)" % (noc)
-            continue
-
-        base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-        p1 = con.setWeightIndex(p0-1)
-        next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-        if next_mse<base_mse: # OK
-            dec = dec + 1
-            #print "  - %d : %d > %d" % (dec, p0, p1)
-        else:
-            p1 = con.setWeightIndex(p0)
-            noc = noc + 1
-            #print "    (%d)" % (noc)
-            continue
-
-    # inc loop
-    for con in samples:
-        if inc>=inc_max:
-            break
-        
-        p0 = con.getWeightIndex()
-        if p0==core.lesserWeightsLen-1:
-            noc = noc + 1
-            #print "    (%d)" % (noc)
-            continue
-        
-        base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-        p1 = con.setWeightIndex(p0+1)
-        next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-        if next_mse<base_mse: # OK
-            inc = inc + 1
-                #print "  + %d : %d > %d" % (inc, p0, p1)
-        else:
-            p1 = con.setWeightIndex(p0)
-            noc = noc + 1
-            #print "    (%d)" % (noc)
-            continue
-    
-    print "inc : %d, dec : %d, noc : %d, total : %d" % (inc, dec, noc, inc+dec+noc)
-#
-#
-#
-def train_algorhythm_5(r, minibatch, num_of_class):
-    connections = r.getConnections()
-    print "connections=%d" % len(connections)
-    
-    cnt = 0
-    noc = 0 # no change
-    inc = 0
-    dec = 0
-    inc_max = 100
-    dec_max = 100
-    inc_list = []
-    dec_list = []
-    samples_max = 400
-    
-    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    samples = random.sample(connections, samples_max)
-    
-    for con in samples:
-        p0 = con.getWeightIndex()
-        
-        p1 = con.setWeightIndex(p0+1)
-        if p0==core.lesserWeightsLen-1:
-            p1 = con.setWeightIndex(p0-1)
-            
-            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-            dec_list.append((con, next_mse))
-        else:
-            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-            if next_mse<base_mse:
-                inc_list.append((con, next_mse))
-            else:
-                dec_list.append((con, next_mse))
-
-        p0 = con.setWeightIndex(p0)
-
-    print "inc : %d, dec : %d, noc : %d, total : %d" % (inc, dec, noc, inc+dec+noc)
-#
-#
-#
 def train_algorhythm_7(r, minibatch, num_of_class):
     connections = r.getConnections()
     print "connections=%d" % len(connections)
@@ -527,139 +330,6 @@ def train_algorhythm_7(r, minibatch, num_of_class):
         con.setWeightIndex(p0+1)
     
     print "inc : %d, dec : %d, noc : %d, total : %d" % (inc, dec, noc, inc+dec+noc)
-#
-#
-#
-def train_algorhythm_6(r, minibatch, num_of_class):
-    connections = r.getConnections()
-    print "connections=%d" % len(connections)
-
-    cnt = 0
-    noc = 0 # no change
-    inc = 0
-    dec = 0
-    inc_list = []
-    dec_list = []
-    samples_max = len(connections)/20 # 5%
-    inc_max = samples_max/5 # 1%
-    dec_max = samples_max/5
-    
-    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    samples = random.sample(connections, samples_max)
-
-    for con in samples:
-        if inc>=inc_max and dec>=dec_max:
-            break
-    
-        p0 = con.getWeightIndex()
-        if p0==core.lesserWeightsLen-1:
-            p1 = con.setWeightIndex(p0-1)
-            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-            if next_mse<base_mse:
-                dec = dec + 1
-                base_mse = next_mse
-                print " - (%d > %d)" % (p0, p0-1)
-            elif next_mse==base_mse:
-                con.setWeightIndex(p0)
-                noc = noc + 1
-            else:
-                con.setWeightIndex(p0)
-                noc = noc + 1
-        else:
-            p1 = con.setWeightIndex(p0+1)
-            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-            if next_mse<base_mse:
-                inc = inc + 1
-                base_mse = next_mse
-                print " + (%d > %d)" % (p0, p0+1)
-            elif next_mse==base_mse:
-                con.setWeightIndex(p0)
-                noc = noc + 1
-            else:
-                con.setWeightIndex(p0-1)
-                next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-                base_mse = next_mse
-                dec = dec + 1
-                print " - (%d > %d)" % (p0, p0-1)
-
-    print "inc : %d, dec : %d, noc : %d, total : %d" % (inc, dec, noc, inc+dec+noc)
-#
-#
-#
-def train_algorhythm_8(r, minibatch, num_of_class):
-    connections = r.getConnections()
-    print "connections=%d" % len(connections)
-    
-    inc_max = 100
-    dec_max = 100
-    cnt_max = 200
-    cnt = 0
-    inc = 0
-    dec = 0
-    noc = 0
-    zero = 0
-    inc_list = []
-    dec_list = []
-    zero_list = []
-    
-    
-    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    samples = random.sample(connections, len(connections)/10)
-    
-    # loop
-    for con in samples:
-        cnt = inc + dec + zero
-        if cnt>=cnt_max:
-            break
-        
-        p0 = con.getWeightIndex()
-        if p0==0 or p0==core.lesserWeightsLen-1:
-            p1 = con.setWeightIndex(core.WEIGHT_INDEX_ZERO)
-            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-            if next_mse<base_mse: # OK, zero reset
-                zero = zero + 1
-                zero_list.append(con)
-                print " zero reset"
-            else:
-                noc = noc + 1
-                print " noc (%d)" % (p0)
-
-            p1 = con.setWeightIndex(p0)
-            continue
-
-        p1 = con.setWeightIndex(core.WEIGHT_INDEX_MAX)#(p0+1)
-        next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-        if next_mse<base_mse: # OK, inc
-            inc = inc + 1
-            inc_list.append(con)
-            print " + %d" % (p0+1)
-        else:
-            p1 = con.setWeightIndex(core.WEIGHT_INDEX_MIN)#(p0-1)
-            next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-            if next_mse<base_mse: # OK, dec
-                dec= dec + 1
-                dec_list.append(con)
-                print " + %d" % (p0-1)
-            else:
-                p1 = con.setWeightIndex(p0)
-                noc = noc + 1
-                print " noc (%d)" % (p0)
-
-        con.setWeightIndex(p0)
-
-
-    for con in inc_list:
-        p0 = con.getWeightIndex()
-        con.setWeightIndex(p0+1)
-
-    for con in dec_list:
-        p0 = con.getWeightIndex()
-        con.setWeightIndex(p0-1)
-    
-    for con in zero_list:
-        con.setWeightIndex(core.WEIGHT_INDEX_ZERO)
-
-    print "inc : %d, dec : %d, zero : %d, noc : %d, total : %d" % (inc, dec, zero, noc, inc+dec+noc+zero)
 #
 #
 #
@@ -781,26 +451,38 @@ def train_algorhythm_9(r, minibatch, num_of_class):
 #
 #
 #
+def ziggling_connection(r, minibatch, num_of_class, con, clist, dif):
+
+    p0 = con.getWeightIndex()
+    p1 = con.setWeightIndex(p0 + dif)
+    
+    if p0==core.WEIGHT_INDEX_MIN or p0==core.WEIGHT_INDEX_MAX:
+        p1 = con.setWeightIndex(core.WEIGHT_INDEX_ZERO)
+        next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+        if next_mse<base_mse: # OK
+            con.setWeightIndex(p0)
+            return core.WEIGHT_INDEX_ZERO
+        else: # noc
+            con.setWeightIndex(p0)
+            return -1
+    else:
+        p1 = con.setWeightIndex(p0+dif)
+        next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+        if next_mse<base_mse: # OK
+            con.setWeightIndex(p0)
+            return core.WEIGHT_INDEX_ZERO
+        else: # noc
+            con.setWeightIndex(p0)
+            return -1
+#
+#
+#
 def process_minibatch(r, minibatch, num_of_class):
     epoc = 1
     algo = 9
     for e in range(epoc):
-        if algo == 1:
-            train_algorhythm_1(r, minibatch, num_of_class)
-        elif algo == 2:
-            train_algorhythm_2(r, minibatch, num_of_class)
-        elif algo == 3:
-            train_algorhythm_3(r, minibatch, num_of_class)
-        elif algo == 4:
-            train_algorhythm_4(r, minibatch, num_of_class)
-        elif algo == 5:
-            train_algorhythm_5(r, minibatch, num_of_class)
-        elif algo == 6:
-            train_algorhythm_6(r, minibatch, num_of_class)
         elif algo == 7:
             train_algorhythm_7(r, minibatch, num_of_class)
-        elif algo == 8:
-            train_algorhythm_8(r, minibatch, num_of_class)
         elif algo == 9:
             train_algorhythm_9(r, minibatch, num_of_class)
 #

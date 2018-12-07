@@ -159,15 +159,15 @@ def test(r, minibatch, num_of_class):
 #                print "%d : %d : NG : %s" % (label, index, sample)
 
 #   print "+"
-    return dist, stat
+    return [dist, stat]
 #
 #
 #
 def test_mode(r, batch, num_of_class, iteration, minibatch_size):
-    print ">> self-test mode"
+    print ">>test mode"
     start_time = time.time()
     
-    multi = 1
+    multi = 2
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
     stat = [0,0,0,0,0,0,0,0,0,0]
@@ -188,27 +188,24 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
         jobs = []
         for minibatch in batch:
             job = mp.Process(target=test, args=(r, minibatch, num_of_class))
-            print job
             jobs.append(job)
             job.start()
-        
-        for job in jobs:
-            res = job.join()
-            print res
-
-        
-        #[job.join() for job in jobs]
+    
+        [job.join() for job in jobs]
 
     else:
-        pool = mp.Pool(processes=2)
+        pool = mp.Pool(processes=16)
         multi_results = []
         for minibatch in batch:
             multi_results.append(pool.apply_async(test, args=(r, minibatch, num_of_class)))
     
-    #print multi_results
         for res in multi_results:
-            print res.get()
-
+            ret = res.get()
+            d = ret[0]
+            s = ret[1]
+            for j in range(len(dist)):
+                dist[j] = dist[j] + d[j]
+                stat[j] = stat[j] + s[j]
 
     print dist
     for d in dist:

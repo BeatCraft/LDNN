@@ -53,7 +53,9 @@ def setup_dnn(path):
         r.connectLayers(inputLayer, hiddenLayer_1)
         r.connectLayers(hiddenLayer_1, hiddenLayer_2)
         r.connectLayers(hiddenLayer_2, outputLayer)
-
+        
+        r.init_connections()
+        
         util.pickle_save(path, r)
         return r
     return None
@@ -165,7 +167,7 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     print ">> self-test mode"
     start_time = time.time()
     
-    multi = 2
+    multi = 1
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
     stat = [0,0,0,0,0,0,0,0,0,0]
@@ -186,15 +188,27 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
         jobs = []
         for minibatch in batch:
             job = mp.Process(target=test, args=(r, minibatch, num_of_class))
+            print job
             jobs.append(job)
             job.start()
+        
+        for job in jobs:
+            res = job.join()
+            print res
 
-        [job.join() for job in jobs]
+        
+        #[job.join() for job in jobs]
+
     else:
-        #with mp.Pool(processes=2) as pool:
         pool = mp.Pool(processes=2)
-        print "hoge"
-        #    pool.map(target=test, args=(r, minibatch, num_of_class,))
+        multi_results = []
+        for minibatch in batch:
+            multi_results.append(pool.apply_async(test, args=(r, minibatch, num_of_class)))
+    
+    #print multi_results
+        for res in multi_results:
+            print res.get()
+
 
     print dist
     for d in dist:
@@ -451,8 +465,9 @@ def train_algorhythm_9(r, minibatch, num_of_class):
 #
 #
 #
-def ziggling_connection(r, minibatch, num_of_class, con, clist, dif):
+def ziggling_connection(r, minibatch, num_of_class, con, dif, base_mse):
 
+    c_id = con.get_id()
     p0 = con.getWeightIndex()
     p1 = con.setWeightIndex(p0 + dif)
     
@@ -461,67 +476,95 @@ def ziggling_connection(r, minibatch, num_of_class, con, clist, dif):
         next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
         if next_mse<base_mse: # OK
             con.setWeightIndex(p0)
-            return core.WEIGHT_INDEX_ZERO
+            print "   ZERO"
+            return c_id, core.WEIGHT_INDEX_ZERO
         else: # noc
             con.setWeightIndex(p0)
-            return -1
+            return c_id, -1
     else:
         p1 = con.setWeightIndex(p0+dif)
         next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
         if next_mse<base_mse: # OK
             con.setWeightIndex(p0)
-            return core.WEIGHT_INDEX_ZERO
+            return c_id, p0+dif
         else: # noc
             con.setWeightIndex(p0)
-            return -1
+            return c_id, -1
 #
 #
 #
 def train_algorhythm_10(r, minibatch, num_of_class):
     connections = r.getConnections()
-    print "connections=%d" % len(connections)
+    c_num = len(connections)
+    print "connections=%d" % c_num
     
-    inc_max = 100 # len(connections)/100
-    dec_max = 100 # len(connections)/100
-    cnt = 0
+    inc_max = c_num/100
+    dec_max = c_num/100
+
     inc = 0
     dec = 0
     noc = 0
-    zero = 0
-    zero_2 = 0
+    
     inc_list = []
     dec_list = []
-    zero_list = []
-    zero_list_2 = []
     
     base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    samples = random.sample(connections, len(connections)/10)
+    samples = random.sample(connections, c_num/10)
     
     # dec loop
     for con in samples:
         if dec>=dec_max:
             break
 
-        ziggling_connection(r, minibatch, num_of_class, con, clist, -1)
+        c_id, index = ziggling_connection(r, minibatch, num_of_class, con, -1, base_mse)
+        print "[%06d] %d" % (c_id, index)
+        if index>=0:
+            dec = dec + 1
+            dec_list.append((c_id, index))
+        else:
+            noc = noc + 1
 
+
+    for c_info in dec_list:
+        con = connections[c_info[0]]
+        con.setWeightIndex(c_info[1])
+
+    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
+    samples = random.sample(connections, c_num/10)
+ 
     # inc loop
     for con in samples:
-        if inc>=incc_max:
+        if inc>=inc_max:
             break
         
-        ziggling_connection(r, minibatch, num_of_class, con, clist, 1)
+        c_id, index = ziggling_connection(r, minibatch, num_of_class, con, 1, base_mse)
+        print "%d = %d" % (c_id, index)
+        if index>=0:
+            inc = inc + 1
+            inc_list.append((c_id, index))
+        else:
+            noc = noc + 1
+
+    for c_info in inc_list:
+        con = connections[c_info[0]]
+        con.setWeightIndex(c_info[1])
+
+    print "dec : %d, inc : %d, noc : %d, total : %d" % (dec, inc, noc, inc+noc)
 #
 #
 #
 def process_minibatch(r, minibatch, num_of_class):
     epoc = 1
-    algo = 9
+    algo = 10
     
     for e in range(epoc):
         if algo == 7:
             train_algorhythm_7(r, minibatch, num_of_class)
         elif algo == 9:
             train_algorhythm_9(r, minibatch, num_of_class)
+        elif algo == 10:
+            train_algorhythm_10(r, minibatch, num_of_class)
+
 #
 #
 #

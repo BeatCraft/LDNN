@@ -308,6 +308,12 @@ class Roster:
         self.layers = []
         self.connections = []
     
+    def init_connections(self):
+        i = 0
+        for con in self.connections:
+            con.set_id(i)
+            i = i + 1
+    
     def countLayers(self):
         return len(self.layers)
 

@@ -31,7 +31,7 @@ lesserWeightsLen = len(lesserWeights)
 WEIGHT_INDEX_ZERO = 8
 WEIGHT_INDEX_MAX = lesserWeightsLen-1
 WEIGHT_INDEX_MIN = 0
-WEIGHT_RANDOM_RANGE = 4
+WEIGHT_RANDOM_RANGE = 6
 #
 #
 #
@@ -185,9 +185,15 @@ class Node:
             elif self._output_filter_index==1:
                 self.y = relu(sum)
             elif self._output_filter_index==2:
-                self.y = softmax(sum)
+                #print "node.propagate() sum=%f, sofymax()=%f" % (sum, softmax(sum))
+                if sum>0.0:
+                    self.y = softmax(sum)
+                else:
+                    self.y = 0.0
 
-
+#
+# this is a test for multiprocessing
+#
 def node_propagete(node):
     sum = 0
     num = len(node.inputs)
@@ -199,6 +205,7 @@ def node_propagete(node):
             else:
                 self.y = 0.0
     else:
+        #print "node._output_filter_index=%f" % node._output_filter_index
         for i in range(num):
             input = node.inputs[i]
             sum += input.propagate()
@@ -208,7 +215,11 @@ def node_propagete(node):
             elif node._output_filter_index==1:
                 node.y = relu(sum)
             elif node._output_filter_index==2:
-                node.y = softmax(sum)
+                #print "node sum  = %f" % sum
+                if sum>0.0:
+                    node.y = softmax(sum)
+                else:
+                    node.y = 0.0
 #
 #
 #
@@ -345,7 +356,7 @@ class Roster:
     def connectNodes(self, leftNode, rightNode):
         c = Connection(leftNode, rightNode)
         #
-        #i = WEIGHT_INDEX_ZERO
+        #i = WEIGHT_INDEX_ZERO + 4
         i = random.randrange(lesserWeightsLen)
         #i = random.randrange(WEIGHT_INDEX_ZERO, WEIGHT_INDEX_ZERO+WEIGHT_RANDOM_RANGE, 1)
         #
@@ -412,8 +423,10 @@ class Roster:
         sum = 0.0
         if softmax:
             for node in nodes:
+                #print node.getY()
                 sum += node.getY()
             
+            #print "sum=%f" % sum
             #if sum==0.0:
             #    print "FUCK : %f" % sum
             #

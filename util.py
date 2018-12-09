@@ -54,16 +54,26 @@ def mean_squared_error_B(y, y_len, t, t_len):
         s += abs(y[i]-t[i])
 
     return s
-
+#
+# mostly, mean_absolute_error is used
+#
 def mean_absolute_error(y, y_len, t, t_len):
     if y_len != t_len:
         return None
     
     s = 0.0
+    sum = 0.0
+    
     for i in range(y_len):
+        sum = sum + y[i]
         s += abs(y[i]-t[i])
     
     return s/y_len
+
+    if sum>0.0:
+        return s/y_len
+
+    return 100.0
 #
 #
 #
@@ -84,7 +94,7 @@ def img2List(img):
 def loadData(path):
     img = Image.open(path)
     img = img.convert("L")
-    img = img.resize((14,14))
+    #img = img.resize((14,14))
     data = img2List(img)
     return data
 #

@@ -44,10 +44,10 @@ def setup_dnn(path):
         return r
     else:
         r = core.Roster()
-        
-        inputLayer = r.addLayer(196, 0)    # 0 : input
-        hiddenLayer_1 = r.addLayer(32, 1)  # 1 : hiddeh
-        hiddenLayer_2 = r.addLayer(32, 1)  # 2 : hiddeh
+        #inputLayer = r.addLayer(196, 0)    # 0 : input
+        inputLayer = r.addLayer(28*28, 0)    # 0 : input
+        hiddenLayer_1 = r.addLayer(16, 1)  # 1 : hiddeh
+        hiddenLayer_2 = r.addLayer(16, 1)  # 2 : hiddeh
         outputLayer = r.addLayer(10, 2)    # 3 : output
         
         r.connectLayers(inputLayer, hiddenLayer_1)
@@ -144,15 +144,18 @@ def test(r, minibatch, num_of_class):
             if inf is None:
                 print "ERROR"
                 continue
-                
+            
+            #print inf
             index = -1
             mx = max(inf)
-            for k in range(num_of_class):
-                if inf[k] == mx:
-                    index = k
-        
-            dist[index] = dist[index] + 1
-#            if label==index:
+            if mx>0.0:
+                for k in range(num_of_class):
+                    if inf[k] == mx:
+                        index = k
+            
+                dist[index] = dist[index] + 1
+            if label==index:
+                stat[index] = stat[index] + 1
 #                print "%d : %d : OK : %s" % (label, index, sample)
 #                stat[index] = stat[index] + 1
 #            else:
@@ -167,6 +170,7 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     print ">>test mode"
     start_time = time.time()
     
+    #iteration = 1
     multi = 2
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
@@ -176,8 +180,8 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
         for minibatch in batch:
             if it>=iteration:
                 break
-            print "it : %d" % it
-        
+            
+            #print "it : %d" % it
             d, s = test(r, minibatch, num_of_class)
             for j in range(len(dist)):
                 dist[j] = dist[j] + d[j]
@@ -192,6 +196,7 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
             job.start()
     
         [job.join() for job in jobs]
+        # how can i get these resoults???
 
     else:
         pool = mp.Pool(processes=16)
@@ -471,9 +476,10 @@ def ziggling_connection(r, minibatch, num_of_class, con, dif, base_mse):
     if p0==core.WEIGHT_INDEX_MIN or p0==core.WEIGHT_INDEX_MAX:
         p1 = con.setWeightIndex(core.WEIGHT_INDEX_ZERO)
         next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+        #print "next=%f" % next_mse
         if next_mse<base_mse: # OK
-            con.setWeightIndex(p0)
             print "   ZERO"
+            con.setWeightIndex(p0)
             return c_id, core.WEIGHT_INDEX_ZERO
         else: # noc
             con.setWeightIndex(p0)
@@ -481,6 +487,7 @@ def ziggling_connection(r, minibatch, num_of_class, con, dif, base_mse):
     else:
         p1 = con.setWeightIndex(p0+dif)
         next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+        #print "next=%f" % next_mse
         if next_mse<base_mse: # OK
             con.setWeightIndex(p0)
             return c_id, p0+dif
@@ -512,19 +519,19 @@ def train_algorhythm_10(r, minibatch, num_of_class):
     for con in samples:
         if dec>=dec_max:
             break
-
+        
         c_id, index = ziggling_connection(r, minibatch, num_of_class, con, -1, base_mse)
-        print "[%06d] %d" % (c_id, index)
         if index>=0:
             dec = dec + 1
             dec_list.append((c_id, index))
         else:
             noc = noc + 1
 
-
     for c_info in dec_list:
         con = connections[c_info[0]]
         con.setWeightIndex(c_info[1])
+    
+    print "dec : %d, noc : %d, total : %d" % (dec, noc, dec+noc)
 
     base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
     samples = random.sample(connections, c_num/10)
@@ -535,7 +542,6 @@ def train_algorhythm_10(r, minibatch, num_of_class):
             break
         
         c_id, index = ziggling_connection(r, minibatch, num_of_class, con, 1, base_mse)
-        print "%d = %d" % (c_id, index)
         if index>=0:
             inc = inc + 1
             inc_list.append((c_id, index))
@@ -546,7 +552,7 @@ def train_algorhythm_10(r, minibatch, num_of_class):
         con = connections[c_info[0]]
         con.setWeightIndex(c_info[1])
 
-    print "dec : %d, inc : %d, noc : %d, total : %d" % (dec, inc, noc, inc+noc)
+    print "inc : %d, noc : %d, total : %d" % (inc, noc, inc+noc)
 #
 #
 #

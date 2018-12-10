@@ -498,6 +498,24 @@ def ziggling_connection(r, minibatch, num_of_class, con, dif, base_mse):
 #
 #
 #
+def ziggle_connection(r, minibatch, num_of_class, con, dif, base_mse):
+    c_id = con.get_id()
+    p0 = con.getWeightIndex()
+    p1 = con.setWeightIndex(p0 + dif)
+    if p0==p1:
+        return c_id, -1
+    
+    p1 = con.setWeightIndex(p0+dif)
+    next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+    if next_mse<base_mse: # OK
+        con.setWeightIndex(p0)
+        return c_id, p0+dif
+    else: # noc
+        con.setWeightIndex(p0)
+        return c_id, -1
+#
+#
+#
 def train_algorhythm_10(r, minibatch, num_of_class):
     connections = r.getConnections()
     c_num = len(connections)
@@ -521,7 +539,7 @@ def train_algorhythm_10(r, minibatch, num_of_class):
         if dec>=dec_max:
             break
         
-        c_id, index = ziggling_connection(r, minibatch, num_of_class, con, -1, base_mse)
+        c_id, index = ziggle_connection(r, minibatch, num_of_class, con, -1, base_mse)
         if index>=0:
             dec = dec + 1
             dec_list.append((c_id, index))
@@ -534,6 +552,7 @@ def train_algorhythm_10(r, minibatch, num_of_class):
     
     print "dec : %d, noc : %d, total : %d" % (dec, noc, dec+noc)
 
+    noc = 0
     base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
     samples = random.sample(connections, c_num/10)
  
@@ -542,7 +561,7 @@ def train_algorhythm_10(r, minibatch, num_of_class):
         if inc>=inc_max:
             break
         
-        c_id, index = ziggling_connection(r, minibatch, num_of_class, con, 1, base_mse)
+        c_id, index = ziggle_connection(r, minibatch, num_of_class, con, 1, base_mse)
         if index>=0:
             inc = inc + 1
             inc_list.append((c_id, index))

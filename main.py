@@ -15,6 +15,7 @@ import random
 import copy
 import math
 import multiprocessing as mp
+#import cProfile
 #
 #
 # LDNN Modules
@@ -171,7 +172,7 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     start_time = time.time()
     
     #iteration = 1
-    multi = 2
+    multi = 0
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
     stat = [0,0,0,0,0,0,0,0,0,0]
@@ -181,7 +182,7 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
             if it>=iteration:
                 break
             
-            #print "it : %d" % it
+            print "it : %d" % it
             d, s = test(r, minibatch, num_of_class)
             for j in range(len(dist)):
                 dist[j] = dist[j] + d[j]
@@ -654,6 +655,9 @@ def main():
 #
 if __name__=='__main__':
     print ">> start"
+    
+    #cProfile.run(main())
+    
     sts = main()
     print ">> end"
     print("\007")

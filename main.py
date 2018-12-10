@@ -674,9 +674,6 @@ def main():
 #
 if __name__=='__main__':
     print ">> start"
-    
-    #cProfile.run(main())
-    
     sts = main()
     print ">> end"
     print("\007")

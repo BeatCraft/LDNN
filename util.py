@@ -65,15 +65,16 @@ def mean_absolute_error(y, y_len, t, t_len):
     sum = 0.0
     
     for i in range(y_len):
-        sum = sum + y[i]
+        sum += y[i]
         s += abs(y[i]-t[i])
     
-    return s/y_len
-
-    if sum>0.0:
-        return s/y_len
-
-    return 100.0
+    if sum<=0:
+        print "FUCK(%f)" % sum
+    
+    return s/float(y_len)
+#    if sum>0.0:
+#       return s/y_len
+#    return 100.0
 #
 #
 #
@@ -94,7 +95,7 @@ def img2List(img):
 def loadData(path):
     img = Image.open(path)
     img = img.convert("L")
-    #img = img.resize((14,14))
+    img = img.resize((14,14))
     data = img2List(img)
     return data
 #

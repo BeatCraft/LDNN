@@ -166,7 +166,7 @@ class Node:
         self.bias = b
 
     def propagate(self):
-        sum = 0
+        sum = 0.0
         num = len(self.inputs)
         
         if num==0:
@@ -186,10 +186,12 @@ class Node:
                 self.y = relu(sum)
             elif self._output_filter_index==2:
                 #print "node.propagate() sum=%f, sofymax()=%f" % (sum, softmax(sum))
-                if sum>0.0:
-                    self.y = softmax(sum)
-                else:
-                    self.y = 0.0
+                self.y = softmax(sum)
+#                if sum>0.0:
+#                    self.y = softmax(sum)
+#                else:
+#                    self.y = 0.0
+#                    print " ASS HOLE"
 
 #
 # this is a test for multiprocessing
@@ -407,7 +409,7 @@ class Roster:
             print "error : Roster : propagate"
             return
         
-        prev = self.getLayerAt(0)
+        #prev = self.getLayerAt(0)
         for i in range(0, c):
             layer = self.getLayerAt(i)
             layer.propagate()
@@ -423,35 +425,18 @@ class Roster:
         sum = 0.0
         if softmax:
             for node in nodes:
-                #print node.getY()
                 sum += node.getY()
             
-            #print "sum=%f" % sum
-            #if sum==0.0:
-            #    print "FUCK : %f" % sum
-            #
-            #    out = self.getLayerAt(3)
-            #    nodes = out.getNodes()
-            #    node = nodes[0]
-            #    connections = node.getInputs()
-            #
-            #    for con in connections:
-            #        print con.getWeight()
-            #
-            #    exit()
-                #self.dump()
-                #return None
-                #sum = 0.01
-                #for node in nodes:
-                #    print node.getY()
-                    
-            for node in nodes:
-                if node.getY()==0.0:
+            if sum==0.0:
+                print "FUCK FUCK"
+                for node in nodes:
+                    print node.getY()
                     ret.append(0.0)
-                else:
+            else:
+                for node in nodes:
                     ret.append(node.getY()/sum)
-                            
-        else:
+                        
+        else: # usually, this part is not used
             for node in nodes:
                 ret.append(node.getY())
         

@@ -31,7 +31,9 @@ sys.setrecursionlimit(10000)
 TRAIN_BASE_PATH  = "./data/train/"
 TRAIN_BATCH_PATH = "./train_batch.pickle"
 TEST_BASE_PATH   = "./data/test/"
+TEST_BATCH_PATH = "./test_batch.pickle"
 NETWORK_PATH     = "./network.pickle"
+PROCEEDED_PATH   = "./proceeded.pickle"
 NUM_OF_CLASS     = 10    # 0,1,2,3,4,5,6,7,8,9
 NUM_OF_SAMPLES   = 5000  # must be 5,000 per a class
 NUM_OF_TEST      = 500
@@ -45,10 +47,10 @@ def setup_dnn(path):
         return r
     else:
         r = core.Roster()
-        #inputLayer = r.addLayer(196, 0)    # 0 : input
-        inputLayer = r.addLayer(28*28, 0)    # 0 : input
-        hiddenLayer_1 = r.addLayer(16, 1)  # 1 : hiddeh
-        hiddenLayer_2 = r.addLayer(16, 1)  # 2 : hiddeh
+        inputLayer = r.addLayer(196, 0)    # 0 : input
+        #inputLayer = r.addLayer(28*28, 0)    # 0 : input
+        hiddenLayer_1 = r.addLayer(32, 1)  # 1 : hiddeh
+        hiddenLayer_2 = r.addLayer(32, 1)  # 2 : hiddeh
         outputLayer = r.addLayer(10, 2)    # 3 : output
         
         r.connectLayers(inputLayer, hiddenLayer_1)
@@ -64,20 +66,23 @@ def setup_dnn(path):
 #
 #
 def setup_batch(minibatch_size, it_train, it_test):
-    save_data = util.pickle_load(TRAIN_BATCH_PATH)
-    if save_data is None:
+    train_batch = util.pickle_load(TRAIN_BATCH_PATH)
+    if train_batch is None:
         train_list = scan_data(TRAIN_BASE_PATH, NUM_OF_SAMPLES, NUM_OF_CLASS)
         train_batch = make_batch(NUM_OF_CLASS, it_train, minibatch_size, train_list)
-        
+        util.pickle_save(TRAIN_BATCH_PATH, train_batch)
+    else:
+        print "train batch restored."
+
+    test_batch = util.pickle_load(TEST_BATCH_PATH)
+    if test_batch is None:
         test_list = scan_data(TEST_BASE_PATH, NUM_OF_TEST, NUM_OF_CLASS)
         test_batch = make_batch(NUM_OF_CLASS, it_test, minibatch_size, test_list)
-        
-        save_data = [0, train_batch, test_batch]
-        util.pickle_save(TRAIN_BATCH_PATH, save_data)
+        util.pickle_save(TEST_BATCH_PATH, test_batch)
     else:
-        print "batch restored."
+        print "test batch restored."
 
-    return save_data
+    return train_batch, test_batch
 #
 #
 #
@@ -155,14 +160,17 @@ def test(r, minibatch, num_of_class):
                         index = k
             
                 dist[index] = dist[index] + 1
+            else:
+                print "ASS HOLE"
+                print mx
+        
             if label==index:
                 stat[index] = stat[index] + 1
-#                print "%d : %d : OK : %s" % (label, index, sample)
-#                stat[index] = stat[index] + 1
 #            else:
-#                print "%d : %d : NG : %s" % (label, index, sample)
+#                print mx
+#                print "fuck %d" % index
+#                print inf
 
-#   print "+"
     return [dist, stat]
 #
 #
@@ -532,7 +540,7 @@ def train_algorhythm_10(r, minibatch, num_of_class):
     dec_list = []
     
     base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    samples = random.sample(connections, c_num/10)
+    samples = random.sample(connections, c_num)
     
     # dec loop
     for con in samples:
@@ -554,7 +562,7 @@ def train_algorhythm_10(r, minibatch, num_of_class):
 
     noc = 0
     base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    samples = random.sample(connections, c_num/10)
+    samples = random.sample(connections, c_num)
  
     # inc loop
     for con in samples:
@@ -607,6 +615,9 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
         print "[%03d|%03d] %s" % (k, it_train, t)
         k = k + 1
     
+        util.pickle_save(PROCEEDED_PATH, num_of_processed + k)
+        util.pickle_save(NETWORK_PATH, r)
+
     return k
 #
 #
@@ -615,10 +626,7 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     
-    num_of_processed = 0
-    num_of_iteration = 0
-    
-    list_of_path = []
+    #list_of_path = []
     train_batch = []
     test_batch = []
     minibatch_size = 1
@@ -626,20 +634,24 @@ def main():
     max_it_test = NUM_OF_TEST/minibatch_size
     it_train = 0
     it_test = 0
-    
+ 
+    num_of_processed = util.pickle_load(PROCEEDED_PATH)
+    if num_of_processed is None:
+        num_of_processed = 0
+ 
     r = setup_dnn(NETWORK_PATH)
     if r is None:
         print "fatal DNN error"
         return 0
     
-    save_data = setup_batch(minibatch_size, max_it_train, max_it_test)
-    if save_data is None:
-        print "fatal save_data error"
+    train_batch, test_batch = setup_batch(minibatch_size, max_it_train, max_it_test)
+    if train_batch is None:
+        print "fatal train_batch error"
         return 0
 
-    num_of_processed = save_data[0]
-    train_batch = save_data[1]
-    test_batch =  save_data[2]
+    if test_batch is None:
+        print "fatal test_batch error"
+        return 0
 
     mode = get_key_input("0:train, 1:test, 2:self-test, 3:debug, 8:reset, 9:quit >")
     if mode==0:
@@ -651,9 +663,8 @@ def main():
         
         prosecced = train_mode(r, train_batch, it_train, NUM_OF_CLASS, num_of_processed)
         num_of_processed = num_of_processed + prosecced
-        save_data[0] = num_of_processed
+        util.pickle_save(PROCEEDED_PATH, num_of_processed)
         util.pickle_save(NETWORK_PATH, r)
-        util.pickle_save(TRAIN_BATCH_PATH, save_data)
     elif mode==1:
         print ">> test mode"
         it_test = max_it_test
@@ -663,6 +674,13 @@ def main():
         test_mode(r, train_batch, NUM_OF_CLASS, num_of_processed, minibatch_size)
     elif mode==3:
         print ">> debug mode"
+        connections = r.getConnections()
+        for con in connections:
+            w = con.getWeightIndex()
+            if w<=core.WEIGHT_INDEX_ZERO:
+                print "ASS(%d)" % w
+            else:
+                print w
     elif mode==9:
         print ">> quit"
     else:

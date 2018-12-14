@@ -674,13 +674,16 @@ def main():
         test_mode(r, train_batch, NUM_OF_CLASS, num_of_processed, minibatch_size)
     elif mode==3:
         print ">> debug mode"
-        connections = r.getConnections()
-        for con in connections:
-            w = con.getWeightIndex()
-            if w<=core.WEIGHT_INDEX_ZERO:
-                print "ASS(%d)" % w
-            else:
-                print w
+    
+        r.get_weight_array()
+        
+#        connections = r.getConnections()
+#        for con in connections:
+#            w = con.getWeightIndex()
+#            if w<=core.WEIGHT_INDEX_ZERO:
+#                print "ASS(%d)" % w
+#            else:
+#                print w
     elif mode==9:
         print ">> quit"
     else:

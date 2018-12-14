@@ -185,43 +185,17 @@ class Node:
             elif self._output_filter_index==1:
                 self.y = relu(sum)
             elif self._output_filter_index==2:
-                #print "node.propagate() sum=%f, sofymax()=%f" % (sum, softmax(sum))
                 self.y = softmax(sum)
-#                if sum>0.0:
-#                    self.y = softmax(sum)
-#                else:
-#                    self.y = 0.0
-#                    print " ASS HOLE"
 
-#
-# this is a test for multiprocessing
-#
-def node_propagete(node):
-    sum = 0
-    num = len(node.inputs)
-        
-    if num==0:
-        if node._input_filter_index==1:
-            if node.x>0:
-                node.y = float(node.x)/255.0
-            else:
-                self.y = 0.0
-    else:
-        #print "node._output_filter_index=%f" % node._output_filter_index
-        for i in range(num):
-            input = node.inputs[i]
-            sum += input.propagate()
-            
-            if node._output_filter_index==0:
-                node.y = sum
-            elif node._output_filter_index==1:
-                node.y = relu(sum)
-            elif node._output_filter_index==2:
-                #print "node sum  = %f" % sum
-                if sum>0.0:
-                    node.y = softmax(sum)
-                else:
-                    node.y = 0.0
+    def get_weight_array(self):
+        wl = []
+        for con in self.inputs:
+            i = con.getWeightIndex()
+            w = lesserWeights[i]
+            wl.append(w)
+
+        wa = np.array(wl)
+        return wa
 #
 #
 #
@@ -281,38 +255,14 @@ class Layer:
         for node in self.nodes:
             node.propagate()
 
-        #with mp.Pool(processes=4) as pool:
-        #    pool.map(target=node_propagete, args=nodes)
+    def get_weight_array(self):
 
-        #jobs = []
-        #for node in self.nodes:
-        #    job = mp.Process(target=node.propagate)
-        #    jobs.append(job)
-        #    job.start()
-        #
-        #[job.join() for job in jobs]
+        wl = []
+        for node in self.nodes:
+            wl.append(node.get_weight_array())
 
-
-        #with mp.Pool(processes=4) as pool:
-        #   pool.map(node.propagate)
-        #for node in self.nodes:
-        #   p = mp.Process(target=node.propagate)#, args=(node))
-        #   p.start()
-        #   p.join()
-                
-#pool.map(node.propagate())
-
-
-#        if self.type==0: # input
-#            for node in self.nodes:
-#                node.setY( float(node.getX())/255.0 )
-#        elif self.type==1: # hidden
-#            for node in self.nodes:
-#                node.propagate(1)
-#        elif self.type==2: # output
-#            for node in self.nodes:
-#                node.propagate(2)
-
+        a = np.array(wl)
+        return a
 #
 #
 #
@@ -441,6 +391,17 @@ class Roster:
                 ret.append(node.getY())
         
         return ret
+
+    def get_weight_array(self):
+        c = self.countLayers()
+        if c<=0:
+            print "error : Roster : get_weight_array"
+            return
+        
+        for i in range(0, c):
+            layer = self.getLayerAt(i)
+            a = layer.get_weight_array()
+            print a
 #
 #
 #

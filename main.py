@@ -145,15 +145,24 @@ def test(r, minibatch, num_of_class):
             sample = samplese[label]
             data = util.loadData(sample)
             r.setInputData(data)
-            r.propagate()
+            #r.propagate()
+            r.propagate_np()
             inf = r.getInferences(1)
             if inf is None:
                 print "ERROR"
                 continue
             
             #print inf
+            #print "-------------"
+            #
+            #r.get_inference_by_array()
+            #inf = r.getInferences(1)
+            #print inf
+            #print "-------------"
+
             index = -1
             mx = max(inf)
+            #print mx
             if mx>0.0:
                 for k in range(num_of_class):
                     if inf[k] == mx:
@@ -166,11 +175,17 @@ def test(r, minibatch, num_of_class):
         
             if label==index:
                 stat[index] = stat[index] + 1
+
+
 #            else:
 #                print mx
 #                print "fuck %d" % index
 #                print inf
 
+
+
+
+         
     return [dist, stat]
 #
 #
@@ -262,7 +277,8 @@ def evaluate_minibatch(r, minibatch, num_of_class):
             #print "[%d] %d : %s" % (i, j, mb[j])
             data = util.loadData(mb[j])
             r.setInputData(data)
-            r.propagate()
+            #r.propagate()
+            r.propagate_np()
             inf = r.getInferences(1)
             if inf is None:
                 print "ERROR"

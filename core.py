@@ -191,8 +191,8 @@ class Node:
         wl = []
         for con in self.inputs:
             i = con.getWeightIndex()
-            w = lesserWeights[i]
-            wl.append(w)
+            #w = lesserWeights[i]
+            wl.append( lesserWeights[i] )
 
         wa = np.array(wl)
         return wa
@@ -255,13 +255,41 @@ class Layer:
         for node in self.nodes:
             node.propagate()
 
+    def propagate_np(self, array_in):
+        #print "propagate_np layer=%d" % self.type
+        if self.type==0:   # input
+            for node in self.nodes:
+                #print float(node.getX()/255.0)
+                node.setY( float(node.getX()/255.0) )
+        elif self.type==1: # hidden
+            for node in self.nodes:
+                array_w = node.get_weight_array()
+                array_p = np.dot(array_in, array_w)
+                sum = np.sum(array_p)
+                #print sum
+                node.setY( relu(sum) )
+        elif self.type==2: # output
+            for node in self.nodes:
+                array_w = node.get_weight_array()
+                #array_p = array_in * array_w
+                array_p = np.dot(array_in, array_w)
+                sum = np.sum(array_p)
+                node.setY( np.exp(sum) )
+    
     def get_weight_array(self):
-
         wl = []
         for node in self.nodes:
             wl.append(node.get_weight_array())
 
         a = np.array(wl)
+        return a
+
+    def get_y_array(self):
+        yl = []
+        for node in self.nodes:
+            yl.append( node.getY() )
+
+        a = np.array(yl)
         return a
 #
 #
@@ -376,6 +404,7 @@ class Roster:
         if softmax:
             for node in nodes:
                 sum += node.getY()
+                #print node.getY()
             
             if sum==0.0:
                 print "FUCK FUCK"
@@ -402,6 +431,18 @@ class Roster:
             layer = self.getLayerAt(i)
             a = layer.get_weight_array()
             print a
+
+    def propagate_np(self):
+        c = self.countLayers()
+        pre = self.getLayerAt(0)
+        pre.propagate_np(None)
+
+        for i in range(1, c):
+            #print i
+            array_y = pre.get_y_array()
+            layer = self.getLayerAt(i)
+            layer.propagate_np(array_y)
+            pre = layer
 #
 #
 #

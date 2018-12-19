@@ -56,8 +56,9 @@ def relu(x):
 #
 #
 def softmax(x):
-#    return math.exp(x)
-    return np.exp(x)
+    return math.exp(x)
+#return np.exp(x)
+
 #
 #
 #
@@ -361,12 +362,7 @@ class Roster:
             print "error : Roster : getLayerAt"
             return None
         return self.layers[i]
-    
-    def addLayer_np(self, type, num_input, num_node):
-        c = self.countLayers()
-        layer = Layer(i, type, num_input, num_node)
-    
-    
+
     def addLayer(self, num_of_nodes, type):
         c = self.countLayers()
         # create a layer
@@ -500,9 +496,9 @@ def main():
     hiddenLayer_2 = r.addLayer(10, 1)  # 2 : hiddeh
     outputLayer = r.addLayer(10, 2)    # 3 : output
         
-#    r.connectLayers(inputLayer, hiddenLayer_1)
-#    r.connectLayers(hiddenLayer_1, hiddenLayer_2)
-#    r.connectLayers(hiddenLayer_2, outputLayer)
+    r.connectLayers(inputLayer, hiddenLayer_1)
+    r.connectLayers(hiddenLayer_1, hiddenLayer_2)
+    r.connectLayers(hiddenLayer_2, outputLayer)
     
     return 0
 #

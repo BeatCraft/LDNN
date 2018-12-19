@@ -52,6 +52,7 @@ def setup_dnn(path):
         hiddenLayer_1 = r.add_layer(1, 196, 32)
         hiddenLayer_2 = r.add_layer(1, 32, 32)
         outputLayer = r.add_layer(2, 32, 10)
+        r.init_weight()
 
 #        inputLayer = r.addLayer(196, 0)    # 0 : input
 #        hiddenLayer_1 = r.addLayer(32, 1)  # 1 : hiddeh
@@ -154,7 +155,7 @@ def test(r, minibatch, num_of_class):
 #            r.propagate_np()
 
             r.propagate_np_s(data)
-            inf = r.get_inferences(1) #getInferences(1)
+            inf = r.get_inferences(1)
             if inf is None:
                 print "ERROR"
                 continue
@@ -166,10 +167,8 @@ def test(r, minibatch, num_of_class):
             #inf = r.getInferences(1)
             #print inf
             #print "-------------"
-
             index = -1
             mx = max(inf)
-            #print mx
             if mx>0.0:
                 for k in range(num_of_class):
                     if inf[k] == mx:
@@ -688,7 +687,7 @@ def main():
     elif mode==3:
         print ">> debug mode"
     
-        r.get_weight_array()
+        #r.get_weight_array()
         
 #        connections = r.getConnections()
 #        for con in connections:

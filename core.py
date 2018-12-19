@@ -234,7 +234,7 @@ class Layer:
 
     def propagate_np_s(self, array_in):
         if self._type==0:   # input
-                self._y_array = array_in/255.0
+            self._y_array = array_in/255.0
         elif self._type==1: # hidden
             for i in range(self._num_node):
                 sum = np.sum(self._weight_matrix[i]*array_in)
@@ -328,12 +328,14 @@ class Layer:
         return a
 
     def get_y_array(self):
-        yl = []
-        for node in self.nodes:
-            yl.append( node.getY() )
-
-        a = np.array(yl)
-        return a
+        return self._y_array
+        
+#        yl = []
+#        for node in self.nodes:
+#            yl.append( node.getY() )
+#
+#        a = np.array(yl)
+#        return a
 #
 #
 #
@@ -343,7 +345,12 @@ class Roster:
         self.connections = []
     
         self._weight_list = []
-    
+
+    def init_weight(self):
+        for w in self._weight_list:
+            i = random.randrange(lesserWeightsLen)
+            w.set( lesserWeights[i] )
+
     def init_connections(self):
         i = 0
         for con in self.connections:
@@ -448,12 +455,18 @@ class Roster:
 
 
     def get_inferences(self, softmax=0):
+        ret = []
         c = self.countLayers()
         output = self.getLayerAt(c-1)
         y_array = output.get_y_array()
-        #sum = np.sum(y_array)
-
-        print y_array
+        
+        #max = np.max(y_array)
+        sum = np.sum(y_array)
+        
+        for a in y_array:
+            ret.append(a/sum)
+        
+        return ret
     
     
     def getInferences(self, softmax=0):
@@ -513,11 +526,10 @@ class Roster:
         pre = self.getLayerAt(0)
         input = np.array(data)
         pre.propagate_np_s(input)
-        
         for i in range(1, c):
             array_y = pre.get_y_array()
             layer = self.getLayerAt(i)
-            layer.propagate_np(array_y)
+            layer.propagate_np_s(array_y)
             pre = layer
 #
 #

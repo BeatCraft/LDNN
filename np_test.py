@@ -21,6 +21,11 @@ def main():
     print aa * ba[0]
     print aa * ba[1]
     
+    print aa * 2
+    
+    print ba[1,1]
+    print ba[1][1]
+    
     return 0
 #
 #

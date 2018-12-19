@@ -175,16 +175,6 @@ def test(r, minibatch, num_of_class):
         
             if label==index:
                 stat[index] = stat[index] + 1
-
-
-#            else:
-#                print mx
-#                print "fuck %d" % index
-#                print inf
-
-
-
-
          
     return [dist, stat]
 #

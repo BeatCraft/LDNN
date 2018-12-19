@@ -199,13 +199,56 @@ class Node:
 #
 #
 #
-class Layer:
-    def __init__(self, i, type):
-        self._id = -1
+class Weight:
+    # layer : Layer class object
+    # node  : index of neurons
+    # i     : index of neurons in previous layer
+    def __init__(self, layer, node, i):
+        self._layer = layer
+        self._node = node
+        self._i = i
         
-        self.index = i
-        self.type = type # 0 : input, 1 : hidden, 2 : output
+    def set(self, w):
+        return self._layer.set_weight(self._node, self._i, w)
+
+    def get(self):
+        return self._layer.get_weight(self._node, self._i)
+#
+#
+#
+class Layer:
+    # i         : index of layers
+    # type      : 0 = input, 1 = hidden, 2 = output
+    # num_input : number of inputs / outputs from a previous layer
+    # num_node  : numbers of neurons
+    def __init__(self, i, type, num_input, num_node):
+        self._id = -1
+        self._index = i
+        self._type = type
+        self._num_input = num_input
+        self._num_node = num_node
+        self._weight_matrix = numpy.zeros(self._num_node, self._num_input)
+        self._y_array = numpy.zeros(self._num_node)
+
         self.nodes = []
+
+    def propagate_np_s(array_in):
+        if self._type==0:   # input
+                self._y_array = array_in/255.0
+        elif self._type==1: # hidden
+            for i in range(self._num_node):
+                sum = np.sum(self._weight_matrix[i]*array_in)
+                self._y_array[i] = relu(sum)
+        elif self._type==2: # output
+            for i in range(self._num_node):
+                sum = np.sum(self._weight_matrix[i]*array_in)
+                self._y_array[i] = np.exp(sum)
+
+    def get_weight(self, node, i):
+        return self._weight_matrix[node][i]
+    
+    def set_weight(self, node, i, w):
+        self._weight_matrix[node][i] = w
 
     def set_id(self, id):
         if id>=0:
@@ -215,7 +258,7 @@ class Layer:
         return self._id
     
     def getType(self):
-        return self.type
+        return self._type
 
     def countNodes(self):
         return len(self.nodes)
@@ -228,19 +271,19 @@ class Layer:
     def addNode(self, node):
         # 2018-12-06 by lesser
         # this part is temporaly implemented for multi-processing, shuod be re-desinged later
-        if self.type==0:
+        if self._type==0:
             node.set_input_filter(1) # scaling
             #set_output_filter(0) # default=0, no filter
-        elif self.type==1:
+        elif self._type==1:
             node.set_output_filter(1)
-        elif self.type==2:
+        elif self._type==2:
             node.set_output_filter(2)
         #
         self.nodes.append(node)
         return self.countNodes()
 
     def dump(self):
-        out = "layer(%d) : " % self.index
+        out = "layer(%d) : " % self._index
         for node in self.nodes:
             v = "%f, " % node.getY()
             out = out + v
@@ -256,19 +299,19 @@ class Layer:
             node.propagate()
 
     def propagate_np(self, array_in):
-        #print "propagate_np layer=%d" % self.type
-        if self.type==0:   # input
+        #print "propagate_np layer=%d" % self._type
+        if self._type==0:   # input
             for node in self.nodes:
                 #print float(node.getX()/255.0)
                 node.setY( float(node.getX()/255.0) )
-        elif self.type==1: # hidden
+        elif self._type==1: # hidden
             for node in self.nodes:
                 array_w = node.get_weight_array()
                 array_p = np.dot(array_in, array_w)
                 sum = np.sum(array_p)
                 #print sum
                 node.setY( relu(sum) )
-        elif self.type==2: # output
+        elif self._type==2: # output
             for node in self.nodes:
                 array_w = node.get_weight_array()
                 #array_p = array_in * array_w

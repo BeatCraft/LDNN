@@ -56,9 +56,8 @@ def relu(x):
 #
 #
 def softmax(x):
-    return math.exp(x)
-#return np.exp(x)
-
+    #return math.exp(x)
+    return np.exp(x)
 #
 #
 #
@@ -225,14 +224,15 @@ class Layer:
         self._id = -1
         self._index = i
         self._type = type
+#        if self._type==0:
+#            self._x_array = np.zeros(self.num_input)
         self._num_input = num_input
         self._num_node = num_node
-        self._weight_matrix = numpy.zeros(self._num_node, self._num_input)
-        self._y_array = numpy.zeros(self._num_node)
-
+        self._weight_matrix = np.zeros( (self._num_node, self._num_input) )
+        self._y_array = np.zeros(self._num_node)
         self.nodes = []
 
-    def propagate_np_s(array_in):
+    def propagate_np_s(self, array_in):
         if self._type==0:   # input
                 self._y_array = array_in/255.0
         elif self._type==1: # hidden
@@ -342,6 +342,8 @@ class Roster:
         self.layers = []
         self.connections = []
     
+        self._weight_list = []
+    
     def init_connections(self):
         i = 0
         for con in self.connections:
@@ -363,6 +365,15 @@ class Roster:
             return None
         return self.layers[i]
 
+    def add_layer(self, type, num_input, num_node):
+        c = self.countLayers()
+        layer = Layer(c, type, num_input, num_node)
+        for i in range(num_node):
+            for j in range(num_input):
+                self._weight_list.append( Weight(layer, i, j) )
+
+        self.layers.append(layer)
+    
     def addLayer(self, num_of_nodes, type):
         c = self.countLayers()
         # create a layer
@@ -435,6 +446,16 @@ class Roster:
             layer = self.getLayerAt(i)
             layer.propagate()
 
+
+    def get_inferences(self, softmax=0):
+        c = self.countLayers()
+        output = self.getLayerAt(c-1)
+        y_array = output.get_y_array()
+        #sum = np.sum(y_array)
+
+        print y_array
+    
+    
     def getInferences(self, softmax=0):
         c = self.countLayers()
         if c<=0:
@@ -482,6 +503,18 @@ class Roster:
 
         for i in range(1, c):
             #print i
+            array_y = pre.get_y_array()
+            layer = self.getLayerAt(i)
+            layer.propagate_np(array_y)
+            pre = layer
+
+    def propagate_np_s(self, data):
+        c = self.countLayers()
+        pre = self.getLayerAt(0)
+        input = np.array(data)
+        pre.propagate_np_s(input)
+        
+        for i in range(1, c):
             array_y = pre.get_y_array()
             layer = self.getLayerAt(i)
             layer.propagate_np(array_y)

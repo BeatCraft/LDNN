@@ -47,18 +47,23 @@ def setup_dnn(path):
         return r
     else:
         r = core.Roster()
-        inputLayer = r.addLayer(196, 0)    # 0 : input
-        #inputLayer = r.addLayer(28*28, 0)    # 0 : input
-        hiddenLayer_1 = r.addLayer(32, 1)  # 1 : hiddeh
-        hiddenLayer_2 = r.addLayer(32, 1)  # 2 : hiddeh
-        outputLayer = r.addLayer(10, 2)    # 3 : output
-        
-        r.connectLayers(inputLayer, hiddenLayer_1)
-        r.connectLayers(hiddenLayer_1, hiddenLayer_2)
-        r.connectLayers(hiddenLayer_2, outputLayer)
-        
-        r.init_connections()
-        
+
+        inputLayer = r.add_layer(0, 196, 196)
+        hiddenLayer_1 = r.add_layer(1, 196, 32)
+        hiddenLayer_2 = r.add_layer(1, 32, 32)
+        outputLayer = r.add_layer(2, 32, 10)
+
+#        inputLayer = r.addLayer(196, 0)    # 0 : input
+#        hiddenLayer_1 = r.addLayer(32, 1)  # 1 : hiddeh
+#        hiddenLayer_2 = r.addLayer(32, 1)  # 2 : hiddeh
+#        outputLayer = r.addLayer(10, 2)    # 3 : output
+#ß
+#        r.connectLayers(inputLayer, hiddenLayer_1)
+#        r.connectLayers(hiddenLayer_1, hiddenLayer_2)
+#        r.connectLayers(hiddenLayer_2, outputLayer)
+#
+#        r.init_connections()
+
         util.pickle_save(path, r)
         return r
     return None
@@ -144,10 +149,12 @@ def test(r, minibatch, num_of_class):
         for label in range(len(samplese)):
             sample = samplese[label]
             data = util.loadData(sample)
-            r.setInputData(data)
+#            r.setInputData(data)
             #r.propagate()
-            r.propagate_np()
-            inf = r.getInferences(1)
+#            r.propagate_np()
+
+            r.propagate_np_s(data)
+            inf = r.get_inferences(1) #getInferences(1)
             if inf is None:
                 print "ERROR"
                 continue

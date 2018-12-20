@@ -596,6 +596,84 @@ def train_algorhythm_10(r, minibatch, num_of_class):
 #
 #
 #
+def ziggle_connection_np(r, minibatch, num_of_class, con, dif, base_mse):
+    c_id = 0 #con.get_id()
+    p0 = con.get_index() #getWeightIndex()
+    p1 = con.set_index(p0 + dif) #setWeightIndex(p0 + dif)
+    if p0==p1:
+        return c_id, -1
+    
+    p1 = con.set_index(p0+dif)
+    next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+    if next_mse<base_mse: # OK
+        con.set_index(p0)
+        return c_id, p0+dif
+    else: # noc
+        con.set_index(p0)
+        return c_id, -1
+#
+#
+#
+def train_algorhythm_np(r, minibatch, num_of_class):
+    connections = r.get_weight_list() #r.getConnections()
+    c_num = len(connections)
+    print "connections=%d" % c_num
+    
+    inc_max = c_num/100
+    dec_max = c_num/100
+    
+    inc = 0
+    dec = 0
+    noc = 0
+    
+    inc_list = []
+    dec_list = []
+    
+    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
+    samples = random.sample(connections, c_num)
+    
+    # dec loop
+    for con in samples:
+        if dec>=dec_max:
+            break
+        
+        c_id, index = ziggle_connection_np(r, minibatch, num_of_class, con, -1, base_mse)
+        if index>=0:
+            dec = dec + 1
+            dec_list.append((c_id, index))
+        else:
+            noc = noc + 1
+
+    for c_info in dec_list:
+        con = connections[c_info[0]]
+        con.set_index(c_info[1])
+    
+    print "dec : %d, noc : %d, total : %d" % (dec, noc, dec+noc)
+    
+    noc = 0
+    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
+    samples = random.sample(connections, c_num)
+    
+    # inc loop
+    for con in samples:
+        if inc>=inc_max:
+            break
+        
+        c_id, index = ziggle_connection_np(r, minibatch, num_of_class, con, 1, base_mse)
+        if index>=0:
+            inc = inc + 1
+            inc_list.append((c_id, index))
+        else:
+            noc = noc + 1
+
+    for c_info in inc_list:
+        con = connections[c_info[0]]
+        con.setWeightIndex(c_info[1])
+    
+    print "inc : %d, noc : %d, total : %d" % (inc, noc, inc+noc)
+#
+#
+#
 def process_minibatch(r, minibatch, num_of_class):
     epoc = 1
     algo = 10

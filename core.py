@@ -207,7 +207,14 @@ class Weight:
         self._node = node
         self._i = i
         self._index = 0
-        
+        self._id = -1
+    
+    def set_id(self, id):
+        self._id = id
+    
+    def get_id(self):
+        return self._id
+    
     def set(self, w):
         return self._layer.set_weight(self._node, self._i, w)
 
@@ -215,15 +222,14 @@ class Weight:
         return self._layer.get_weight(self._node, self._i)
 
     def set_index(self, i):
-        # error check
-        #self.set( lesserWeights[i] )
         if i>=0 and i<lesserWeightsLen:
             self._index = i
-        
+            self.set( lesserWeights[i] )
+
         return self._index
 
     def get_index(self):
-        return sekf._index
+        return self._index
 #
 #
 #
@@ -359,11 +365,15 @@ class Roster:
         self.connections = []
 
     def init_weight(self):
+        c = 0
         for w in self._weight_list:
             i = random.randrange(lesserWeightsLen)
             w.set( lesserWeights[i] )
+            w.set_index(i)
+            w.set_id(c)
+            c += 1
 
-    def get_weight_list():
+    def get_weight_list(self):
         return self._weight_list
 
     def init_connections(self):
@@ -390,9 +400,10 @@ class Roster:
     def add_layer(self, type, num_input, num_node):
         c = self.countLayers()
         layer = Layer(c, type, num_input, num_node)
-        for i in range(num_node):
-            for j in range(num_input):
-                self._weight_list.append( Weight(layer, i, j) )
+        if c>0:
+            for i in range(num_node):
+                for j in range(num_input):
+                    self._weight_list.append( Weight(layer, i, j) )
 
         self.layers.append(layer)
     

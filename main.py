@@ -272,10 +272,15 @@ def evaluate_minibatch(r, minibatch, num_of_class):
             labels = make_train_label(j, num_of_class)
             #print "[%d] %d : %s" % (i, j, mb[j])
             data = util.loadData(mb[j])
-            r.setInputData(data)
+            #
+            r.propagate_np_s(data)
+            inf = r.get_inferences(1)
+            #print inf
+            #
+            #r.setInputData(data)
             #r.propagate()
-            r.propagate_np()
-            inf = r.getInferences(1)
+            #r.propagate_np()
+            #inf = r.getInferences(1)
             if inf is None:
                 print "ERROR"
                 print r
@@ -597,14 +602,16 @@ def train_algorhythm_10(r, minibatch, num_of_class):
 #
 #
 def ziggle_connection_np(r, minibatch, num_of_class, con, dif, base_mse):
-    c_id = 0 #con.get_id()
+    c_id = con.get_id()
     p0 = con.get_index() #getWeightIndex()
     p1 = con.set_index(p0 + dif) #setWeightIndex(p0 + dif)
+    #print "p0=%d, p1=%d" %(p0, p1)
     if p0==p1:
         return c_id, -1
     
     p1 = con.set_index(p0+dif)
     next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
+    #print "base=%f, next=%f" % (base_mse, next_mse)
     if next_mse<base_mse: # OK
         con.set_index(p0)
         return c_id, p0+dif
@@ -637,7 +644,12 @@ def train_algorhythm_np(r, minibatch, num_of_class):
         if dec>=dec_max:
             break
         
+        #print dec
+        
         c_id, index = ziggle_connection_np(r, minibatch, num_of_class, con, -1, base_mse)
+        #print c_id
+        #print index
+        
         if index>=0:
             dec = dec + 1
             dec_list.append((c_id, index))
@@ -668,7 +680,7 @@ def train_algorhythm_np(r, minibatch, num_of_class):
 
     for c_info in inc_list:
         con = connections[c_info[0]]
-        con.setWeightIndex(c_info[1])
+        con.set_index(c_info[1])
     
     print "inc : %d, noc : %d, total : %d" % (inc, noc, inc+noc)
 #
@@ -684,7 +696,8 @@ def process_minibatch(r, minibatch, num_of_class):
         elif algo == 9:
             train_algorhythm_9(r, minibatch, num_of_class)
         elif algo == 10:
-            train_algorhythm_10(r, minibatch, num_of_class)
+            train_algorhythm_np(r, minibatch, num_of_class)
+#train_algorhythm_10(r, minibatch, num_of_class)
 
 #
 #
@@ -765,6 +778,7 @@ def main():
     elif mode==3:
         print ">> debug mode"
     
+        print len( r.get_weight_list() )
         #r.get_weight_array()
         
 #        connections = r.getConnections()

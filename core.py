@@ -202,8 +202,8 @@ class Roster:
     def propagate(self, data):
         c = self.countLayers()
         pre = self.getLayerAt(0)
-        input = np.array(data)
-        pre.propagate(input)
+        #input = np.array(data)
+        pre.propagate(data)
         for i in range(1, c):
             array_y = pre.get_y_array()
             layer = self.getLayerAt(i)

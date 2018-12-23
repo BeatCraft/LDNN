@@ -15,6 +15,7 @@ import random
 import copy
 import math
 import multiprocessing as mp
+import numpy as np
 #
 #
 # LDNN Modules
@@ -64,7 +65,8 @@ def setup_batch(minibatch_size, it_train, it_test):
     if train_batch is None:
         train_list = scan_data(TRAIN_BASE_PATH, NUM_OF_SAMPLES, NUM_OF_CLASS)
         train_batch = make_batch(NUM_OF_CLASS, it_train, minibatch_size, train_list)
-        util.pickle_save(TRAIN_BATCH_PATH, train_batch)
+        train_array = np.array(train_batch)
+        util.pickle_save(TRAIN_BATCH_PATH, train_array)
     else:
         print "train batch restored."
 
@@ -72,7 +74,8 @@ def setup_batch(minibatch_size, it_train, it_test):
     if test_batch is None:
         test_list = scan_data(TEST_BASE_PATH, NUM_OF_TEST, NUM_OF_CLASS)
         test_batch = make_batch(NUM_OF_CLASS, it_test, minibatch_size, test_list)
-        util.pickle_save(TEST_BATCH_PATH, test_batch)
+        test_array = np.array(test_batch)
+        util.pickle_save(TEST_BATCH_PATH, test_array)
     else:
         print "test batch restored."
 
@@ -102,7 +105,7 @@ def scan_data(path, num, num_of_class):
                 files.append(path_name)
                 if len(files)>=num:
                     break
-        #print len(files)
+
         all_files.append(files)
     
     return all_files
@@ -114,13 +117,11 @@ def make_batch(num_of_class, iteration, size_of_minibatch, list_of_path):
     batch = []
     for i in range(iteration):
         minibatch = []
-        for j in range(size_of_minibatch):
-            block = []
-            for label in range(num_of_class):
-                #print "%d (%d, %d) %d = %d" % (label, i, j, size_of_minibatch, len(list_of_path[label]))
-                path = list_of_path[label][size_of_minibatch*i+j]
-                block.append(path)
-            minibatch.append(block)
+        for label in range(num_of_class):
+            path = list_of_path[label][i]
+            data = util.loadData(path)
+            minibatch.append(data)
+        
         batch.append(minibatch)
 
     return batch
@@ -128,37 +129,31 @@ def make_batch(num_of_class, iteration, size_of_minibatch, list_of_path):
 #
 #
 def test(r, minibatch, num_of_class):
-  
     dist = [0,0,0,0,0,0,0,0,0,0]
     stat = [0,0,0,0,0,0,0,0,0,0]
-  
-    for i in range(len(minibatch)):
-        samplese = minibatch[i]
 
-        for label in range(len(samplese)):
-            sample = samplese[label]
-            data = util.loadData(sample)
-
-            r.propagate(data)
-            inf = r.get_inference(1)
-            if inf is None:
-                print "ERROR"
-                continue
+    for label in range(len(minibatch)):
+        data = minibatch[label]
+        r.propagate(data)
+        inf = r.get_inference(1)
+        if inf is None:
+            print "ERROR"
+            continue
             
-            index = -1
-            mx = max(inf)
-            if mx>0.0:
-                for k in range(num_of_class):
-                    if inf[k] == mx:
-                        index = k
+        index = -1
+        mx = max(inf)
+        if mx>0.0:
+            for k in range(num_of_class):
+                if inf[k] == mx:
+                    index = k
             
-                dist[index] = dist[index] + 1
-            else:
-                print "ASS HOLE"
-                print mx
+            dist[index] = dist[index] + 1
+        else:
+            print "ASS HOLE"
+            print mx
         
-            if label==index:
-                stat[index] = stat[index] + 1
+        if label==index:
+            stat[index] = stat[index] + 1
          
     return [dist, stat]
 #
@@ -344,13 +339,163 @@ def train_algorhythm_basic(r, minibatch, num_of_class):
 #
 #
 #
+def train_algorhythm_single(r, minibatch, num_of_class):
+    weight_list = r.get_weight_list()
+    w_num = len(weight_list)
+    print "connections=%d" % w_num
+    
+    inc_max = w_num/100
+    dec_max = w_num/100
+    
+    inc = 0
+    dec = 0
+    noc = 0
+    
+    base_mse, base_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+    samples = random.sample(weight_list, w_num)
+    
+    # dec loop
+    dif = -1
+    for w in samples:
+        if dec>=dec_max:
+            break
+        
+        p0 = w.get_index()
+        p1 = w.set_index(p0 + dif)
+        if p0==p1:
+            noc = noc + 1
+            w.set_index(p0)
+            continue
+
+        next_mse, next_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+        if next_mse<base_mse: # OK
+            dec = dec + 1
+            base_mse = next_mse
+        else: # noc
+            noc = noc + 1
+            w.set_index(p0)
+    
+    print "dec : %d, noc : %d, total : %d" % (dec, noc, dec+noc)
+
+    # inc loop
+    base_mse, base_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+    samples = random.sample(weight_list, w_num)
+    dif = 1
+    noc = 0
+    for w in samples:
+        if inc>=inc_max:
+            break
+        
+        p0 = w.get_index()
+        p1 = w.set_index(p0 + dif)
+        if p0==p1:
+            noc = noc + 1
+            w.set_index(p0)
+            continue
+        
+        next_mse, next_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+        if next_mse<base_mse: # OK
+            inc = inc + 1
+            base_mse = next_mse
+        else: # noc
+            noc = noc + 1
+            w.set_index(p0)
+
+    print "inc : %d, noc : %d, total : %d" % (inc, noc, inc+noc)
+#
+#
+#
+def evaluate_minibatch_new(r, minibatch, num_of_class):
+    sum_of_mse = 0.0
+    num = 0
+    ret = 0.0
+    labels = [0,0,0,0,0,0,0,0,0,0]
+    
+    for j in range(num_of_class):
+        num = num + 1
+        #labels = make_train_label(j, num_of_class)
+        labels[j] = 1
+        data = minibatch[j] #util.loadData(mb[j])
+        r.propagate(data)
+        inf = r.get_inference(1)
+        if inf is None:
+            print "ERROR"
+            print r
+            sys.exit(0)
+            
+        ret = ret + inf[j]
+        mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
+        sum_of_mse = sum_of_mse + mse
+        labels[j] = 1
+    
+    ret = ret / num
+    mse = sum_of_mse / num
+    return mse, ret
+#
+#
+#
+def train_algorhythm_new(r, minibatch, num_of_class):
+    weight_list = r.get_weight_list()
+    w_num = len(weight_list)
+    print "weights=%d" % w_num
+    
+    max = w_num/100
+    noc = 0
+    cnt = 0
+
+    mb = []
+    for j in range(num_of_class):
+        data = util.loadData(minibatch[j])
+        mb.append(data)
+    
+    mb = np.array(minibatch)
+    base_mse, base_ret = evaluate_minibatch_new(r, mb, num_of_class)
+    samples = random.sample(weight_list, w_num)
+    
+    for w in samples:
+        if dec>=dec_max:
+            break
+        
+        p0 = w.get_index()
+        if p0==WEIGHT_INDEX_MAX:
+            p1 = p1 - 1
+        elif p0>WEIGHT_INDEX_ZERO and p0<WEIGHT_INDEX_MAX:
+            p1 = p1 + 1
+        elif p0==WEIGHT_INDEX_ZERO:
+            k = random.randrange(2)
+            if k==0:
+                p1 = p1 + 1
+            else:
+                p1 = p1 - 1
+        elif p0<index_zero and p0>WEIGHT_INDEX_MIN:
+            p1 = p1 - 1
+        else: # elif p0==WEIGHT_INDEX_MIN:
+            p1 = p1 + 1
+
+        w.set_index(p1)
+        next_mse, next_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+        if next_mse<base_mse: # OK
+            base_mse = next_mse
+            cnt = cnt + 1
+        else: # noc
+            noc = noc + 1
+            w.set_index(p0)
+    
+    print "cnt : %d, total : %d" % (cnt, noc, cnt+noc)
+#
+#
+#
 def process_minibatch(r, minibatch, num_of_class):
     epoc = 1
-    algo = 0
+    algo = 1
     
     for e in range(epoc):
         if algo == 0:
             train_algorhythm_basic(r, minibatch, num_of_class)
+        elif algo == 1:
+            train_algorhythm_single(r, minibatch, num_of_class)
+        elif algo == 2:
+            train_algorhythm_new(r, minibatch, num_of_class)
 #
 #
 #
@@ -431,7 +576,8 @@ def main():
         print ">> debug mode"
         print len( r.get_weight_list() )
     
-    
+        print train_batch[0]
+        print len(train_batch)
     
     elif mode==9:
         print ">> quit"

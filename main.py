@@ -61,8 +61,8 @@ def setup_dnn(path):
 #
 #
 def setup_batch(minibatch_size, it_train, it_test):
-    train_batch = util.pickle_load(TRAIN_BATCH_PATH)
-    if train_batch is None:
+    train_array = util.pickle_load(TRAIN_BATCH_PATH)
+    if train_array is None:
         train_list = scan_data(TRAIN_BASE_PATH, NUM_OF_SAMPLES, NUM_OF_CLASS)
         train_batch = make_batch(NUM_OF_CLASS, it_train, minibatch_size, train_list)
         train_array = np.array(train_batch)
@@ -70,8 +70,8 @@ def setup_batch(minibatch_size, it_train, it_test):
     else:
         print "train batch restored."
 
-    test_batch = util.pickle_load(TEST_BATCH_PATH)
-    if test_batch is None:
+    test_array = util.pickle_load(TEST_BATCH_PATH)
+    if test_array is None:
         test_list = scan_data(TEST_BASE_PATH, NUM_OF_TEST, NUM_OF_CLASS)
         test_batch = make_batch(NUM_OF_CLASS, it_test, minibatch_size, test_list)
         test_array = np.array(test_batch)
@@ -79,7 +79,7 @@ def setup_batch(minibatch_size, it_train, it_test):
     else:
         print "test batch restored."
 
-    return train_batch, test_batch
+    return train_array, test_array
 #
 #
 #
@@ -134,6 +134,7 @@ def test(r, minibatch, num_of_class):
 
     for label in range(len(minibatch)):
         data = minibatch[label]
+        #print data
         r.propagate(data)
         inf = r.get_inference(1)
         if inf is None:
@@ -426,7 +427,7 @@ def evaluate_minibatch_new(r, minibatch, num_of_class):
         ret = ret + inf[j]
         mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
         sum_of_mse = sum_of_mse + mse
-        labels[j] = 1
+        labels[j] = 0
     
     ret = ret / num
     mse = sum_of_mse / num
@@ -439,35 +440,65 @@ def train_algorhythm_new(r, minibatch, num_of_class):
     w_num = len(weight_list)
     print "weights=%d" % w_num
     
-    max = w_num/100
+    max = w_num / 100
+    #max = max * 1
     noc = 0
     cnt = 0
+    dec = 0
+    inc = 0
 
-    mb = []
-    for j in range(num_of_class):
-        data = util.loadData(minibatch[j])
-        mb.append(data)
-    
-    mb = np.array(minibatch)
-    base_mse, base_ret = evaluate_minibatch_new(r, mb, num_of_class)
-    samples = random.sample(weight_list, w_num)
-    
+    base_mse, base_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+    samples = random.sample(weight_list, w_num/10)
     for w in samples:
-        if dec>=dec_max:
+        if cnt>=max:
             break
         
         p0 = w.get_index()
-        if p0==WEIGHT_INDEX_MAX:
+        p1 = p0
+        if p0>core.WEIGHT_INDEX_ZERO and p0<=core.WEIGHT_INDEX_MAX:
             p1 = p1 - 1
-        elif p0>WEIGHT_INDEX_ZERO and p0<WEIGHT_INDEX_MAX:
-            p1 = p1 + 1
-        elif p0==WEIGHT_INDEX_ZERO:
+        elif p0==core.WEIGHT_INDEX_ZERO:
             k = random.randrange(2)
             if k==0:
                 p1 = p1 + 1
             else:
                 p1 = p1 - 1
-        elif p0<index_zero and p0>WEIGHT_INDEX_MIN:
+        elif p0<core.WEIGHT_INDEX_ZERO and p0>=core.WEIGHT_INDEX_MIN:
+            p1 = p1 + 1
+        
+        w.set_index(p1)
+        next_mse, next_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+        if next_mse<base_mse: # OK
+            base_mse = next_mse
+            cnt = cnt + 1
+        else: # noc
+            noc = noc + 1
+            w.set_index(p0)
+
+    dec = cnt
+    print "dec : %d, noc:%d, total : %d" % (dec, noc, dec+noc)
+    
+    noc = 0
+    cnt = 0
+    base_mse, base_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+    samples = random.sample(weight_list, w_num/10)
+    for w in samples:
+        if cnt>=max:
+            break
+        
+        p0 = w.get_index()
+        p1 = p0
+        if p0==core.WEIGHT_INDEX_MAX:
+            p1 = p1 - 1
+        elif p0>core.WEIGHT_INDEX_ZERO and p0<core.WEIGHT_INDEX_MAX:
+            p1 = p1 + 1
+        elif p0==core.WEIGHT_INDEX_ZERO:
+            k = random.randrange(2)
+            if k==0:
+                p1 = p1 + 1
+            else:
+                p1 = p1 - 1
+        elif p0<core.WEIGHT_INDEX_ZERO and p0>core.WEIGHT_INDEX_MIN:
             p1 = p1 - 1
         else: # elif p0==WEIGHT_INDEX_MIN:
             p1 = p1 + 1
@@ -480,14 +511,17 @@ def train_algorhythm_new(r, minibatch, num_of_class):
         else: # noc
             noc = noc + 1
             w.set_index(p0)
-    
-    print "cnt : %d, total : %d" % (cnt, noc, cnt+noc)
+
+    inc = cnt
+    print "inc : %d, noc:%d, total : %d" % (inc, noc, inc+noc)
+
+    return dec + inc
 #
 #
 #
 def process_minibatch(r, minibatch, num_of_class):
-    epoc = 1
-    algo = 1
+    epoc = 10
+    algo = 2
     
     for e in range(epoc):
         if algo == 0:
@@ -495,7 +529,9 @@ def process_minibatch(r, minibatch, num_of_class):
         elif algo == 1:
             train_algorhythm_single(r, minibatch, num_of_class)
         elif algo == 2:
-            train_algorhythm_new(r, minibatch, num_of_class)
+            ret = train_algorhythm_new(r, minibatch, num_of_class)
+            #if ret<=0:
+            #   break
 #
 #
 #
@@ -574,11 +610,10 @@ def main():
         test_mode(r, train_batch, NUM_OF_CLASS, num_of_processed, minibatch_size)
     elif mode==3:
         print ">> debug mode"
-        print len( r.get_weight_list() )
-    
-        print train_batch[0]
-        print len(train_batch)
-    
+        wl = r.get_weight_list()
+        for w in wl:
+            print w.get_index()
+
     elif mode==9:
         print ">> quit"
     else:

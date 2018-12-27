@@ -117,7 +117,7 @@ block_size = 1
 #
 class Gpu:
     def __init__(self):
-        self._ctx = cl.create_some_context(0)
+        self._ctx = cl.create_some_context()
 
         for dev in self._ctx.devices:
             assert dev.local_mem_size > 0
@@ -148,6 +148,11 @@ class Gpu:
         d_c_buf = cl.Buffer(self._ctx, mf.WRITE_ONLY, size=h_c.nbytes)
 
         return d_a_buf, d_b_buf, d_c_buf
+    
+    def write(self, mem_flags, buf, size):
+        mf = cl.mem_flags
+        d_buf = cl.Buffer(self._ctx, mem_flags, hostbuf=buf)
+        return d_buf
     
     # transfer device -> host
     def read(self, d_c_buf, h_c):

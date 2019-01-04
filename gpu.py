@@ -1,194 +1,106 @@
-from __future__ import division
-
-KERNEL_CODE = """
-
-// Thread block size
-#define BLOCK_SIZE %(block_size)d
-
-// Matrix dimensions
-// (chosen as multiples of the thread block size for simplicity)
-#define WA %(w_a)d // Matrix A width
-#define HA %(h_a)d // Matrix A height
-#define WB %(w_b)d // Matrix B width
-#define HB WA      // Matrix B height
-#define WC WB      // Matrix C width
-#define HC HA      // Matrix C height
-
-
-/* Matrix multiplication: C = A * B.
- * Device code.
- */
-
-#define AS(j, i) As[i + j * BLOCK_SIZE]
-#define BS(j, i) Bs[i + j * BLOCK_SIZE]
-
-////////////////////////////////////////////////////////////////////////////////
-//! Matrix multiplication on the device: C = A * B
-//! WA is A's width and WB is B's width
-////////////////////////////////////////////////////////////////////////////////
-//__kernel __attribute__((reqd_work_group_size(16,16,1))) 
-__kernel __attribute__((reqd_work_group_size(1,1,1))) 
-void
-matrixMul( __global float* C, __global float* A, __global float* B)
-{
-    __local float As[BLOCK_SIZE*BLOCK_SIZE];
-    __local float Bs[BLOCK_SIZE*BLOCK_SIZE];
-
-    // Block index
-    int bx = get_group_id(0);
-    int by = get_group_id(1);
-
-    // Thread index
-    int tx = get_local_id(0);
-    int ty = get_local_id(1);
-
-    // Index of the first sub-matrix of A processed by the block
-    int aBegin = WA * BLOCK_SIZE * by;
-
-    // Index of the last sub-matrix of A processed by the block
-    int aEnd   = aBegin + WA - 1;
-
-    // Step size used to iterate through the sub-matrices of A
-    int aStep  = BLOCK_SIZE;
-
-    // Index of the first sub-matrix of B processed by the block
-    int bBegin = BLOCK_SIZE * bx;
-
-    // Step size used to iterate through the sub-matrices of B
-    int bStep  = BLOCK_SIZE * WB;
-
-    // Csub is used to store the element of the block sub-matrix
-    // that is computed by the thread
-    float Csub = 0.0f;
-
-    // Loop over all the sub-matrices of A and B
-    // required to compute the block sub-matrix
-    for (int a = aBegin, b = bBegin;
-             a <= aEnd;
-             a += aStep, b += bStep) {
-
-        // Load the matrices from device memory
-        // to shared memory; each thread loads
-        // one element of each matrix
-        AS(ty, tx) = A[a + WA * ty + tx];
-        BS(ty, tx) = B[b + WB * ty + tx];
-
-        // Synchronize to make sure the matrices are loaded
-        barrier(CLK_LOCAL_MEM_FENCE);
-
-        // Multiply the two matrices together;
-        // each thread computes one element
-        // of the block sub-matrix
-        for (int k = 0; k < BLOCK_SIZE; ++k)
-            Csub += AS(ty, k) * BS(k, tx);
-
-        // Synchronize to make sure that the preceding
-        // computation is done before loading two new
-        // sub-matrices of A and B in the next iteration
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }
-
-    // Write the block sub-matrix to device memory;
-    // each thread writes one element
-    C[get_global_id(1) * get_global_size(0) + get_global_id(0)] = Csub;
-    
-}
-
-"""
-#
-#
-#
 import pyopencl as cl
 import os, sys, time
 from time import time
-import numpy
-## warmup ----------------------------------------------------------------------
-#for i in range(5):
-#    event = kernel(queue, h_c.shape, (block_size, block_size), d_c_buf, d_a_buf, d_b_buf)
-#    event.wait()
-#
-#queue.finish()
-
+import numpy as np
 
 block_size = 1
 
+KERNEL_CODE = """
+
+__kernel void multiple_x_by_w(
+    __global float* x,
+    __global float* w,
+    __global float* y,
+    const int num_x,
+    const int num_y)
+{
+    int i = get_global_id(0);
+    int j = get_global_id(1);
+    //int index = j * num_x + i;
+    //printf(\"%d, %d, d=%d\\n\", i, j, index);
+    
+    y[j * num_x + i] += x[i] * w[j * num_x + i];
+}
+
+"""
+#    for (int h=0; h<4; h++){
+#       y[j] += x[i+h] * w[j*num_x+i+h];
+#    }
+#y[get_global_id(1)] +=  + k;
+# barrier(CLK_LOCAL_MEM_FENCE);
+#y[j*num_x+i] = x[i] * w[j*num_x+i];
+
+#    int dim = get_work_dim();
+#printf(\"get_work_dim= %d\\n\", dim);
+#    //int gid = get_global_id(0);
+#//y[gid] = 0.2;
+#//y[0] = 0.3;
 #
 #
 #
 class Gpu:
     def __init__(self):
-        self._ctx = cl.create_some_context()
-
+        #self._ctx = cl.create_some_context()
+        platform = cl.get_platforms()[0]
+        device = platform.get_devices()[2]
+        self._ctx = cl.Context([device])
+        
         for dev in self._ctx.devices:
             assert dev.local_mem_size > 0
 
-        self._queue = cl.CommandQueue(
-                self._ctx,
-                properties=cl.command_queue_properties.PROFILING_ENABLE)
-                
-        #block_size = 1
-        a_width = block_size * 196
-        a_height = block_size * 1
-        b_width = block_size * 196
-        kernel_params = {
-                "block_size": block_size,
-                "w_a":a_width, "h_a":a_height, "w_b":b_width}
-        prg = cl.Program(
-                self._ctx,
-                KERNEL_CODE % kernel_params,).build(options="-cl-mad-enable -cl-fast-relaxed-math")
-        self._kernel = prg.matrixMul
+        self._queue = cl.CommandQueue(self._ctx)
+        self._bufs = []
 
+    def set_kernel_code(self):
+        self.prg = cl.Program(self._ctx, KERNEL_CODE).build()
     
-    # transfer host -> device
-    def write(self, h_a, h_b, h_c):
+    def get_buffer_list(self):
+        return self._bufs
+    
+    def dev_malloc(self, host_array):
         mf = cl.mem_flags
-
-        d_a_buf = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=h_a)
-        d_b_buf = cl.Buffer(self._ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=h_b)
-        d_c_buf = cl.Buffer(self._ctx, mf.WRITE_ONLY, size=h_c.nbytes)
-
-        return d_a_buf, d_b_buf, d_c_buf
+        buf = cl.Buffer(self._ctx, mf.READ_WRITE|mf.COPY_HOST_PTR, hostbuf=host_array, size=host_array.nbytes)
+        self._bufs.append(buf)
     
-    def write(self, mem_flags, buf, size):
-        mf = cl.mem_flags
-        d_buf = cl.Buffer(self._ctx, mem_flags, hostbuf=buf)
-        return d_buf
-    
-    # transfer device -> host
-    def read(self, d_c_buf, h_c):
-        cl.enqueue_copy(self._queue, d_c_buf, h_c)
-        return d_c_buf, h_c
-    
-    def execute(self, h_c, d_c_buf, d_a_buf, d_b_buf):
-        event = self._kernel(self._queue, h_c.shape, (block_size, block_size), d_c_buf, d_a_buf, d_b_buf)
+    def multiple_x_by_w(self, d_x, d_w, d_y, num_x, num_y):
+        #test_data = np.array([0.1, 0.2, 0.3, 0.4]).astype(np.float32)
+        event = self.prg.multiple_x_by_w(self._queue,(4,2), None,
+                                         d_x, d_w, d_y,
+                                         np.int32(num_x), np.int32(num_y))
         event.wait()
+    
+    def read(self, dev_buf, host_array):
+        cl.enqueue_copy(self._queue, host_array, dev_buf)
 #
 #
 #
 def main():
-    a_width = block_size * 196
-    a_height = block_size * 1
-    b_width = block_size * 196
-    b_height = block_size * 2
-    c_width = b_width
-    c_height = a_height
-
-    assert a_width % block_size == 0
-    assert a_height % block_size == 0
-    assert b_width % block_size == 0
-    
-    h_a = numpy.random.rand(a_height, a_width).astype(numpy.float32)
-    h_b = numpy.random.rand(b_height, b_width).astype(numpy.float32)
-    h_c = numpy.empty((c_height, c_width)).astype(numpy.float32)
+    data_x = np.array([0.1, 0.2, 0.3, 0.4]).astype(np.float32)
+    data_w = np.array(
+                      [[0.5, 0.5, 0.5, 0.5],
+                       [0.1, 0.1, 0.1, 0.1]]).astype(np.float32)
+    data_y = np.array([[0.0, 0.0, 0.0, 0.0],
+                       [0.0, 0.0, 0.0, 0.0]]).astype(np.float32)
+    #data_y = np.array([0.0, 0.0]).astype(np.float32)
+    #data_y_sum = np.array([0.0, 0.0, 0., 0.0]).astype(np.float32)
+                       #data_y_sum = np.array([0.0, 0.0]).astype(np.float32)
+    print data_x
+    print data_w
+    print data_y
+    #print data_y_sum
     
     g = Gpu()
-    d_a_buf, d_b_buf, d_c_buf = g.write(h_a, h_b, h_c)
-    g.execute(h_c, d_c_buf, d_a_buf, d_b_buf)
+    g.dev_malloc(data_x)
+    g.dev_malloc(data_w)
+    g.dev_malloc(data_y)
+    #g.dev_malloc(data_y_sum)
+    g.set_kernel_code()
+    bufs = g.get_buffer_list()
     
-    #ret1, ret2 =
-    d_c_buf, h_c = g.read(d_c_buf, h_c)
-    print d_c_buf
-    print h_c
+    g.multiple_x_by_w(bufs[0], bufs[1], bufs[2], 4, 2)
+    g.read(bufs[2], data_y)
+    
+    print data_y
     
     return 0
 

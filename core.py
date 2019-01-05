@@ -9,12 +9,15 @@ import multiprocessing as mp
 import pickle
 import numpy as np
 
-from PIL import Image
-from PIL import ImageFile
-from PIL import JpegImagePlugin
-from PIL import ImageFile
-from PIL import PngImagePlugin
-import zlib
+# LDNN Modules
+import gpu
+
+#from PIL import Image
+#from PIL import ImageFile
+#from PIL import JpegImagePlugin
+#from PIL import ImageFile
+#from PIL import PngImagePlugin
+#import zlib
 
 sys.setrecursionlimit(10000)
 #
@@ -102,7 +105,8 @@ class Layer:
     # type      : 0 = input, 1 = hidden, 2 = output
     # num_input : number of inputs / outputs from a previous layer
     # num_node  : numbers of neurons
-    def __init__(self, i, type, num_input, num_node):
+    def __init__(self, i, type, num_input, num_node, gpu=None):
+        self._gpu = gpu
         self._id = -1
         self._index = i
         self._type = type
@@ -110,9 +114,33 @@ class Layer:
         self._num_node = num_node
         self._weight_matrix = np.zeros( (self._num_node, self._num_input) )
         self._y_array = np.zeros(self._num_node)
-        self.nodes = []
 
-    def propagate(self, array_in):
+        self.nodes = []
+            
+        if self._type==0:
+            self._input_array = np.zeros(num_node, dtype=int)
+        else:
+            self._input_array = np.zeros(num_node, dtype=float)
+        self._output_array = np.zeros(num_node, dtype=float)
+    
+    def init_gpu(self):
+        print "init_gpu()"
+        if self._gpu:
+            pass
+        else:
+            print "no gpu"
+            return
+        
+        self._gpu_input = self._gpu.dev_malloc(self._input_array)
+        self._gpu_output = self._gpu.dev_malloc(self._output_array)
+
+    def propagate(self, data):
+        if self._gpu:
+            self.propagate_gpu(data)
+        else:
+            self.propagate_cpu(data)
+    
+    def propagate_cpu(self, array_in):
         if self._type==0:   # input
             self._y_array = array_in/255.0
         elif self._type==1: # hidden
@@ -123,7 +151,18 @@ class Layer:
             for i in range(self._num_node):
                 sum = np.sum(self._weight_matrix[i]*array_in)
                 self._y_array[i] = np.exp(sum)
-
+    
+    def propagate_gpu(self, array_in):
+        print "propagate_gpu()"
+        if self._type==0:   # input
+            self._gpu.write(self._gpu_input, array_in)
+            self._gpu.scale(self._gpu_input, self._gpu_output, 255.0, self._num_node)
+            #g.read(data_x, bufs[4])
+            #print "koko"
+            #self._y_array = array_in/255.0
+        else:
+            print "not yet"
+    
     def get_weight(self, node, i):
         return self._weight_matrix[node][i]
     
@@ -148,9 +187,13 @@ class Layer:
 class Roster:
     def __init__(self):
         self._weight_list = []
-        
+        self._gpu = None
+
         self.layers = []
 
+    def set_gpu(self, my_gpu):
+        self._gpu = my_gpu
+    
     def init_weight(self):
         c = 0
         for w in self._weight_list:
@@ -180,13 +223,16 @@ class Roster:
 
     def add_layer(self, type, num_input, num_node):
         c = self.countLayers()
-        layer = Layer(c, type, num_input, num_node)
+        layer = Layer(c, type, num_input, num_node, self._gpu)
         if c>0:
             for i in range(num_node):
                 for j in range(num_input):
                     self._weight_list.append( Weight(layer, i, j) )
 
         self.layers.append(layer)
+
+        if self._gpu:
+            layer.init_gpu()
 
     def get_inference(self, softmax=0):
         ret = []
@@ -198,7 +244,7 @@ class Roster:
             ret.append(a/sum)
         
         return ret
-    
+
     def propagate(self, data):
         c = self.countLayers()
         pre = self.getLayerAt(0)

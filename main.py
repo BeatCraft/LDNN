@@ -21,6 +21,7 @@ import numpy as np
 # LDNN Modules
 import core
 import util
+import gpu
 #
 #
 #
@@ -40,19 +41,23 @@ NUM_OF_TEST      = 500
 #
 #
 #
-def setup_dnn(path):
+def setup_dnn(path, my_gpu):
     if os.path.exists(path):
         print "DNN restored."
         r = util.pickle_load(path)
+        r.set_gpu(my_gpu)
         return r
     else:
         r = core.Roster()
+        r.set_gpu(my_gpu)
         
         input_layer = r.add_layer(0, 196, 196)
         hidden_layer_1 = r.add_layer(1, 196, 32)
         hidden_layer_2 = r.add_layer(1, 32, 32)
         output_layer = r.add_layer(2, 32, 10)
         r.init_weight()
+        
+        #my_gpu.set_kernel_code()
 
         util.pickle_save(path, r)
         return r
@@ -164,7 +169,7 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     print ">>test mode"
     start_time = time.time()
     
-    #iteration = 1
+    iteration = 1
     multi = 0
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
@@ -571,11 +576,20 @@ def main():
     it_train = 0
     it_test = 0
  
+    #
+    # GPU
+    #
+    my_gpu = gpu.Gpu()
+    my_gpu.set_kernel_code()
+    #
+    #
+    #
+     
     num_of_processed = util.pickle_load(PROCEEDED_PATH)
     if num_of_processed is None:
         num_of_processed = 0
  
-    r = setup_dnn(NETWORK_PATH)
+    r = setup_dnn(NETWORK_PATH, my_gpu)
     if r is None:
         print "fatal DNN error"
         return 0
@@ -588,7 +602,7 @@ def main():
     if test_batch is None:
         print "fatal test_batch error"
         return 0
-
+    
     mode = get_key_input("0:train, 1:test, 2:self-test, 3:debug, 8:reset, 9:quit >")
     if mode==0:
         print ">> train mode : max_it_train = %d" % (num_of_processed)
@@ -600,6 +614,7 @@ def main():
         prosecced = train_mode(r, train_batch, it_train, NUM_OF_CLASS, num_of_processed)
         num_of_processed = num_of_processed + prosecced
         util.pickle_save(PROCEEDED_PATH, num_of_processed)
+        r.set_gpu(None)
         util.pickle_save(NETWORK_PATH, r)
     elif mode==1:
         print ">> test mode"

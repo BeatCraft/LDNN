@@ -112,16 +112,18 @@ class Layer:
         self._type = type
         self._num_input = num_input
         self._num_node = num_node
-        self._weight_matrix = np.zeros( (self._num_node, self._num_input) )
-        self._y_array = np.zeros(self._num_node)
+        self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        self._product_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        self._sum = np.zeros(self._num_node, dtype=np.float32)
+        self._y_array = np.zeros(self._num_node, dtype=np.float32)
 
         self.nodes = []
             
         if self._type==0:
             self._input_array = np.zeros(num_node, dtype=int)
         else:
-            self._input_array = np.zeros(num_node, dtype=float)
-        self._output_array = np.zeros(num_node, dtype=float)
+            self._input_array = np.zeros(num_node, dtype=np.float32)
+        self._output_array = np.zeros(num_node, dtype=np.float32)
     
     def init_gpu(self):
         print "init_gpu()"
@@ -132,8 +134,18 @@ class Layer:
             return
         
         self._gpu_input = self._gpu.dev_malloc(self._input_array)
+        if self._type>0:
+            self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+            self._gpu_product = self._gpu.dev_malloc(self._weight_matrix)
+        #self._gpu_sum = self._gpu.dev_malloc(self._output_array)
         self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        print self._output_array
 
+    def update_gpu_weight(self):
+        if self._type>0:
+            self._gpu.write(self._gpu_weight, self._weight_matrix)
+            #print self._weight_matrix
+    
     def propagate(self, data):
         if self._gpu:
             self.propagate_gpu(data)
@@ -153,16 +165,50 @@ class Layer:
                 self._y_array[i] = np.exp(sum)
     
     def propagate_gpu(self, array_in):
-        print "propagate_gpu()"
+        print "propagate_gpu() type=%d" % self._type
         if self._type==0:   # input
-            self._gpu.write(self._gpu_input, array_in)
-            self._gpu.scale(self._gpu_input, self._gpu_output, 255.0, self._num_node)
-            #g.read(data_x, bufs[4])
-            #print "koko"
-            #self._y_array = array_in/255.0
+            self._gpu.copy(self._gpu_input, array_in)
+            self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node)
+        elif self._type==1:   # hidden
+            self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
+                                      self._num_input, self._num_node)
+            self._gpu.copy(self._product_matrix, self._gpu_product)
+            i = 0
+            for row in self._product_matrix:
+                self._sum[i] = relu( np.sum(row) )
+                i += 1
+
+            self._gpu.copy(self._gpu_output, self._sum)
+            print self._sum
+            
+#            if self._type==2:
+#                print "relu"
+#                sum = np.sum(self._sum)
+#                for row in self._sum:
+#                    print row/sum
+#
+#                print "softmax"
+#                for row in self._sum:
+#                    print np.exp(row)
+
         else:
-            print "not yet"
-    
+            self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
+                                      self._num_input, self._num_node)
+            self._gpu.copy(self._product_matrix, self._gpu_product)
+            i = 0
+            for row in self._product_matrix:
+                self._sum[i] = relu( np.sum(row) )
+                i += 1
+
+            sum = np.sum(self._sum)
+            print sum
+            i = 0
+            for row in self._sum:
+                self._y_array[i] = row/sum
+                i += 1
+            
+            #print self._y_array
+
     def get_weight(self, node, i):
         return self._weight_matrix[node][i]
     
@@ -180,6 +226,8 @@ class Layer:
         return self._type
 
     def get_y_array(self):
+        #if self._gpu:
+        #    return self._gpu_output
         return self._y_array
 #
 #
@@ -202,6 +250,10 @@ class Roster:
             w.set_index(i)
             w.set_id(c)
             c += 1
+
+    def update_gpu_weight(self):
+        for layer in self.layers:
+            layer.update_gpu_weight()
 
     def get_weight_list(self):
         return self._weight_list
@@ -245,16 +297,39 @@ class Roster:
         
         return ret
 
+    def get_inference_gpu(self):
+        ret = []
+        c = self.countLayers()
+        output = self.getLayerAt(c-1)
+        return output.get_y_array()
+        
+    
     def propagate(self, data):
+        if self._gpu:
+            self.propagate_gpu(data)
+        else:
+            self.propagate_cpu(data)
+    
+    def propagate_cpu(self, data):
         c = self.countLayers()
         pre = self.getLayerAt(0)
-        #input = np.array(data)
         pre.propagate(data)
         for i in range(1, c):
             array_y = pre.get_y_array()
             layer = self.getLayerAt(i)
             layer.propagate(array_y)
             pre = layer
+
+    def propagate_gpu(self, data):
+        c = self.countLayers()
+        pre = self.getLayerAt(0)
+        pre.propagate(data)
+        for i in range(1, c):
+            #array_y = pre._gpu_output
+            layer = self.getLayerAt(i)
+            layer.propagate_gpu(pre._gpu_output)
+            pre = layer
+
 #
 #
 #

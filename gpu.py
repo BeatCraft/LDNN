@@ -11,12 +11,14 @@ __kernel void multiple_x_by_w(
     __global float* x,
     __global float* w,
     __global float* y,
-    const int num)
+    const int num_w)
 {
     int i = get_global_id(0);
     int j = get_global_id(1);
     
-    y[j*num + i] = x[i] * w[j*num + i];
+    //printf(\"(%d, %d)\\n\", i, j);
+    y[j*num_w + i] = x[i] * w[j*num_w + i];
+//    printf(\"%f\\n\", x[i]);
 };
 
 __kernel void scale(
@@ -26,7 +28,8 @@ __kernel void scale(
 {
     int i = get_global_id(0);
 
-    y[i] = x[i] / max;    
+    y[i] = float(x[i]) / max;
+    //printf(\"%d=%f\\n\", i, y[i]);
 };
 
 """
@@ -61,9 +64,9 @@ class Gpu:
         self._bufs.append(buf)
         return buf
     
-    def multiple_x_by_w(self, d_x, d_w, d_y, num):
-        event = self.prg.multiple_x_by_w(self._queue,(4,2), None,
-                                         d_x, d_w, d_y, np.int32(num))
+    def multiple_x_by_w(self, d_x, d_w, d_y, row, col):
+        event = self.prg.multiple_x_by_w(self._queue,(row,col), None,
+                                         d_x, d_w, d_y, np.int32(row))
         event.wait()
 
     def scale(self, d_x, d_y, max, row):
@@ -71,12 +74,14 @@ class Gpu:
                                d_x, d_y, np.float32(max))
         event.wait()
     
+    def copy(self, dist, src):
+        cl.enqueue_copy(self._queue, dist, src)
     
-    def read(self, host_array, dev_buf):
-        cl.enqueue_copy(self._queue, host_array, dev_buf) # dist, src
+    def read(self, dist, src):
+        cl.enqueue_copy(self._queue, dist, src)
 
-    def write(self, dev_buf, host_array):
-        cl.enqueue_copy(self._queue, dev_buf, host_array)
+    def write(self, dist, src):
+        cl.enqueue_copy(self._queue, dist, src)
 
 #
 #        host_data = np.array([0.0, 0.0, 0.0, 0.0]).astype(np.float32)
@@ -87,7 +92,6 @@ class Gpu:
 #                                       dev_offset=1)
 #        print host_data
 #        event.wait()
-
 
 #
 #

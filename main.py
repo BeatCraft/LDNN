@@ -56,6 +56,7 @@ def setup_dnn(path, my_gpu):
         hidden_layer_2 = r.add_layer(1, 32, 32)
         output_layer = r.add_layer(2, 32, 10)
         r.init_weight()
+        r.update_gpu_weight()
         
         #my_gpu.set_kernel_code()
 
@@ -593,15 +594,18 @@ def main():
     if r is None:
         print "fatal DNN error"
         return 0
-    
-    train_batch, test_batch = setup_batch(minibatch_size, max_it_train, max_it_test)
-    if train_batch is None:
-        print "fatal train_batch error"
-        return 0
+#
+# this part is temporaly disabled
+#
 
-    if test_batch is None:
-        print "fatal test_batch error"
-        return 0
+#    train_batch, test_batch = setup_batch(minibatch_size, max_it_train, max_it_test)
+#    if train_batch is None:
+#        print "fatal train_batch error"
+#        return 0
+#
+#    if test_batch is None:
+#        print "fatal test_batch error"
+#        return 0
     
     mode = get_key_input("0:train, 1:test, 2:self-test, 3:debug, 8:reset, 9:quit >")
     if mode==0:
@@ -625,10 +629,15 @@ def main():
         test_mode(r, train_batch, NUM_OF_CLASS, num_of_processed, minibatch_size)
     elif mode==3:
         print ">> debug mode"
-        wl = r.get_weight_list()
-        for w in wl:
-            print w.get_index()
+        data_list = util.loadData("./data/test/0/00003.png")
+        data_array = np.array(data_list)
+        r.propagate(data_array)
+        print r.get_inference_gpu()
 
+#        wl = r.get_weight_list()
+#        for w in wl:
+#            print w.get_index()
+#
     elif mode==9:
         print ">> quit"
     else:

@@ -165,7 +165,7 @@ class Layer:
                 self._y_array[i] = np.exp(sum)
     
     def propagate_gpu(self, array_in):
-        print "propagate_gpu() type=%d" % self._type
+        #print "propagate_gpu() type=%d" % self._type
         if self._type==0:   # input
             self._gpu.copy(self._gpu_input, array_in)
             self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node)
@@ -179,7 +179,7 @@ class Layer:
                 i += 1
 
             self._gpu.copy(self._gpu_output, self._sum)
-            print self._sum
+            #print self._sum
             
 #            if self._type==2:
 #                print "relu"
@@ -201,10 +201,14 @@ class Layer:
                 i += 1
 
             sum = np.sum(self._sum)
-            print sum
+            #print sum
             i = 0
             for row in self._sum:
-                self._y_array[i] = row/sum
+                if sum>0.0:
+                    self._y_array[i] = row/sum
+                else:
+                    print "fuck : sum is zero"
+                    self._y_array[i] = 0.0
                 i += 1
             
             #print self._y_array
@@ -248,6 +252,15 @@ class Roster:
             i = random.randrange(lesserWeightsLen)
             w.set( lesserWeights[i] )
             w.set_index(i)
+            w.set_id(c)
+            c += 1
+
+    def restore_weighgt(w_list):
+        c = 0
+        for w in self._weight_list:
+            wi = w_list[c]
+            w.set( lesserWeights[wi] )
+            w.set_index(wi)
             w.set_id(c)
             c += 1
 
@@ -302,7 +315,6 @@ class Roster:
         c = self.countLayers()
         output = self.getLayerAt(c-1)
         return output.get_y_array()
-        
     
     def propagate(self, data):
         if self._gpu:
@@ -329,7 +341,6 @@ class Roster:
             layer = self.getLayerAt(i)
             layer.propagate_gpu(pre._gpu_output)
             pre = layer
-
 #
 #
 #

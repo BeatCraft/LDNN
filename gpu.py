@@ -32,6 +32,26 @@ __kernel void scale(
     //printf(\"%d=%f\\n\", i, y[i]);
 };
 
+__kernel void multiple_x_by_w_alt(
+__global float* x,
+__global float* w,
+__global float* y,
+const int num_w,
+const int alt_row,
+const int alt_col,
+const float alt_w)
+{
+    int i = get_global_id(0);
+    int j = get_global_id(1);
+
+    if (j==alt_col && i==alt_row){
+        y[j*num_w + i] = x[i] * alt_w;
+    }else{
+
+        y[j*num_w + i] = x[i] * w[j*num_w + i];
+    }
+};
+
 """
 #
 # printf(\"%f\\n\", y[i]);

@@ -16,6 +16,7 @@ from PIL import ImageFile
 from PIL import PngImagePlugin
 import zlib
 
+import csv
 #
 # constant values
 #
@@ -27,8 +28,8 @@ C_RIGHT_GREEN = (128, 255, 128)
 C_GREEN = (0, 255, 0)
 C_RIGHT_BLUE = (128, 128, 255)
 C_BLUE = (0, 0, 255)
-COLOR_PALLET = [C_BLUE, C_RIGHT_BLUE, C_GREEN, C_RIGHT_GREEN, C_YELLOW, C_ORANGE, C_RED, C_PURPLE]
-
+COLOR_PALLET = [C_BLUE, C_RIGHT_BLUE, C_GREEN, C_RIGHT_GREEN,
+                C_YELLOW, C_ORANGE, C_RED, C_PURPLE]
 #
 #
 #
@@ -175,6 +176,26 @@ def exportPng(r, num_of_processed):
 
     save_name = "./%05d.png" % (num_of_processed)
     img.save(save_name)
+#
+#
+#
+def list_to_csv(path, data_list):
+    with open(path, 'wb') as file:
+        wr = csv.writer(file, quoting=csv.QUOTE_ALL)
+        wr.writerow(data_list)
+#
+#
+#
+def csv_to_list(path):
+    print "csv_to_list()"
+    data_list = []
+    with open(path, 'r') as f:
+        reader = csv.reader(f)
+        for row in reader:
+            for cell in row:
+                data_list.append(cell)
+
+    return data_list
 #
 #
 #

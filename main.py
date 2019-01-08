@@ -42,27 +42,38 @@ NUM_OF_TEST      = 500
 #
 #
 def setup_dnn(path, my_gpu):
-    if os.path.exists(path):
-        print "DNN restored."
-        r = util.pickle_load(path)
-        r.set_gpu(my_gpu)
-        return r
-    else:
-        r = core.Roster()
-        r.set_gpu(my_gpu)
+    r = core.Roster()
+    r.set_gpu(my_gpu)
         
-        input_layer = r.add_layer(0, 196, 196)
-        hidden_layer_1 = r.add_layer(1, 196, 32)
-        hidden_layer_2 = r.add_layer(1, 32, 32)
-        output_layer = r.add_layer(2, 32, 10)
-        r.init_weight()
-        r.update_gpu_weight()
-        
+    input_layer = r.add_layer(0, 196, 196)
+    hidden_layer_1 = r.add_layer(1, 196, 32)
+    hidden_layer_2 = r.add_layer(1, 32, 32)
+    output_layer = r.add_layer(2, 32, 10)
+    r.init_weight()
+    r.update_gpu_weight()
+    return r
+    
+#    if os.path.exists(path):
+#        print "DNN restored."
+#        r = util.pickle_load(path)
+#        r.set_gpu(my_gpu)
+#        return r
+#    else:
+#        r = core.Roster()
+#        r.set_gpu(my_gpu)
+#
+#        input_layer = r.add_layer(0, 196, 196)
+#        hidden_layer_1 = r.add_layer(1, 196, 32)
+#        hidden_layer_2 = r.add_layer(1, 32, 32)
+#        output_layer = r.add_layer(2, 32, 10)
+#        r.init_weight()
+#        r.update_gpu_weight()
+#
         #my_gpu.set_kernel_code()
-
-        util.pickle_save(path, r)
-        return r
-    return None
+        #
+        #       util.pickle_save(path, r)
+        #       return r
+#   return None
 #
 #
 #
@@ -142,7 +153,9 @@ def test(r, minibatch, num_of_class):
         data = minibatch[label]
         #print data
         r.propagate(data)
-        inf = r.get_inference(1)
+        #print data
+        #inf = r.get_inference(1)
+        inf = r.get_inference_gpu()
         if inf is None:
             print "ERROR"
             continue
@@ -170,7 +183,7 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     print ">>test mode"
     start_time = time.time()
     
-    iteration = 1
+    #iteration = 1
     multi = 0
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
@@ -567,8 +580,7 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
 def main():
     argvs = sys.argv
     argc = len(argvs)
-    
-    #list_of_path = []
+
     train_batch = []
     test_batch = []
     minibatch_size = 1
@@ -583,6 +595,12 @@ def main():
     my_gpu = gpu.Gpu()
     my_gpu.set_kernel_code()
     #
+    #my_gpu = None
+    #mode = get_key_input("GPU? yes=1 >")
+    #if mode==1:
+    #    my_gpu = gpu.Gpu()
+    #    my_gpu.set_kernel_code()
+    #
     #
     #
      
@@ -594,50 +612,65 @@ def main():
     if r is None:
         print "fatal DNN error"
         return 0
-#
-# this part is temporaly disabled
-#
 
-#    train_batch, test_batch = setup_batch(minibatch_size, max_it_train, max_it_test)
-#    if train_batch is None:
-#        print "fatal train_batch error"
-#        return 0
-#
-#    if test_batch is None:
-#        print "fatal test_batch error"
-#        return 0
-    
-    mode = get_key_input("0:train, 1:test, 2:self-test, 3:debug, 8:reset, 9:quit >")
+    print "0 : make train batch"
+    print "1 : make test batch"
+    print "2 : train"
+    print "3 : test"
+    print "4 : self-test"
+    print "5 : debug"
+    print "6 : debug 2"
+    print "9 : quit"
+    mode = get_key_input("input command >")
     if mode==0:
+        train_list = scan_data(TRAIN_BASE_PATH, NUM_OF_SAMPLES, NUM_OF_CLASS)
+        train_batch = make_batch(NUM_OF_CLASS, it_train, minibatch_size, train_list)
+        train_array = np.array(train_batch)
+        util.pickle_save(TRAIN_BATCH_PATH, train_array)
+    elif mode==1:
+        test_list = scan_data(TEST_BASE_PATH, NUM_OF_TEST, NUM_OF_CLASS)
+        test_batch = make_batch(NUM_OF_CLASS, it_test, minibatch_size, test_list)
+        test_array = np.array(test_batch)
+        util.pickle_save(TEST_BATCH_PATH, test_array)
+    elif mode==2:
         print ">> train mode : max_it_train = %d" % (num_of_processed)
         it_train = get_key_input("iteration > ")
         if it_train<0:
             print "error : iteration = %d" % it_train
             return 0
         
+        train_array = util.pickle_load(TRAIN_BATCH_PATH)
+        #
         prosecced = train_mode(r, train_batch, it_train, NUM_OF_CLASS, num_of_processed)
         num_of_processed = num_of_processed + prosecced
         util.pickle_save(PROCEEDED_PATH, num_of_processed)
         r.set_gpu(None)
         util.pickle_save(NETWORK_PATH, r)
-    elif mode==1:
+    elif mode==3:
         print ">> test mode"
+        test_array = util.pickle_load(TEST_BATCH_PATH)
+        #
         it_test = max_it_test
         test_mode(r, test_batch, NUM_OF_CLASS, it_test, minibatch_size)
-    elif mode==2:
+    elif mode==4:
         print ">> self-test mode"
         test_mode(r, train_batch, NUM_OF_CLASS, num_of_processed, minibatch_size)
-    elif mode==3:
+    elif mode==5:
         print ">> debug mode"
         data_list = util.loadData("./data/test/0/00003.png")
         data_array = np.array(data_list)
         r.propagate(data_array)
         print r.get_inference_gpu()
+    elif mode==6:
+        wl = r.get_weight_list()
+        wi_list = []
+        for w in wl:
+            wi_list.append( w.get_index() )
 
-#        wl = r.get_weight_list()
-#        for w in wl:
-#            print w.get_index()
-#
+        print len(wi_list)
+        util.list_to_csv("./test.cvs", wi_list)
+        d_list = util.csv_to_list("./test.cvs")
+        print len(d_list)
     elif mode==9:
         print ">> quit"
     else:

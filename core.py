@@ -211,7 +211,38 @@ class Layer:
                     self._y_array[i] = 0.0
                 i += 1
             
-            #print self._y_array
+    def propagate_gpu_alt(self, array_in, w, wi_alt):
+        if self._type==0:   # input
+            self._gpu.copy(self._gpu_input, array_in)
+            self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node)
+        elif self._type==1:   # hidden
+            self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
+                                      self._num_input, self._num_node)
+            self._gpu.copy(self._product_matrix, self._gpu_product)
+            i = 0
+            for row in self._product_matrix:
+                self._sum[i] = relu( np.sum(row) )
+                i += 1
+
+            self._gpu.copy(self._gpu_output, self._sum)
+        else:
+            self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
+                                      self._num_input, self._num_node)
+            self._gpu.copy(self._product_matrix, self._gpu_product)
+            i = 0
+            for row in self._product_matrix:
+                self._sum[i] = relu( np.sum(row) )
+                i += 1
+                                      
+            sum = np.sum(self._sum)
+            i = 0
+            for row in self._sum:
+                if sum>0.0:
+                    self._y_array[i] = row/sum
+                else:
+                    #print "fuck : sum is zero"
+                    self._y_array[i] = 0.0
+                i += 1
 
     def get_weight(self, node, i):
         return self._weight_matrix[node][i]
@@ -255,11 +286,11 @@ class Roster:
             w.set_id(c)
             c += 1
 
-    def restore_weighgt(w_list):
+    def restore_weighgt(self, w_list):
         c = 0
         for w in self._weight_list:
             wi = w_list[c]
-            w.set( lesserWeights[wi] )
+            w.set( lesserWeights[int(wi)] )
             w.set_index(wi)
             w.set_id(c)
             c += 1

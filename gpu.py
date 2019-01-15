@@ -89,6 +89,12 @@ class Gpu:
                                          d_x, d_w, d_y, np.int32(row))
         event.wait()
 
+    def multiple_x_by_w_alt(self, d_x, d_w, d_y, row, col, layer_i, node_i, w):
+        event = self.prg.multiple_x_by_w_alt(self._queue,(row,col), None,
+                                             d_x, d_w, d_y, np.int32(row)
+                                             layer_i, node_i, w)
+        event.wait()
+    
     def scale(self, d_x, d_y, max, row):
         event = self.prg.scale(self._queue, (row,), None,
                                d_x, d_y, np.float32(max))

@@ -55,8 +55,10 @@ def setup_dnn(path, my_gpu):
     
     wi = util.csv_to_list(WEIGHT_INDEX_CSV_PATH)
     if len(wi)>0:
+        print "restore weights"
         r.restore_weighgt(wi)
     else:
+        print "init weights"
         r.init_weight()
 
     if my_gpu:
@@ -170,58 +172,31 @@ def test(r, minibatch, num_of_class):
 #
 #
 def test_mode(r, batch, num_of_class, iteration, minibatch_size):
-    print ">>test mode"
+    print ">>test mode(%d)" % iteration
     start_time = time.time()
-    
-    #iteration = 1
-    multi = 0
+
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
     stat = [0,0,0,0,0,0,0,0,0,0]
     
-    if multi==0:
-        for minibatch in batch:
-            if it>=iteration:
-                break
-            
-            print "it : %d" % it
-            d, s = test(r, minibatch, num_of_class)
-            for j in range(len(dist)):
-                dist[j] = dist[j] + d[j]
-                stat[j] = stat[j] + s[j]
-
-            it = it + 1
-    elif multi==1:
-        jobs = []
-        for minibatch in batch:
-            job = mp.Process(target=test, args=(r, minibatch, num_of_class))
-            jobs.append(job)
-            job.start()
+    for minibatch in batch:
+        if it>=iteration:
+            break
+        print "it : %d" % it
+        d, s = test(r, minibatch, num_of_class)
+        for j in range(len(dist)):
+            dist[j] = dist[j] + d[j]
+            stat[j] = stat[j] + s[j]
+        
+        it = it + 1
     
-        [job.join() for job in jobs]
-        # how can i get these resoults???
-
-    else:
-        pool = mp.Pool(processes=16)
-        multi_results = []
-        for minibatch in batch:
-            multi_results.append(pool.apply_async(test, args=(r, minibatch, num_of_class)))
-    
-        for res in multi_results:
-            ret = res.get()
-            d = ret[0]
-            s = ret[1]
-            for j in range(len(dist)):
-                dist[j] = dist[j] + d[j]
-                stat[j] = stat[j] + s[j]
-
     print dist
-    for d in dist:
-        print d
+    #for d in dist:
+    #    print d
 
     print stat
-    for s in stat:
-        print s
+    #for s in stat:
+    #    print s
 
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
@@ -255,7 +230,8 @@ def evaluate_minibatch(r, minibatch, num_of_class):
             labels = make_train_label(j, num_of_class)
             data = util.loadData(mb[j])
             r.propagate(data)
-            inf = r.get_inference(1)
+            #inf = r.get_inference(1)
+            inf = r.get_inference_gpu()
             if inf is None:
                 print "ERROR"
                 print r
@@ -361,7 +337,7 @@ def train_algorhythm_single(r, minibatch, num_of_class):
     dec = 0
     noc = 0
     
-    base_mse, base_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
     samples = random.sample(weight_list, w_num)
     
     # dec loop
@@ -377,7 +353,7 @@ def train_algorhythm_single(r, minibatch, num_of_class):
             w.set_index(p0)
             continue
 
-        next_mse, next_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+        next_mse, next_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
         if next_mse<base_mse: # OK
             dec = dec + 1
             base_mse = next_mse
@@ -388,7 +364,7 @@ def train_algorhythm_single(r, minibatch, num_of_class):
     print "dec : %d, noc : %d, total : %d" % (dec, noc, dec+noc)
 
     # inc loop
-    base_mse, base_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
     samples = random.sample(weight_list, w_num)
     dif = 1
     noc = 0
@@ -403,7 +379,7 @@ def train_algorhythm_single(r, minibatch, num_of_class):
             w.set_index(p0)
             continue
         
-        next_mse, next_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+        next_mse, next_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
         if next_mse<base_mse: # OK
             inc = inc + 1
             base_mse = next_mse
@@ -444,37 +420,6 @@ def evaluate_minibatch_new(r, minibatch, num_of_class):
 #
 #
 #
-def evaluate_minibatch_gpu(r, minibatch, num_of_class):
-    sum_of_mse = 0.0
-    num = 0
-    ret = 0.0
-    labels = [0,0,0,0,0,0,0,0,0,0]
-    
-    for j in range(num_of_class):
-        num = num + 1
-        labels[j] = 1
-        data = minibatch[j]
-        
-        r.propagate(data)
-        #inf = r.get_inference(1)
-        inf = r.get_inference_gpu()
-        
-        if inf is None:
-            print "ERROR"
-            print r
-            sys.exit(0)
-        
-        ret = ret + inf[j]
-        mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
-        sum_of_mse = sum_of_mse + mse
-        labels[j] = 0
-    
-    ret = ret / num
-    mse = sum_of_mse / num
-    return mse, ret
-#
-#
-#
 def train_algorhythm_new(r, minibatch, num_of_class):
     weight_list = r.get_weight_list()
     w_num = len(weight_list)
@@ -487,7 +432,7 @@ def train_algorhythm_new(r, minibatch, num_of_class):
     dec = 0
     inc = 0
 
-    base_mse, base_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
     samples = random.sample(weight_list, w_num/10)
     for w in samples:
         if cnt>=max:
@@ -510,7 +455,7 @@ def train_algorhythm_new(r, minibatch, num_of_class):
         #
         r.update_gpu_weight()
         #
-        next_mse, next_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+        next_mse, next_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
         if next_mse<base_mse: # OK
             base_mse = next_mse
             cnt = cnt + 1
@@ -526,7 +471,7 @@ def train_algorhythm_new(r, minibatch, num_of_class):
     
     noc = 0
     cnt = 0
-    base_mse, base_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
     samples = random.sample(weight_list, w_num/10)
     for w in samples:
         if cnt>=max:
@@ -553,7 +498,7 @@ def train_algorhythm_new(r, minibatch, num_of_class):
         #
         r.update_gpu_weight()
         #
-        next_mse, next_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
+        next_mse, next_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
         if next_mse<base_mse: # OK
             base_mse = next_mse
             cnt = cnt + 1
@@ -570,8 +515,100 @@ def train_algorhythm_new(r, minibatch, num_of_class):
 #
 #
 #
+def evaluate_gpu(r, w, data, data_class):
+    sum_of_mse = 0.0
+    num = 0
+    ret = 0.0
+    labels = [0,0,0,0,0,0,0,0,0,0]
+    labels[data_class] = 1
+
+    r.propagate(data)
+    inf = r.get_inference_gpu()
+    if inf is None:
+        print "ERROR"
+        print r
+        sys.exit(0)
+        
+    ret = inf[data_class]
+    mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
+
+    return mse, ret
+#
+#
+#
+def evaluate_minibatch_gpu(r, minibatch, num_of_class):
+    sum_of_mse = 0.0
+    num = 0
+    ret = 0.0
+    labels = [0,0,0,0,0,0,0,0,0,0]
+    
+    for j in range(num_of_class):
+        num = num + 1
+        labels[j] = 1
+        data = minibatch[j]
+        
+        r.propagate(data)
+        inf = r.get_inference_gpu()
+        
+        if inf is None:
+            print "ERROR"
+            print r
+            sys.exit(0)
+        
+        ret = ret + inf[j]
+        mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
+        sum_of_mse = sum_of_mse + mse
+        labels[j] = 0
+    
+    ret = ret / num
+    mse = sum_of_mse / num
+    return mse, ret
+#
+#
+#
+def train_algorhythm_zero(r, minibatch, num_of_class):
+    start_time = time.time()
+    
+    weight_list = r.get_weight_list()
+    w_num = len(weight_list)
+    max = w_num / 100
+    noc = 0
+    cnt = 0
+    dec = 0
+    inc = 0
+    
+    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
+    samples = random.sample(weight_list, w_num)
+    for w in weight_list:#samples:
+        p0 = w.get_index()
+        p1 = -1
+        for i in range(core.lesserWeightsLen):
+            w.set_index(i)
+            w._layer.update_gpu_weight()
+            next_mse, next_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
+            print "%f / %f" % (base_mse , next_mse)
+            if next_mse<base_mse: # OK
+                p1 = i
+                break
+        if p1<0:
+            w.set_index(WEIGHT_INDEX_ZERO)
+            w._layer.update_gpu_weight()
+            
+            
+    
+            
+
+        print "%d = %d (%d)" % (cnt, i, p0)
+        cnt = cnt + 1
+
+    elapsed_time = time.time() - start_time
+    t = format(elapsed_time, "0")
+    print "time = %s" % (t)
+#
+#
+#
 def process_minibatch(r, minibatch, num_of_class):
-    epoc = 10
+    epoc = 1
     algo = 2
     
     for e in range(epoc):
@@ -580,7 +617,7 @@ def process_minibatch(r, minibatch, num_of_class):
         elif algo == 1:
             train_algorhythm_single(r, minibatch, num_of_class)
         elif algo == 2:
-            ret = train_algorhythm_new(r, minibatch, num_of_class)
+            ret = train_algorhythm_zero(r, minibatch, num_of_class)
             #if ret<=0:
             #   break
 #
@@ -602,8 +639,7 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
         t = format(elapsed_time, "0")
         print "[%03d|%03d] %s" % (k, it_train, t)
         k = k + 1
-    
-        util.pickle_save(PROCEEDED_PATH, num_of_processed + k)
+        #util.pickle_save(PROCEEDED_PATH, num_of_processed + k)
         #util.pickle_save(NETWORK_PATH, r)
 
     return k
@@ -701,13 +737,16 @@ def main():
         num_of_processed = num_of_processed + prosecced
         util.pickle_save(PROCEEDED_PATH, num_of_processed)
         # save weight here
-        #
+        save_weight(r)
     elif mode==3:
         print ">> test mode"
         test_array = util.pickle_load(TEST_BATCH_PATH)
+        if test_array is None:
+            print "error : no test batch"
+            return 0
         #
         it_test = max_it_test
-        test_mode(r, test_batch, NUM_OF_CLASS, it_test, minibatch_size)
+        test_mode(r, test_array, NUM_OF_CLASS, it_test, minibatch_size)
     elif mode==4:
         print ">> self-test mode"
         test_mode(r, train_batch, NUM_OF_CLASS, num_of_processed, minibatch_size)

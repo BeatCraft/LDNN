@@ -50,7 +50,9 @@ def setup_dnn(path, my_gpu):
     hidden_layer_2 = r.add_layer(1, 32, 32)
     output_layer = r.add_layer(2, 32, 10)
     r.init_weight()
-    r.update_gpu_weight()
+    if my_gpu:
+        r.update_gpu_weight()
+    
     return r
     
 #    if os.path.exists(path):
@@ -74,29 +76,7 @@ def setup_dnn(path, my_gpu):
         #       util.pickle_save(path, r)
         #       return r
 #   return None
-#
-#
-#
-def setup_batch(minibatch_size, it_train, it_test):
-    train_array = util.pickle_load(TRAIN_BATCH_PATH)
-    if train_array is None:
-        train_list = scan_data(TRAIN_BASE_PATH, NUM_OF_SAMPLES, NUM_OF_CLASS)
-        train_batch = make_batch(NUM_OF_CLASS, it_train, minibatch_size, train_list)
-        train_array = np.array(train_batch)
-        util.pickle_save(TRAIN_BATCH_PATH, train_array)
-    else:
-        print "train batch restored."
 
-    test_array = util.pickle_load(TEST_BATCH_PATH)
-    if test_array is None:
-        test_list = scan_data(TEST_BASE_PATH, NUM_OF_TEST, NUM_OF_CLASS)
-        test_batch = make_batch(NUM_OF_CLASS, it_test, minibatch_size, test_list)
-        test_array = np.array(test_batch)
-        util.pickle_save(TEST_BATCH_PATH, test_array)
-    else:
-        print "test batch restored."
-
-    return train_array, test_array
 #
 #
 #
@@ -136,6 +116,7 @@ def make_batch(num_of_class, iteration, size_of_minibatch, list_of_path):
         minibatch = []
         for label in range(num_of_class):
             path = list_of_path[label][i]
+            print path
             data = util.loadData(path)
             minibatch.append(data)
         
@@ -592,10 +573,10 @@ def main():
     #
     # GPU
     #
-    my_gpu = gpu.Gpu()
-    my_gpu.set_kernel_code()
+    #my_gpu = gpu.Gpu()
+    #my_gpu.set_kernel_code()
     #
-    #my_gpu = None
+    my_gpu = None
     #mode = get_key_input("GPU? yes=1 >")
     #if mode==1:
     #    my_gpu = gpu.Gpu()
@@ -624,12 +605,12 @@ def main():
     mode = get_key_input("input command >")
     if mode==0:
         train_list = scan_data(TRAIN_BASE_PATH, NUM_OF_SAMPLES, NUM_OF_CLASS)
-        train_batch = make_batch(NUM_OF_CLASS, it_train, minibatch_size, train_list)
+        train_batch = make_batch(NUM_OF_CLASS, max_it_train, minibatch_size, train_list)
         train_array = np.array(train_batch)
         util.pickle_save(TRAIN_BATCH_PATH, train_array)
     elif mode==1:
         test_list = scan_data(TEST_BASE_PATH, NUM_OF_TEST, NUM_OF_CLASS)
-        test_batch = make_batch(NUM_OF_CLASS, it_test, minibatch_size, test_list)
+        test_batch = make_batch(NUM_OF_CLASS, max_it_test, minibatch_size, test_list)
         test_array = np.array(test_batch)
         util.pickle_save(TEST_BATCH_PATH, test_array)
     elif mode==2:

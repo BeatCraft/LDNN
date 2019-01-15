@@ -35,6 +35,9 @@ TEST_BASE_PATH   = "./data/test/"
 TEST_BATCH_PATH = "./test_batch.pickle"
 NETWORK_PATH     = "./network.pickle"
 PROCEEDED_PATH   = "./proceeded.pickle"
+
+WEIGHT_INDEX_CSV_PATH   = "./wi.csv"
+
 NUM_OF_CLASS     = 10    # 0,1,2,3,4,5,6,7,8,9
 NUM_OF_SAMPLES   = 5000  # must be 5,000 per a class
 NUM_OF_TEST      = 500
@@ -49,7 +52,13 @@ def setup_dnn(path, my_gpu):
     hidden_layer_1 = r.add_layer(1, 196, 32)
     hidden_layer_2 = r.add_layer(1, 32, 32)
     output_layer = r.add_layer(2, 32, 10)
-    r.init_weight()
+    
+    wi = util.csv_to_list(WEIGHT_INDEX_CSV_PATH)
+    if len(wi)>0:
+        r.restore_weighgt(wi)
+    else:
+        r.init_weight()
+
     if my_gpu:
         r.update_gpu_weight()
     
@@ -435,6 +444,37 @@ def evaluate_minibatch_new(r, minibatch, num_of_class):
 #
 #
 #
+def evaluate_minibatch_gpu(r, minibatch, num_of_class):
+    sum_of_mse = 0.0
+    num = 0
+    ret = 0.0
+    labels = [0,0,0,0,0,0,0,0,0,0]
+    
+    for j in range(num_of_class):
+        num = num + 1
+        labels[j] = 1
+        data = minibatch[j]
+        
+        r.propagate(data)
+        #inf = r.get_inference(1)
+        inf = r.get_inference_gpu()
+        
+        if inf is None:
+            print "ERROR"
+            print r
+            sys.exit(0)
+        
+        ret = ret + inf[j]
+        mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
+        sum_of_mse = sum_of_mse + mse
+        labels[j] = 0
+    
+    ret = ret / num
+    mse = sum_of_mse / num
+    return mse, ret
+#
+#
+#
 def train_algorhythm_new(r, minibatch, num_of_class):
     weight_list = r.get_weight_list()
     w_num = len(weight_list)
@@ -467,6 +507,9 @@ def train_algorhythm_new(r, minibatch, num_of_class):
             p1 = p1 + 1
         
         w.set_index(p1)
+        #
+        r.update_gpu_weight()
+        #
         next_mse, next_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
         if next_mse<base_mse: # OK
             base_mse = next_mse
@@ -474,6 +517,9 @@ def train_algorhythm_new(r, minibatch, num_of_class):
         else: # noc
             noc = noc + 1
             w.set_index(p0)
+            #
+            r.update_gpu_weight()
+            #
 
     dec = cnt
     print "dec : %d, noc:%d, total : %d" % (dec, noc, dec+noc)
@@ -504,6 +550,9 @@ def train_algorhythm_new(r, minibatch, num_of_class):
             p1 = p1 + 1
 
         w.set_index(p1)
+        #
+        r.update_gpu_weight()
+        #
         next_mse, next_ret = evaluate_minibatch_new(r, minibatch, num_of_class)
         if next_mse<base_mse: # OK
             base_mse = next_mse
@@ -511,7 +560,9 @@ def train_algorhythm_new(r, minibatch, num_of_class):
         else: # noc
             noc = noc + 1
             w.set_index(p0)
-
+            #
+            r.update_gpu_weight()
+            #
     inc = cnt
     print "inc : %d, noc:%d, total : %d" % (inc, noc, inc+noc)
 
@@ -543,6 +594,7 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
     start = num_of_processed
     k = 0
     for i in range(start, start+it_train, 1):
+        print i
         minibatch = train_batch[i]
         start_time = time.time()
         process_minibatch(r, minibatch, num_of_class)
@@ -552,9 +604,26 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
         k = k + 1
     
         util.pickle_save(PROCEEDED_PATH, num_of_processed + k)
-        util.pickle_save(NETWORK_PATH, r)
+        #util.pickle_save(NETWORK_PATH, r)
 
     return k
+#
+#
+#
+def save_weight(r):
+    wl = r.get_weight_list()
+    wi_list = []
+    for w in wl:
+        wi_list.append( w.get_index() )
+
+    util.list_to_csv(WEIGHT_INDEX_CSV_PATH, wi_list)
+#
+#
+#
+def load_weight(r):
+    wi_list = util.csv_to_list(WEIGHT_INDEX_CSV_PATH)
+    wl = r.get_weight_list()
+    return
 #
 #
 #
@@ -573,10 +642,11 @@ def main():
     #
     # GPU
     #
-    #my_gpu = gpu.Gpu()
-    #my_gpu.set_kernel_code()
+    my_gpu = gpu.Gpu()
+    my_gpu.set_kernel_code()
     #
-    my_gpu = None
+    #my_gpu = None
+    #
     #mode = get_key_input("GPU? yes=1 >")
     #if mode==1:
     #    my_gpu = gpu.Gpu()
@@ -604,11 +674,13 @@ def main():
     print "9 : quit"
     mode = get_key_input("input command >")
     if mode==0:
+        print ">> make train batch"
         train_list = scan_data(TRAIN_BASE_PATH, NUM_OF_SAMPLES, NUM_OF_CLASS)
         train_batch = make_batch(NUM_OF_CLASS, max_it_train, minibatch_size, train_list)
         train_array = np.array(train_batch)
         util.pickle_save(TRAIN_BATCH_PATH, train_array)
     elif mode==1:
+        print ">> make test batch"
         test_list = scan_data(TEST_BASE_PATH, NUM_OF_TEST, NUM_OF_CLASS)
         test_batch = make_batch(NUM_OF_CLASS, max_it_test, minibatch_size, test_list)
         test_array = np.array(test_batch)
@@ -621,12 +693,15 @@ def main():
             return 0
         
         train_array = util.pickle_load(TRAIN_BATCH_PATH)
+        if train_array is None:
+            print "error : no train batch"
+            return 0
         #
-        prosecced = train_mode(r, train_batch, it_train, NUM_OF_CLASS, num_of_processed)
+        prosecced = train_mode(r, train_array, it_train, NUM_OF_CLASS, num_of_processed)
         num_of_processed = num_of_processed + prosecced
         util.pickle_save(PROCEEDED_PATH, num_of_processed)
-        r.set_gpu(None)
-        util.pickle_save(NETWORK_PATH, r)
+        # save weight here
+        #
     elif mode==3:
         print ">> test mode"
         test_array = util.pickle_load(TEST_BATCH_PATH)

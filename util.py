@@ -189,11 +189,17 @@ def list_to_csv(path, data_list):
 def csv_to_list(path):
     print "csv_to_list()"
     data_list = []
-    with open(path, 'r') as f:
-        reader = csv.reader(f)
-        for row in reader:
-            for cell in row:
-                data_list.append(cell)
+    try:
+        with open(path, 'r') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                for cell in row:
+                    data_list.append(cell)
+
+        return data_list
+
+    except:
+        return data_list
 
     return data_list
 #

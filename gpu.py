@@ -47,7 +47,6 @@ const float alt_w)
     if (j==alt_col && i==alt_row){
         y[j*num_w + i] = x[i] * alt_w;
     }else{
-
         y[j*num_w + i] = x[i] * w[j*num_w + i];
     }
 };
@@ -91,8 +90,9 @@ class Gpu:
 
     def multiple_x_by_w_alt(self, d_x, d_w, d_y, row, col, layer_i, node_i, w):
         event = self.prg.multiple_x_by_w_alt(self._queue,(row,col), None,
-                                             d_x, d_w, d_y, np.int32(row)
-                                             layer_i, node_i, w)
+                                             d_x, d_w, d_y, np.int32(row),
+                                             np.int32(layer_i), np.int32(node_i),
+                                             np.float32(w))
         event.wait()
     
     def scale(self, d_x, d_y, max, row):

@@ -67,7 +67,7 @@ class Weight:
     # layer : Layer class object
     # node  : index of neurons
     # i     : index of neurons in previous layer
-    # index : index of lookup table
+    # index : index of lookup table / weight index
     # id    : seaquencial number assigned by Roster
     def __init__(self, layer, node, i):
         self._layer = layer
@@ -210,14 +210,15 @@ class Layer:
                     print "fuck : sum is zero"
                     self._y_array[i] = 0.0
                 i += 1
-            
+
     def propagate_gpu_alt(self, array_in, w, wi_alt):
-        if self._type==0:   # input
+        if self._type==0: # input
             self._gpu.copy(self._gpu_input, array_in)
             self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node)
-        elif self._type==1:   # hidden
-            self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-                                      self._num_input, self._num_node)
+        elif self._type==1: # hidden            
+            self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
+                                          self._num_input, self._num_node,
+                                          w._node, w._i, lesserWeights[wi_alt])
             self._gpu.copy(self._product_matrix, self._gpu_product)
             i = 0
             for row in self._product_matrix:
@@ -225,9 +226,10 @@ class Layer:
                 i += 1
 
             self._gpu.copy(self._gpu_output, self._sum)
-        else:
-            self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-                                      self._num_input, self._num_node)
+        else: # output
+            self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
+                                          self._num_input, self._num_node,
+                                          w._node, w._i, lesserWeights[wi_alt])
             self._gpu.copy(self._product_matrix, self._gpu_product)
             i = 0
             for row in self._product_matrix:
@@ -280,20 +282,26 @@ class Roster:
     def init_weight(self):
         c = 0
         for w in self._weight_list:
-            i = random.randrange(lesserWeightsLen)
-            w.set( lesserWeights[i] )
-            w.set_index(i)
+            #i = random.randrange(lesserWeightsLen)
+            #w.set( lesserWeights[i] )
+            #w.set_index(i)
+            
+            #w.set( lesserWeights[WEIGHT_INDEX_ZERO] )
+            w.set_index(WEIGHT_INDEX_MAX)
+            #
             w.set_id(c)
             c += 1
 
     def restore_weighgt(self, w_list):
         c = 0
         for w in self._weight_list:
-            wi = w_list[c]
-            w.set( lesserWeights[int(wi)] )
+            wi = int(w_list[c])
+            #print wi
+            #w.set( lesserWeights[int(wi)] )
             w.set_index(wi)
             w.set_id(c)
             c += 1
+            #print "restore : %d, %d" % (wi, w.get_index())
 
     def update_gpu_weight(self):
         for layer in self.layers:
@@ -371,6 +379,15 @@ class Roster:
             #array_y = pre._gpu_output
             layer = self.getLayerAt(i)
             layer.propagate_gpu(pre._gpu_output)
+            pre = layer
+
+    def propagate_gpu_alt(self, data, w, wi_alt):
+        c = self.countLayers()
+        pre = self.getLayerAt(0)
+        pre.propagate_gpu_alt(data, w, wi_alt)
+        for i in range(1, c):
+            layer = self.getLayerAt(i)
+            layer.propagate_gpu_alt(pre._gpu_output, w, wi_alt)
             pre = layer
 #
 #

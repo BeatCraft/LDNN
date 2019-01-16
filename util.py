@@ -63,14 +63,14 @@ def mean_absolute_error(y, y_len, t, t_len):
         return None
     
     s = 0.0
-    sum = 0.0
+    #sum = 0.0
     
     for i in range(y_len):
-        sum += y[i]
+        #sum += y[i]
         s += abs(y[i]-t[i])
     
-    if sum<=0:
-        print "FUCK(%f)" % sum
+    #if sum<=0:
+    #    print "FUCK(%f)" % sum
     
     return s/float(y_len)
 #    if sum>0.0:

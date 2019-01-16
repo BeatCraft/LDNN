@@ -515,27 +515,6 @@ def train_algorhythm_new(r, minibatch, num_of_class):
 #
 #
 #
-def evaluate_gpu(r, w, data, data_class):
-    sum_of_mse = 0.0
-    num = 0
-    ret = 0.0
-    labels = [0,0,0,0,0,0,0,0,0,0]
-    labels[data_class] = 1
-
-    r.propagate(data)
-    inf = r.get_inference_gpu()
-    if inf is None:
-        print "ERROR"
-        print r
-        sys.exit(0)
-        
-    ret = inf[data_class]
-    mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
-
-    return mse, ret
-#
-#
-#
 def evaluate_minibatch_gpu(r, minibatch, num_of_class):
     sum_of_mse = 0.0
     num = 0
@@ -595,9 +574,6 @@ def train_algorhythm_zero(r, minibatch, num_of_class):
             w._layer.update_gpu_weight()
             
             
-    
-            
-
         print "%d = %d (%d)" % (cnt, i, p0)
         cnt = cnt + 1
 
@@ -607,17 +583,62 @@ def train_algorhythm_zero(r, minibatch, num_of_class):
 #
 #
 #
-def process_minibatch(r, minibatch, num_of_class):
-    epoc = 1
-    algo = 2
+def evaluate_gpu(r, data, data_class, w, wi_alt):
+    sum_of_mse = 0.0
+    num = 0
+    ret = 0.0
+    labels = [0,0,0,0,0,0,0,0,0,0]
+    labels[data_class] = 1
     
-    for e in range(epoc):
-        if algo == 0:
-            train_algorhythm_basic(r, minibatch, num_of_class)
-        elif algo == 1:
-            train_algorhythm_single(r, minibatch, num_of_class)
-        elif algo == 2:
-            ret = train_algorhythm_zero(r, minibatch, num_of_class)
+    #r.propagate(data)
+    r.propagate_gpu_alt(data, w, wi_alt)
+    inf = r.get_inference_gpu()
+    #print inf
+    if inf is None:
+        print "ERROR"
+        print r
+        sys.exit(0)
+
+    ret = inf[data_class]
+    mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
+
+    return mse, ret
+#
+#
+#
+def train_gpu(r, data, data_class):
+    weight_list = r.get_weight_list()
+    w_num = len(weight_list)
+
+    c = 0
+    for w in weight_list:
+        print "%d = %d" % (c, w.get_index())
+        mse, ret = evaluate_gpu(r, data, data_class, w, w.get_index())
+        print mse
+        for wi_alt in range(core.WEIGHT_INDEX_ZERO, core.lesserWeightsLen):
+            mse, ret = evaluate_gpu(r, data, data_class, w, wi_alt)
+            print "    %d : %f" % (wi_alt, mse)
+
+        c += 1
+#
+#
+#
+def process_minibatch(r, minibatch, num_of_class):
+    c = 0
+    for data in minibatch:
+        train_gpu(r, data, c)
+        c = c + 1
+        break # debug
+
+#    epoc = 1
+#    algo = 2
+#    for e in range(epoc):
+#        if algo == 0:
+#            train_algorhythm_basic(r, minibatch, num_of_class)
+#        elif algo == 1:
+#            train_algorhythm_single(r, minibatch, num_of_class)
+#        elif algo == 2:
+#            ret = train_algorhythm_zero(r, minibatch, num_of_class)
             #if ret<=0:
             #   break
 #
@@ -650,6 +671,7 @@ def save_weight(r):
     wl = r.get_weight_list()
     wi_list = []
     for w in wl:
+        #print w.get_index()
         wi_list.append( w.get_index() )
 
     util.list_to_csv(WEIGHT_INDEX_CSV_PATH, wi_list)

@@ -287,7 +287,7 @@ class Roster:
             #w.set_index(i)
             
             #w.set( lesserWeights[WEIGHT_INDEX_ZERO] )
-            w.set_index(WEIGHT_INDEX_MAX)
+            w.set_index(WEIGHT_INDEX_ZERO+1)
             #
             w.set_id(c)
             c += 1

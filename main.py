@@ -143,11 +143,9 @@ def test(r, minibatch, num_of_class):
 
     for label in range(len(minibatch)):
         data = minibatch[label]
-        #print data
-        r.propagate(data)
-        #print data
-        #inf = r.get_inference(1)
+        r.propagate_gpu(data)
         inf = r.get_inference_gpu()
+        #print inf
         if inf is None:
             print "ERROR"
             continue
@@ -182,8 +180,10 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     for minibatch in batch:
         if it>=iteration:
             break
-        print "it : %d" % it
+        #print "it : %d" % it
         d, s = test(r, minibatch, num_of_class)
+        #print d
+        #print s
         for j in range(len(dist)):
             dist[j] = dist[j] + d[j]
             stat[j] = stat[j] + s[j]
@@ -515,36 +515,6 @@ def train_algorhythm_new(r, minibatch, num_of_class):
 #
 #
 #
-def evaluate_minibatch_gpu(r, minibatch, num_of_class):
-    sum_of_mse = 0.0
-    num = 0
-    ret = 0.0
-    labels = [0,0,0,0,0,0,0,0,0,0]
-    
-    for j in range(num_of_class):
-        num = num + 1
-        labels[j] = 1
-        data = minibatch[j]
-        
-        r.propagate(data)
-        inf = r.get_inference_gpu()
-        
-        if inf is None:
-            print "ERROR"
-            print r
-            sys.exit(0)
-        
-        ret = ret + inf[j]
-        mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
-        sum_of_mse = sum_of_mse + mse
-        labels[j] = 0
-    
-    ret = ret / num
-    mse = sum_of_mse / num
-    return mse, ret
-#
-#
-#
 def train_algorhythm_zero(r, minibatch, num_of_class):
     start_time = time.time()
     
@@ -583,14 +553,33 @@ def train_algorhythm_zero(r, minibatch, num_of_class):
 #
 #
 #
-def evaluate_gpu(r, data, data_class, w, wi_alt):
+def evaluate_gpu(r, data, data_class):
     sum_of_mse = 0.0
     num = 0
     ret = 0.0
     labels = [0,0,0,0,0,0,0,0,0,0]
     labels[data_class] = 1
     
-    #r.propagate(data)
+    r.propagate_gpu(data)
+    inf = r.get_inference_gpu()
+    if inf is None:
+        print "ERROR"
+        print r
+        sys.exit(0)
+    
+    ret = inf[data_class]
+    mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
+    return mse, ret
+#
+#
+#
+def evaluate_gpu_alt(r, data, data_class, w, wi_alt):
+    sum_of_mse = 0.0
+    num = 0
+    ret = 0.0
+    labels = [0,0,0,0,0,0,0,0,0,0]
+    labels[data_class] = 1
+    
     r.propagate_gpu_alt(data, w, wi_alt)
     inf = r.get_inference_gpu()
     #print inf
@@ -600,8 +589,65 @@ def evaluate_gpu(r, data, data_class, w, wi_alt):
         sys.exit(0)
 
     ret = inf[data_class]
-    mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
-
+    mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
+    return mse, ret
+#
+#
+#
+def evaluate_minibatch_gpu(r, minibatch, num_of_class):
+    sum_of_mse = 0.0
+    num = 0
+    ret = 0.0
+    labels = [0,0,0,0,0,0,0,0,0,0]
+    
+    for j in range(num_of_class):
+        num = num + 1
+        labels[j] = 1
+        data = minibatch[j]
+        
+        r.propagate(data)
+        inf = r.get_inference_gpu()
+        
+        if inf is None:
+            print "ERROR"
+            print r
+            sys.exit(0)
+        
+        ret = ret + inf[j]
+        mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
+        sum_of_mse = sum_of_mse + mse
+        labels[j] = 0
+    
+    ret = ret / num
+    mse = sum_of_mse / num
+    return mse, ret
+#
+#
+#
+def evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt):
+    sum_of_mse = 0.0
+    num = 0
+    ret = 0.0
+    labels = [0,0,0,0,0,0,0,0,0,0]
+    
+    for j in range(num_of_class):
+        num = num + 1
+        labels[j] = 1
+        data = minibatch[j]
+        r.propagate_gpu_alt(data, w, wi_alt)
+        inf = r.get_inference_gpu()
+        if inf is None:
+            print "ERROR"
+            print r
+            sys.exit(0)
+        
+        ret = ret + inf[j]
+        mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
+        sum_of_mse = sum_of_mse + mse
+        labels[j] = 0
+    
+    ret = ret / num
+    mse = sum_of_mse / num
     return mse, ret
 #
 #
@@ -611,15 +657,32 @@ def train_gpu(r, data, data_class):
     w_num = len(weight_list)
 
     c = 0
-    for w in weight_list:
-        print "%d = %d" % (c, w.get_index())
-        mse, ret = evaluate_gpu(r, data, data_class, w, w.get_index())
-        print mse
-        for wi_alt in range(core.WEIGHT_INDEX_ZERO, core.lesserWeightsLen):
-            mse, ret = evaluate_gpu(r, data, data_class, w, wi_alt)
-            print "    %d : %f" % (wi_alt, mse)
-
+    updates = []
+    samples = random.sample(weight_list, w_num)
+    for w in samples:
+        base_mse, base_ret = evaluate_gpu(r, data, data_class, w, w.get_index())
+        #print "%d = %d : %f" % (c, w.get_index(), base_mse)
+        wi_alt = w.get_index() +1
+        if wi_alt>core.WEIGHT_INDEX_MAX:
+            pass
+        else:
+            mse, ret = evaluate_gpu_alt(r, data, data_class, w, wi_alt)
+            if mse<base_mse:
+                print "%d : %d = %f > %d = %f " % (w.get_id(), w.get_index(), base_mse, wi_alt, mse)
+                updates.append(w.get_id())
+#        for wi_alt in range(core.WEIGHT_INDEX_ZERO+2, core.lesserWeightsLen):
+#           mse, ret = evaluate_gpu(r, data, data_class, w, wi_alt)
+#            if mse<base_mse:
+#                print "    %d : %f" % (wi_alt, mse)
         c += 1
+
+    for i in updates:
+        w = weight_list[i]
+        #print "> %d = %d" % (i, w.get_index())
+        w.set_index(w.get_index()+1)
+
+    #print r.get_inference_gpu()
+    r.update_gpu_weight()
 #
 #
 #
@@ -628,7 +691,7 @@ def process_minibatch(r, minibatch, num_of_class):
     for data in minibatch:
         train_gpu(r, data, c)
         c = c + 1
-        break # debug
+        #break # debug
 
 #    epoc = 1
 #    algo = 2

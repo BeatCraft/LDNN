@@ -41,7 +41,7 @@ def mean_squared_error(y, y_len, t, t_len):
     for i in range(y_len):
         s += (y[i]-t[i])**2.0
     
-    s = s * 0.5
+    s = s / float(y_len)
     return s
 #
 #

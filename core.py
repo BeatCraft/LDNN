@@ -380,11 +380,18 @@ class Roster:
 
     def propagate_gpu_alt(self, data, w, wi_alt):
         c = self.countLayers()
+        
         pre = self.getLayerAt(0)
-        pre.propagate_gpu_alt(data, w, wi_alt)
+        if w._layer._index==0:
+            pre.propagate_gpu_alt(data, w, wi_alt)
+        else:
+            pre.propagate(data)
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            layer.propagate_gpu_alt(pre._gpu_output, w, wi_alt)
+            if w._layer._index==i:
+                layer.propagate_gpu_alt(pre._gpu_output, w, wi_alt)
+            else:
+                layer.propagate_gpu(pre._gpu_output)
             pre = layer
 #
 #

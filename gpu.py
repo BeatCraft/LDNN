@@ -46,6 +46,7 @@ const float alt_w)
 
     if (j==alt_col && i==alt_row){
         y[j*num_w + i] = x[i] * alt_w;
+        printf(\"GPU :(%d, %d) = %f\\n\", j, i, x[i]);
     }else{
         y[j*num_w + i] = x[i] * w[j*num_w + i];
     }
@@ -59,7 +60,8 @@ class Gpu:
     def __init__(self):
         #self._ctx = cl.create_some_context()
         platform = cl.get_platforms()[0]
-        device = platform.get_devices()[2]
+        device = platform.get_devices()[1] # Intel
+        #device = platform.get_devices()[2] # AMD
         self._ctx = cl.Context([device])
         
         for dev in self._ctx.devices:

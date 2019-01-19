@@ -282,12 +282,9 @@ class Roster:
     def init_weight(self):
         c = 0
         for w in self._weight_list:
-            #i = random.randrange(lesserWeightsLen)
-            #w.set( lesserWeights[i] )
-            #w.set_index(i)
-            
-            #w.set( lesserWeights[WEIGHT_INDEX_ZERO] )
-            w.set_index(WEIGHT_INDEX_ZERO+1)
+            i = random.randrange(lesserWeightsLen)
+            w.set_index(i)
+            #w.set_index(WEIGHT_INDEX_ZERO+1)
             #
             w.set_id(c)
             c += 1

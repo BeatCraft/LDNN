@@ -50,7 +50,7 @@ def mean_squared_error_B(y, y_len, t, t_len):
     if y_len != t_len:
         return None
     
-    s = 0
+    s = 0.0
     for i in range(y_len):
         s += abs(y[i]-t[i])
 

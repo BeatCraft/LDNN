@@ -596,27 +596,25 @@ def evaluate_gpu_alt(r, data, data_class, w, wi_alt):
 #
 def evaluate_minibatch_gpu(r, minibatch, num_of_class):
     sum_of_mse = 0.0
-    num = 0
+    num = float(num_of_class)
     ret = 0.0
-    labels = [0,0,0,0,0,0,0,0,0,0]
+    labels = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
     
     for j in range(num_of_class):
-        num = num + 1
-        labels[j] = 1
+        labels[j] = 1.0
         data = minibatch[j]
         
         r.propagate(data)
         inf = r.get_inference_gpu()
-        
         if inf is None:
             print "ERROR"
             print r
             sys.exit(0)
         
         ret = ret + inf[j]
-        mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
+        mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
         sum_of_mse = sum_of_mse + mse
-        labels[j] = 0
+        labels[j] = 0.0
     
     ret = ret / num
     mse = sum_of_mse / num
@@ -626,13 +624,13 @@ def evaluate_minibatch_gpu(r, minibatch, num_of_class):
 #
 def evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt):
     sum_of_mse = 0.0
-    num = 0
+    num = float(num_of_class)
     ret = 0.0
-    labels = [0,0,0,0,0,0,0,0,0,0]
+    labels = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
     
     for j in range(num_of_class):
-        num = num + 1
-        labels[j] = 1
+        #num = num + 1
+        labels[j] = 1.0
         data = minibatch[j]
         r.propagate_gpu_alt(data, w, wi_alt)
         inf = r.get_inference_gpu()
@@ -644,7 +642,7 @@ def evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt):
         ret = ret + inf[j]
         mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
         sum_of_mse = sum_of_mse + mse
-        labels[j] = 0
+        labels[j] = 0.0
     
     ret = ret / num
     mse = sum_of_mse / num
@@ -687,10 +685,62 @@ def train_gpu(r, data, data_class):
 #
 #
 def process_minibatch(r, minibatch, num_of_class):
+    weight_list = r.get_weight_list()
+    w_num = len(weight_list)
+
+    data = minibatch[0]
+    w = weight_list[0]
+    r.propagate_gpu(data)
+    inf = r.get_inference_gpu()
+    print inf
+    wi = w.get_index()
+    print wi
+    print data[0]
+    r.propagate_gpu_alt(data, w, core.WEIGHT_INDEX_ZERO)
+    inf = r.get_inference_gpu()
+    print inf
+    return
+    
+    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
+    
     c = 0
-    for data in minibatch:
-        train_gpu(r, data, c)
-        c = c + 1
+    inc = 0
+    dec = 0
+    
+    for w in weight_list:
+        wi = w.get_index()
+        id = w.get_id()
+        if wi>=core.WEIGHT_INDEX_MAX:
+            print "%d : MAX" % (id)
+            continue
+
+        wi_alt = wi + 1
+        mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+        if mse_alt<base_mse:
+            print "+ %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
+            w.set_index(w.get_index()+1)
+            inc = inc + 1
+        else:
+            if wi==core.WEIGHT_INDEX_MIN:
+                print "%d : MIN" % (id)
+                continue
+            wi_alt = wi - 1
+            mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+            if mse_alt<base_mse:
+                print "- %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
+                w.set_index(w.get_index()-1)
+                dec = dec + 1
+            else:
+                print "%d : %d NOC" % (id, wi)
+
+    r.update_gpu_weight()
+    print "inc=%d, dec=%d" % (inc, dec)
+
+#    c = 0
+#    for data in minibatch:
+#        train_gpu(r, data, c)
+#        c = c + 1
+
         #break # debug
 
 #    epoc = 1
@@ -718,7 +768,11 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
         print i
         minibatch = train_batch[i]
         start_time = time.time()
-        process_minibatch(r, minibatch, num_of_class)
+        #
+        for i in range(10):
+            print i
+            process_minibatch(r, minibatch, num_of_class)
+        #
         elapsed_time = time.time() - start_time
         t = format(elapsed_time, "0")
         print "[%03d|%03d] %s" % (k, it_train, t)

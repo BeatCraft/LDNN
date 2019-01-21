@@ -191,12 +191,12 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
         it = it + 1
     
     print dist
-    #for d in dist:
-    #    print d
+    for d in dist:
+        print d
 
     print stat
-    #for s in stat:
-    #    print s
+    for s in stat:
+        print s
 
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
@@ -688,18 +688,18 @@ def process_minibatch(r, minibatch, num_of_class):
     weight_list = r.get_weight_list()
     w_num = len(weight_list)
 
-    data = minibatch[0]
-    w = weight_list[0]
-    r.propagate_gpu(data)
-    inf = r.get_inference_gpu()
-    print inf
-    wi = w.get_index()
-    print wi
-    print data[0]
-    r.propagate_gpu_alt(data, w, core.WEIGHT_INDEX_ZERO)
-    inf = r.get_inference_gpu()
-    print inf
-    return
+#    data = minibatch[0]
+#    w = weight_list[1]
+#    r.propagate_gpu(data)
+#    inf = r.get_inference_gpu()
+#    print inf
+#    wi = w.get_index()
+#    print wi
+#    print data[1]
+#    r.propagate_gpu_alt(data, w, core.WEIGHT_INDEX_ZERO)
+#    inf = r.get_inference_gpu()
+#    print inf
+#    return
     
     base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
     
@@ -769,7 +769,7 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
         minibatch = train_batch[i]
         start_time = time.time()
         #
-        for i in range(10):
+        for i in range(1):
             print i
             process_minibatch(r, minibatch, num_of_class)
         #

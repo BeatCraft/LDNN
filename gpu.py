@@ -46,14 +46,13 @@ const float alt_w)
 
     if (j==alt_col && i==alt_row){
         y[j*num_w + i] = x[i] * alt_w;
-        printf(\"GPU :(%d, %d) = %f\\n\", j, i, x[i]);
     }else{
         y[j*num_w + i] = x[i] * w[j*num_w + i];
     }
 };
 
 """
-#
+# printf(\"GPU :(%d, %d) = %f\\n\", j, i, x[i]);
 # printf(\"%f\\n\", y[i]);
 #
 class Gpu:

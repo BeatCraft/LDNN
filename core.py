@@ -218,7 +218,7 @@ class Layer:
         elif self._type==1: # hidden            
             self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
                                           self._num_input, self._num_node,
-                                          w._node, w._i, lesserWeights[wi_alt])
+                                          w._i, w._node, lesserWeights[wi_alt])
             self._gpu.copy(self._product_matrix, self._gpu_product)
             i = 0
             for row in self._product_matrix:
@@ -229,7 +229,7 @@ class Layer:
         else: # output
             self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
                                           self._num_input, self._num_node,
-                                          w._node, w._i, lesserWeights[wi_alt])
+                                          w._i, w._node, lesserWeights[wi_alt])
             self._gpu.copy(self._product_matrix, self._gpu_product)
             i = 0
             for row in self._product_matrix:

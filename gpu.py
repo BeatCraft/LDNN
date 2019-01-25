@@ -19,6 +19,8 @@ __kernel void multiple_x_by_w(
     //printf(\"(%d, %d)\\n\", i, j);
     y[j*num_w + i] = x[i] * w[j*num_w + i];
 //    printf(\"%f\\n\", x[i]);
+//
+//    printf(\"%f\\n\", y[j*num_w + i]);
 };
 
 __kernel void scale(
@@ -27,9 +29,8 @@ __kernel void scale(
     const float max)
 {
     int i = get_global_id(0);
-
-    y[i] = float(x[i]) / max;
-    //printf(\"%d=%f\\n\", i, y[i]);
+    float v = x[i];
+    y[i] = v/max;
 };
 
 __kernel void multiple_x_by_w_alt(

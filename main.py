@@ -51,6 +51,12 @@ def setup_dnn(path, my_gpu):
     input_layer = r.add_layer(0, 196, 196)
     hidden_layer_1 = r.add_layer(1, 196, 32)
     hidden_layer_2 = r.add_layer(1, 32, 32)
+    #
+    #hidden_layer_3 = r.add_layer(1, 32, 32)
+    #hidden_layer_4 = r.add_layer(1, 32, 32)
+    #hidden_layer_5 = r.add_layer(1, 32, 32)
+    #hidden_layer_6 = r.add_layer(1, 32, 32)
+    #
     output_layer = r.add_layer(2, 32, 10)
     
     wi = util.csv_to_list(WEIGHT_INDEX_CSV_PATH)
@@ -127,7 +133,7 @@ def make_batch(num_of_class, iteration, size_of_minibatch, list_of_path):
         minibatch = []
         for label in range(num_of_class):
             path = list_of_path[label][i]
-            print path
+            print "%d : %s" %(i, path)
             data = util.loadData(path)
             minibatch.append(data)
         
@@ -142,6 +148,7 @@ def test(r, minibatch, num_of_class):
     stat = [0,0,0,0,0,0,0,0,0,0]
 
     for label in range(len(minibatch)):
+        print label
         data = minibatch[label]
         r.propagate_gpu(data)
         inf = r.get_inference_gpu()
@@ -180,7 +187,7 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     for minibatch in batch:
         if it>=iteration:
             break
-        #print "it : %d" % it
+        print "it : %d" % it
         d, s = test(r, minibatch, num_of_class)
         #print d
         #print s
@@ -710,28 +717,45 @@ def process_minibatch(r, minibatch, num_of_class):
     for w in weight_list:
         wi = w.get_index()
         id = w.get_id()
+        
         if wi>=core.WEIGHT_INDEX_MAX:
             print "%d : MAX" % (id)
             continue
-
-        wi_alt = wi + 1
-        mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
-        if mse_alt<base_mse:
-            print "+ %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
-            w.set_index(w.get_index()+1)
-            inc = inc + 1
-        else:
-            if wi==core.WEIGHT_INDEX_MIN:
-                print "%d : MIN" % (id)
-                continue
             wi_alt = wi - 1
             mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
             if mse_alt<base_mse:
                 print "- %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
-                w.set_index(w.get_index()-1)
+                w.set_index(wi_alt)
                 dec = dec + 1
             else:
                 print "%d : %d NOC" % (id, wi)
+        elif wi==core.WEIGHT_INDEX_MIN:
+            print "%d : MIN" % (id)
+            continue
+            wi_alt = wi + 1
+            mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+            if mse_alt<base_mse:
+                print "+ %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
+                w.set_index(wi_alt)
+                inc = inc + 1
+            else:
+                print "%d : %d NOC" % (id, wi)
+        else:
+            wi_alt = wi + 1
+            mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+            if mse_alt<base_mse:
+                print "+ %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
+                w.set_index(wi_alt)
+                inc = inc + 1
+            else:
+                wi_alt = wi - 1
+                mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+                if mse_alt<base_mse:
+                    print "- %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
+                    w.set_index(wi_alt)
+                    dec = dec + 1
+                else:
+                    print "%d : %d NOC" % (id, wi)
 
     r.update_gpu_weight()
     print "inc=%d, dec=%d" % (inc, dec)
@@ -891,9 +915,10 @@ def main():
         test_mode(r, train_batch, NUM_OF_CLASS, num_of_processed, minibatch_size)
     elif mode==5:
         print ">> debug mode"
-        data_list = util.loadData("./data/test/0/00003.png")
+        data_list = util.loadData("./data/test/8/06755.png")
         data_array = np.array(data_list)
-        r.propagate(data_array)
+        #r.propagate(data_array)
+        r.propagate_gpu(data_array)
         print r.get_inference_gpu()
     elif mode==6:
         wl = r.get_weight_list()

@@ -29,9 +29,20 @@ WEIGHT_SET_1 = [-1, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.007812
 
 WEIGHT_SET_2 = [-1, -0.72363462, -0.52364706, -0.37892914, -0.27420624, -0.19842513, -0.14358729, -0.10390474, -0.07518906, -0.05440941, -0.03937253, -0.02849133, -0.02061731, -0.0149194, -0.01079619, -0.0078125, 0, 0.72363462, 0.52364706, 0.37892914, 0.27420624, 0.19842513, 0.14358729, 0.10390474, 0.07518906, 0.05440941, 0.03937253, 0.02849133, 0.02061731, 0.0149194, 0.01079619, 0.0078125, 1]
 
+
+WEIGHT_SET_3 = [-1, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1]
+
+
+#lesserWeights = WEIGHT_SET_1
+#lesserWeightsLen = len(lesserWeights)
+#WEIGHT_INDEX_ZERO = 8
+#WEIGHT_INDEX_MAX = lesserWeightsLen-1
+#WEIGHT_INDEX_MIN = 0
+#WEIGHT_RANDOM_RANGE = 6
+
 lesserWeights = WEIGHT_SET_1
 lesserWeightsLen = len(lesserWeights)
-WEIGHT_INDEX_ZERO = 8
+WEIGHT_INDEX_ZERO = 18
 WEIGHT_INDEX_MAX = lesserWeightsLen-1
 WEIGHT_INDEX_MIN = 0
 WEIGHT_RANDOM_RANGE = 6
@@ -179,7 +190,7 @@ class Layer:
                 i += 1
 
             self._gpu.copy(self._gpu_output, self._sum)
-            #print self._sum
+            print self._sum
             
 #            if self._type==2:
 #                print "relu"
@@ -197,6 +208,7 @@ class Layer:
             self._gpu.copy(self._product_matrix, self._gpu_product)
             i = 0
             for row in self._product_matrix:
+                #print np.sum(row)
                 self._sum[i] = relu( np.sum(row) )
                 i += 1
 

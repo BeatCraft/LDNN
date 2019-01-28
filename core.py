@@ -42,7 +42,10 @@ WEIGHT_SET_3 = [-1, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1]
 
 lesserWeights = WEIGHT_SET_1
 lesserWeightsLen = len(lesserWeights)
-WEIGHT_INDEX_ZERO = 18
+
+WEIGHT_INDEX = WEIGHT_SET_1
+WEIGHT_INDEX_SIZE = len(WEIGHT_INDEX)
+WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = lesserWeightsLen-1
 WEIGHT_INDEX_MIN = 0
 WEIGHT_RANDOM_RANGE = 6
@@ -190,7 +193,7 @@ class Layer:
                 i += 1
 
             self._gpu.copy(self._gpu_output, self._sum)
-            print self._sum
+            #print self._sum
             
 #            if self._type==2:
 #                print "relu"
@@ -219,7 +222,7 @@ class Layer:
                 if sum>0.0:
                     self._y_array[i] = row/sum
                 else:
-                    print "fuck : sum is zero"
+                    #print "fuck : sum is zero"
                     self._y_array[i] = 0.0
                 i += 1
 

@@ -148,7 +148,7 @@ def test(r, minibatch, num_of_class):
     stat = [0,0,0,0,0,0,0,0,0,0]
 
     for label in range(len(minibatch)):
-        print label
+        #print label
         data = minibatch[label]
         r.propagate_gpu(data)
         inf = r.get_inference_gpu()
@@ -691,6 +691,76 @@ def train_gpu(r, data, data_class):
 #
 #
 #
+def weight_shit(r, minibatch, num_of_class, w, base_mse, base_ret):
+    inc = 0
+    dec = 0
+    wi = w.get_index()
+    id = w.get_id()
+    if wi>=core.WEIGHT_INDEX_MAX:
+        #print "%d : MAX" % (id)
+        #continue
+        wi_alt = wi - 1
+        mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+        if mse_alt<base_mse:
+            print "- MAX(%d) : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
+            w.set_index(wi_alt)
+            dec = dec + 1
+        else:
+            print "%d : %d NOC @MAX" % (id, wi)
+    elif wi==core.WEIGHT_INDEX_MIN:
+        #print "%d : MIN" % (id)
+        #continue
+        wi_alt = wi + 1
+        mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+        if mse_alt<base_mse:
+            print "+ MIN(%d) : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
+            w.set_index(wi_alt)
+            inc = inc + 1
+        else:
+            print "%d : %d NOC @MIN" % (id, wi)
+    else:
+        wi_alt = wi + 1
+        mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+        if mse_alt<base_mse:
+            print "+ %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
+            w.set_index(wi_alt)
+            inc = inc + 1
+        else:
+            wi_alt = wi - 1
+            mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+            if mse_alt<base_mse:
+                print "- %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
+                w.set_index(wi_alt)
+                dec = dec + 1
+            else:
+                print "%d : %d NOC" % (id, wi)
+
+    return inc, dec
+#
+#
+#
+def weight_scan(r, minibatch, num_of_class, w, base_mse, base_ret):
+    wi = w.get_index()
+    id = w.get_id()
+    min = base_mse
+    min_index = -1
+    #min_index = core.WEIGHT_INDEX_ZERO
+    
+    #mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, 0)
+    min = base_mse
+    for i in range(core.WEIGHT_INDEX_SIZE):
+        mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, i)
+        #print " %d : %f" % (i, mse_alt)
+        if mse_alt<min:
+            min = mse_alt
+            min_index = i
+
+    if min_index>=0:
+        print "     %d -> %d" % (wi, min_index)
+        w.set_index(min_index)
+#
+#
+#
 def process_minibatch(r, minibatch, num_of_class):
     weight_list = r.get_weight_list()
     w_num = len(weight_list)
@@ -709,75 +779,16 @@ def process_minibatch(r, minibatch, num_of_class):
 #    return
     
     base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-    
     c = 0
     inc = 0
     dec = 0
-    
     for w in weight_list:
-        wi = w.get_index()
-        id = w.get_id()
-        
-        if wi>=core.WEIGHT_INDEX_MAX:
-            print "%d : MAX" % (id)
-            continue
-            wi_alt = wi - 1
-            mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
-            if mse_alt<base_mse:
-                print "- %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
-                w.set_index(wi_alt)
-                dec = dec + 1
-            else:
-                print "%d : %d NOC" % (id, wi)
-        elif wi==core.WEIGHT_INDEX_MIN:
-            print "%d : MIN" % (id)
-            continue
-            wi_alt = wi + 1
-            mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
-            if mse_alt<base_mse:
-                print "+ %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
-                w.set_index(wi_alt)
-                inc = inc + 1
-            else:
-                print "%d : %d NOC" % (id, wi)
-        else:
-            wi_alt = wi + 1
-            mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
-            if mse_alt<base_mse:
-                print "+ %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
-                w.set_index(wi_alt)
-                inc = inc + 1
-            else:
-                wi_alt = wi - 1
-                mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
-                if mse_alt<base_mse:
-                    print "- %d : %d > %d | %f > %f" % (id, wi, wi_alt, base_mse, mse_alt)
-                    w.set_index(wi_alt)
-                    dec = dec + 1
-                else:
-                    print "%d : %d NOC" % (id, wi)
-
+        print c
+        #inc, dec = weight_shit(r, minibatch, num_of_class, w, base_mse, base_ret)
+        weight_scan(r, minibatch, num_of_class, w, base_mse, base_ret)
+        c = c + 1
     r.update_gpu_weight()
     print "inc=%d, dec=%d" % (inc, dec)
-
-#    c = 0
-#    for data in minibatch:
-#        train_gpu(r, data, c)
-#        c = c + 1
-
-        #break # debug
-
-#    epoc = 1
-#    algo = 2
-#    for e in range(epoc):
-#        if algo == 0:
-#            train_algorhythm_basic(r, minibatch, num_of_class)
-#        elif algo == 1:
-#            train_algorhythm_single(r, minibatch, num_of_class)
-#        elif algo == 2:
-#            ret = train_algorhythm_zero(r, minibatch, num_of_class)
-            #if ret<=0:
-            #   break
 #
 #
 #

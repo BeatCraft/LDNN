@@ -60,8 +60,8 @@ class Gpu:
     def __init__(self):
         #self._ctx = cl.create_some_context()
         platform = cl.get_platforms()[0]
-        device = platform.get_devices()[1] # Intel
-        #device = platform.get_devices()[2] # AMD
+        #device = platform.get_devices()[1] # Intel
+        device = platform.get_devices()[2] # AMD
         self._ctx = cl.Context([device])
         
         for dev in self._ctx.devices:

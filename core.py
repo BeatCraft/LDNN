@@ -29,9 +29,9 @@ WEIGHT_SET_1 = [-1, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.007812
 
 WEIGHT_SET_2 = [-1, -0.72363462, -0.52364706, -0.37892914, -0.27420624, -0.19842513, -0.14358729, -0.10390474, -0.07518906, -0.05440941, -0.03937253, -0.02849133, -0.02061731, -0.0149194, -0.01079619, -0.0078125, 0, 0.72363462, 0.52364706, 0.37892914, 0.27420624, 0.19842513, 0.14358729, 0.10390474, 0.07518906, 0.05440941, 0.03937253, 0.02849133, 0.02061731, 0.0149194, 0.01079619, 0.0078125, 1]
 
-
 WEIGHT_SET_3 = [-1, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1]
 
+WEIGHT_SET_4 = [0, 0.72363462, 0.52364706, 0.37892914, 0.27420624, 0.19842513, 0.14358729, 0.10390474, 0.07518906, 0.05440941, 0.03937253, 0.02849133, 0.02061731, 0.0149194, 0.01079619, 0.0078125, 1]
 
 #lesserWeights = WEIGHT_SET_1
 #lesserWeightsLen = len(lesserWeights)
@@ -40,13 +40,12 @@ WEIGHT_SET_3 = [-1, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1]
 #WEIGHT_INDEX_MIN = 0
 #WEIGHT_RANDOM_RANGE = 6
 
-lesserWeights = WEIGHT_SET_1
-lesserWeightsLen = len(lesserWeights)
-
-WEIGHT_INDEX = WEIGHT_SET_1
-WEIGHT_INDEX_SIZE = len(WEIGHT_INDEX)
-WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
-WEIGHT_INDEX_MAX = lesserWeightsLen-1
+WEIGHT_SET = WEIGHT_SET_4
+lesserWeights = WEIGHT_SET
+lesserWeightsLen = len(WEIGHT_SET)
+WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
+WEIGHT_INDEX_ZERO = 0#WEIGHT_INDEX_SIZE/2
+WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
 WEIGHT_RANDOM_RANGE = 6
 #
@@ -130,6 +129,7 @@ class Layer:
         self._product_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
         self._sum = np.zeros(self._num_node, dtype=np.float32)
         self._y_array = np.zeros(self._num_node, dtype=np.float32)
+        #self._weight_list = []
 
         self.nodes = []
             
@@ -153,7 +153,7 @@ class Layer:
             self._gpu_product = self._gpu.dev_malloc(self._weight_matrix)
         #self._gpu_sum = self._gpu.dev_malloc(self._output_array)
         self._gpu_output = self._gpu.dev_malloc(self._output_array)
-        print self._output_array
+        #print self._output_array
 
     def update_gpu_weight(self):
         if self._type>0:
@@ -297,7 +297,7 @@ class Roster:
     def init_weight(self):
         c = 0
         for w in self._weight_list:
-            i = random.randrange(lesserWeightsLen)
+            i = random.randrange(WEIGHT_INDEX_SIZE)
             w.set_index(i)
             #w.set_index(WEIGHT_INDEX_ZERO+1)
             #
@@ -325,7 +325,7 @@ class Roster:
     def countLayers(self):
         return len(self.layers)
 
-    def getLayers(self):
+    def get_layers(self):
         if self.countLayers() == 0:
             return 0
         return self.layers

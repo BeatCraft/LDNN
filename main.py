@@ -761,6 +761,50 @@ def weight_scan(r, minibatch, num_of_class, w, base_mse, base_ret):
 #
 #
 #
+#def weight_shit_layer_by_layer(r, minibatch, num_of_class, w, base_mse, base_ret):
+#
+#
+#
+#
+#
+def process_minibatch_layer_by_layer(r, minibatch, num_of_class):
+    c = r.countLayers()
+    wcnt = 0
+    inc_total = 0
+    dec_total = 0
+    for index in range(1, c):
+        layer = r.getLayerAt(index)
+        w_num = layer._num_node * layer._num_input
+        num = w_num / 10 / index
+        #
+        # mse
+        base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
+        #
+        for k in range(num):
+            n = random.randint(0, layer._num_node-1)
+            i = random.randint(0, layer._num_input-1)
+            rwi = n*layer._num_input + i
+            w = r._weight_list[wcnt + rwi]
+            wi = w.get_index()
+            print "%d : %d/%d (%d, %d) %d" % (index, k, num, n, i, rwi)
+            #print "     %f : %f" %(core.WEIGHT_SET[wi], layer.get_weight(n, i))
+            #inc, dec = weight_shit(r, minibatch, num_of_class, w, base_mse, base_ret)
+            
+            weight_scan(r, minibatch, num_of_class, w, base_mse, base_ret)
+            
+            #inc_total = inc_total + inc
+            #dec_total = dec_total + dec
+
+        # weight update
+        wcnt = wcnt + layer._num_node * layer._num_input
+        r.update_gpu_weight()
+        # renew mse
+        #base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
+
+    print "inc=%d, dec=%d" % (inc_total, dec_total)
+#
+#
+#
 def process_minibatch(r, minibatch, num_of_class):
     weight_list = r.get_weight_list()
     w_num = len(weight_list)
@@ -796,7 +840,8 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
         start_time = time.time()
         #
         for j in range(1):
-            process_minibatch(r, minibatch, num_of_class)
+            #process_minibatch(r, minibatch, num_of_class)
+            process_minibatch_layer_by_layer(r, minibatch, num_of_class)
         #
         elapsed_time = time.time() - start_time
         t = format(elapsed_time, "0")

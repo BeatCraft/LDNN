@@ -33,18 +33,11 @@ WEIGHT_SET_3 = [-1, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1]
 
 WEIGHT_SET_4 = [0, 0.72363462, 0.52364706, 0.37892914, 0.27420624, 0.19842513, 0.14358729, 0.10390474, 0.07518906, 0.05440941, 0.03937253, 0.02849133, 0.02061731, 0.0149194, 0.01079619, 0.0078125, 1]
 
-#lesserWeights = WEIGHT_SET_1
-#lesserWeightsLen = len(lesserWeights)
-#WEIGHT_INDEX_ZERO = 8
-#WEIGHT_INDEX_MAX = lesserWeightsLen-1
-#WEIGHT_INDEX_MIN = 0
-#WEIGHT_RANDOM_RANGE = 6
+WEIGHT_SET_5 = [-1.00, -0.95, -0.90, -0.85, -0.80, -0.75, -0.70, -0.65, -0.60, -0.55, -0.50, -0.45, -0.40, -0.35, -0.30, -0.25, -0.20, -0.15, -0.10, -0.05, 0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00]
 
-WEIGHT_SET = WEIGHT_SET_4
-lesserWeights = WEIGHT_SET
-lesserWeightsLen = len(WEIGHT_SET)
+WEIGHT_SET = WEIGHT_SET_5
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
-WEIGHT_INDEX_ZERO = 0#WEIGHT_INDEX_SIZE/2
+WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
 WEIGHT_RANDOM_RANGE = 6
@@ -102,9 +95,9 @@ class Weight:
         return self._layer.get_weight(self._node, self._i)
 
     def set_index(self, i):
-        if i>=0 and i<lesserWeightsLen:
+        if i>=0 and i<WEIGHT_INDEX_SIZE:
             self._index = i
-            self.set( lesserWeights[i] )
+            self.set( WEIGHT_SET[i] )
 
         return self._index
 
@@ -233,7 +226,7 @@ class Layer:
         elif self._type==1: # hidden            
             self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
                                           self._num_input, self._num_node,
-                                          w._i, w._node, lesserWeights[wi_alt])
+                                          w._i, w._node, WEIGHT_SET[wi_alt])
             self._gpu.copy(self._product_matrix, self._gpu_product)
             i = 0
             for row in self._product_matrix:
@@ -244,7 +237,7 @@ class Layer:
         else: # output
             self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
                                           self._num_input, self._num_node,
-                                          w._i, w._node, lesserWeights[wi_alt])
+                                          w._i, w._node, WEIGHT_SET[wi_alt])
             self._gpu.copy(self._product_matrix, self._gpu_product)
             i = 0
             for row in self._product_matrix:
@@ -309,7 +302,7 @@ class Roster:
         for w in self._weight_list:
             wi = int(w_list[c])
             #print wi
-            #w.set( lesserWeights[int(wi)] )
+            #w.set( WEIGHT_SET[int(wi)] )
             w.set_index(wi)
             w.set_id(c)
             c += 1

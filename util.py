@@ -96,7 +96,7 @@ def img2List(img):
 def loadData(path):
     img = Image.open(path)
     img = img.convert("L")
-    img = img.resize((14,14))
+    #img = img.resize((14,14))
     data = img2List(img)
     return data
 #

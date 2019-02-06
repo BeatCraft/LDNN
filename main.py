@@ -50,7 +50,7 @@ def setup_dnn(path, my_gpu):
         
     #input_layer = r.add_layer(0, 196, 196)
     input_layer = r.add_layer(0, 784, 784)
-    hidden_layer_1 = r.add_layer(1, 196, 32)
+    hidden_layer_1 = r.add_layer(1, 784, 32)
     hidden_layer_2 = r.add_layer(1, 32, 32)
     #
     #hidden_layer_3 = r.add_layer(1, 32, 32)
@@ -855,10 +855,38 @@ def process_minibatch_layer_by_layer(r, minibatch, num_of_class):
 #
 #
 #
+def process_minibatch_layer_by_layer_reversed(r, minibatch, num_of_class):
+    c = r.countLayers()
+    wcnt = 0
+    inc_total = 0
+    dec_total = 0
+    for index in range(c-1, 0, -1):
+        layer = r.getLayerAt(index)
+        w_num = layer._num_node * layer._num_input
+        num = w_num / 10 / index
+        # mse
+        base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
+        for k in range(num):
+            n = random.randint(0, layer._num_node-1)
+            i = random.randint(0, layer._num_input-1)
+            rwi = n*layer._num_input + i
+            w = r._weight_list[wcnt + rwi]
+            wi = w.get_index()
+            inc, dec = weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
+            inc_total = inc_total + inc
+            dec_total = dec_total + dec
+        
+        # weight update
+        wcnt = wcnt + layer._num_node * layer._num_input
+        r.update_gpu_weight()
+
+    return inc_total, dec_total
+#
+#
+#
 def process_minibatch(r, minibatch, num_of_class):
     weight_list = r.get_weight_list()
     w_num = len(weight_list)
-    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
     c = 0
     inc_total = 0
     dec_total = 0
@@ -866,15 +894,18 @@ def process_minibatch(r, minibatch, num_of_class):
     num = w_num / 10
     samples = random.sample(weight_list, num)
     for w in samples:
-        print "%d / %d" % (c, num)
-        inc, dec = weight_shit(r, minibatch, num_of_class, w, base_mse, base_ret)
+        base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
+        #print "%d / %d" % (c, num)
         #weight_scan(r, minibatch, num_of_class, w, base_mse, base_ret)
+        #inc, dec = weight_shit(r, minibatch, num_of_class, w, base_mse, base_ret)
+        inc, dec = weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
         c = c + 1
         inc_total = inc_total + inc
         dec_total = dec_total + dec
-    
-    r.update_gpu_weight()
-    print "inc=%d, dec=%d" % (inc_total, dec_total)
+        r.update_gpu_weight()
+
+    #print "inc=%d, dec=%d" % (inc_total, dec_total)
+    return inc_total, dec_total
 #
 #
 #
@@ -882,17 +913,18 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
     print ">> train mode"
     print len(train_batch)
     print "train (%d, %d)" % (num_of_processed, it_train)
-
+    inc = 0
+    dec = 0
     start = num_of_processed
     k = 0
     for i in range(start, start+it_train, 1):
         minibatch = train_batch[i]
         start_time = time.time()
-        #
+        # currently, epoch is fixed to 1
         for j in range(1):
-            #process_minibatch(r, minibatch, num_of_class)
-            inc, dec = process_minibatch_layer_by_layer(r, minibatch, num_of_class)
-        
+            inc, dec = process_minibatch(r, minibatch, num_of_class)
+            #inc, dec = process_minibatch_layer_by_layer(r, minibatch, num_of_class)
+            #inc, dec = process_minibatch_layer_by_layer_reversed(r, minibatch, num_of_class)
         
         print "[%d/%d] inc=%d, dec=%d" % (i, start+it_train, inc, dec)
         #

@@ -60,13 +60,18 @@ class Gpu:
     def __init__(self):
         #self._ctx = cl.create_some_context()
         platform = cl.get_platforms()[0]
-        device = platform.get_devices()[1] # Intel
-        #device = platform.get_devices()[2] # AMD
+        # AMD Server
+        #device = platform.get_devices()[0]
+        # Intel on MBP
+        #device = platform.get_devices()[1]
+        # AMD on eGPU
+        device = platform.get_devices()[2]
+        print platform
+        print device
+    
         self._ctx = cl.Context([device])
-        
         for dev in self._ctx.devices:
             assert dev.local_mem_size > 0
-
         self._queue = cl.CommandQueue(self._ctx)
         self._bufs = []
 

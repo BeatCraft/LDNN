@@ -40,7 +40,7 @@ WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
-WEIGHT_RANDOM_RANGE = 6
+#WEIGHT_RANDOM_RANGE = 6
 #
 #
 #
@@ -133,7 +133,7 @@ class Layer:
         self._output_array = np.zeros(num_node, dtype=np.float32)
     
     def init_gpu(self):
-        print "init_gpu()"
+        #print "init_gpu()"
         if self._gpu:
             pass
         else:
@@ -184,21 +184,9 @@ class Layer:
             for row in self._product_matrix:
                 self._sum[i] = relu( np.sum(row) )
                 i += 1
-
-            self._gpu.copy(self._gpu_output, self._sum)
-            #print self._sum
             
-#            if self._type==2:
-#                print "relu"
-#                sum = np.sum(self._sum)
-#                for row in self._sum:
-#                    print row/sum
-#
-#                print "softmax"
-#                for row in self._sum:
-#                    print np.exp(row)
-
-        else:
+            self._gpu.copy(self._gpu_output, self._sum)
+        else: # output
             self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
                                       self._num_input, self._num_node)
             self._gpu.copy(self._product_matrix, self._gpu_product)
@@ -381,19 +369,18 @@ class Roster:
         pre = self.getLayerAt(0)
         pre.propagate(data)
         for i in range(1, c):
-            #array_y = pre._gpu_output
             layer = self.getLayerAt(i)
             layer.propagate_gpu(pre._gpu_output)
             pre = layer
 
     def propagate_gpu_alt(self, data, w, wi_alt):
         c = self.countLayers()
-        
         pre = self.getLayerAt(0)
-        if w._layer._index==0:
-            pre.propagate_gpu_alt(data, w, wi_alt)
-        else:
-            pre.propagate(data)
+        pre.propagate_gpu_alt(data, w, wi_alt)
+        #if w._layer._index==0:
+        #    pre.propagate_gpu_alt(data, w, wi_alt)
+        #else:
+        #    pre.propagate(data)
         for i in range(1, c):
             layer = self.getLayerAt(i)
             if w._layer._index==i:

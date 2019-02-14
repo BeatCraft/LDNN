@@ -52,8 +52,7 @@ def setup_dnn(path, my_gpu):
     input_layer = r.add_layer(0, 784, 784)
     hidden_layer_1 = r.add_layer(1, 784, 32)
     hidden_layer_2 = r.add_layer(1, 32, 32)
-    #
-    #hidden_layer_3 = r.add_layer(1, 32, 32)
+    hidden_layer_3 = r.add_layer(1, 32, 32)
     #hidden_layer_4 = r.add_layer(1, 32, 32)
     #hidden_layer_5 = r.add_layer(1, 32, 32)
     #hidden_layer_6 = r.add_layer(1, 32, 32)
@@ -739,6 +738,48 @@ def weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret):
 #
 #
 #
+def weight_shit_signed_rigid(r, minibatch, num_of_class, w, base_mse, base_ret):
+    inc = 0
+    dec = 0
+    wi = w.get_index()
+    id = w.get_id()
+    
+    if wi==WEIGHT_INDEX_MAX:
+        wi_alt = wi - 1
+        mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+        if mse_alt<=base_mse:
+            w.set_index(wi_alt)
+            dec = dec + 1
+            print " - : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+
+    elif wi==WEIGHT_INDEX_MIN:
+        wi_alt = wi + 1
+        mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+        if mse_alt<=base_mse:
+            w.set_index(wi_alt)
+            inc = inc + 1
+            print " + : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+
+    else:
+        wi_alt = wi + 1
+        mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+        if mse_alt<base_mse:
+            w.set_index(wi_alt)
+            inc = inc + 1
+            print " + : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+
+        else:
+            wi_alt = wi - 1
+            mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
+            if mse_alt<base_mse:
+                w.set_index(wi_alt)
+                dec = dec + 1
+                print " - : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+                    
+    return inc, dec
+#
+#
+#
 def weight_shit_positive(r, minibatch, num_of_class, w, base_mse, base_ret):
     inc = 0
     dec = 0
@@ -942,8 +983,8 @@ def process_minibatch_layer_by_layer_reversed_even(r, minibatch, num_of_class):
                 rwi = node_index*layer._num_input + i
                 w = r._weight_list[wcnt + rwi]
                 wi = w.get_index()
-                #inc, dec = weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
-                inc, dec = weight_shit_positive(r, minibatch, num_of_class, w, base_mse, base_ret)
+                inc, dec = weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
+                #inc, dec = weight_shit_positive(r, minibatch, num_of_class, w, base_mse, base_ret)
                 inc_total = inc_total + inc
                 dec_total = dec_total + dec
         

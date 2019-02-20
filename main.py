@@ -47,8 +47,7 @@ NUM_OF_TEST      = 500
 def setup_dnn(path, my_gpu):
     r = core.Roster()
     r.set_gpu(my_gpu)
-        
-    #input_layer = r.add_layer(0, 196, 196)
+
     input_layer = r.add_layer(0, 784, 784)
     hidden_layer_1 = r.add_layer(1, 784, 32)
     hidden_layer_2 = r.add_layer(1, 32, 32)
@@ -71,29 +70,6 @@ def setup_dnn(path, my_gpu):
         r.update_gpu_weight()
     
     return r
-    
-#    if os.path.exists(path):
-#        print "DNN restored."
-#        r = util.pickle_load(path)
-#        r.set_gpu(my_gpu)
-#        return r
-#    else:
-#        r = core.Roster()
-#        r.set_gpu(my_gpu)
-#
-#        input_layer = r.add_layer(0, 196, 196)
-#        hidden_layer_1 = r.add_layer(1, 196, 32)
-#        hidden_layer_2 = r.add_layer(1, 32, 32)
-#        output_layer = r.add_layer(2, 32, 10)
-#        r.init_weight()
-#        r.update_gpu_weight()
-#
-        #my_gpu.set_kernel_code()
-        #
-        #       util.pickle_save(path, r)
-        #       return r
-#   return None
-
 #
 #
 #
@@ -143,16 +119,14 @@ def make_batch(num_of_class, iteration, size_of_minibatch, list_of_path):
 #
 #
 #
-def test(r, minibatch, num_of_class):
+def test(r, minibatch, num_of_class, debug=0):
     dist = [0,0,0,0,0,0,0,0,0,0]
     stat = [0,0,0,0,0,0,0,0,0,0]
 
     for label in range(len(minibatch)):
-        #print label
         data = minibatch[label]
         r.propagate_gpu(data)
         inf = r.get_inference_gpu()
-        #print inf
         if inf is None:
             print "ERROR"
             continue
@@ -166,8 +140,7 @@ def test(r, minibatch, num_of_class):
             
             dist[index] = dist[index] + 1
         else:
-            print "ASS HOLE"
-            print mx
+            print "ASS HOLE : %d, %f" % (label, mx)
         
         if label==index:
             stat[index] = stat[index] + 1
@@ -176,7 +149,7 @@ def test(r, minibatch, num_of_class):
 #
 #
 #
-def test_mode(r, batch, num_of_class, iteration, minibatch_size):
+def test_mode(r, batch, num_of_class, iteration, minibatch_size, debug=0):
     print ">>test mode(%d)" % iteration
     start_time = time.time()
 
@@ -187,10 +160,9 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
     for minibatch in batch:
         if it>=iteration:
             break
-        print "it : %d" % it
-        d, s = test(r, minibatch, num_of_class)
-        #print d
-        #print s
+        if debug:
+            print "it : %d" % it
+        d, s = test(r, minibatch, num_of_class, debug)
         for j in range(len(dist)):
             dist[j] = dist[j] + d[j]
             stat[j] = stat[j] + s[j]
@@ -198,12 +170,18 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size):
         it = it + 1
     
     print dist
-    for d in dist:
-        print d
+    if debug:
+        for d in dist:
+            print d
 
     print stat
+    sum = 0.0
     for s in stat:
-        print s
+        if debug:
+            print s
+        sum = sum + s
+
+    print "accuracy = %f" % (sum/(iteration*num_of_class))
 
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
@@ -224,388 +202,46 @@ def make_train_label(label, num):
 #
 #
 #
-def evaluate_minibatch(r, minibatch, num_of_class):
+def evaluate_alt(r, data, data_class, num_of_class, w, wi_alt):
     sum_of_mse = 0.0
-    num = 0
-    ret = 0.0
-    minibatch_size = len(minibatch)
-
-    for i in range(minibatch_size):
-        mb = minibatch[i]
-        for j in range(num_of_class):
-            num = num + 1
-            labels = make_train_label(j, num_of_class)
-            data = util.loadData(mb[j])
-            r.propagate(data)
-            #inf = r.get_inference(1)
-            inf = r.get_inference_gpu()
-            if inf is None:
-                print "ERROR"
-                print r
-                sys.exit(0)
-            
-            ret = ret + inf[j]
-            mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
-            sum_of_mse = sum_of_mse + mse
-    
-    ret = ret / num
-    mse = sum_of_mse / num
-    return mse, ret
-#
-#
-#
-def ziggle_connection(r, minibatch, num_of_class, con, dif, base_mse):
-    c_id = con.get_id()
-    p0 = con.get_index()
-    p1 = con.set_index(p0 + dif)
-    if p0==p1:
-        return c_id, -1
-    
-    p1 = con.set_index(p0+dif)
-    next_mse, next_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    if next_mse<base_mse: # OK
-        con.set_index(p0)
-        return c_id, p0+dif
-    else: # noc
-        con.set_index(p0)
-        return c_id, -1
-#
-#
-#
-def train_algorhythm_basic(r, minibatch, num_of_class):
-    connections = r.get_weight_list() #r.getConnections()
-    c_num = len(connections)
-    print "connections=%d" % c_num
-    
-    inc_max = c_num/100*2
-    dec_max = c_num/100*2
-    
-    inc = 0
-    dec = 0
-    noc = 0
-    
-    inc_list = []
-    dec_list = []
-    
-    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    samples = random.sample(connections, c_num)
-    
-    # dec loop
-    for con in samples:
-        if dec>=dec_max:
-            break
-    
-        c_id, index = ziggle_connection(r, minibatch, num_of_class, con, -1, base_mse)
-        if index>=0:
-            dec = dec + 1
-            dec_list.append((c_id, index))
-        else:
-            noc = noc + 1
-
-    for c_info in dec_list:
-        con = connections[c_info[0]]
-        con.set_index(c_info[1])
-    
-    print "dec : %d, noc : %d, total : %d" % (dec, noc, dec+noc)
-    
-    noc = 0
-    base_mse, base_ret = evaluate_minibatch(r, minibatch, num_of_class)
-    samples = random.sample(connections, c_num)
-    
-    # inc loop
-    for con in samples:
-        if inc>=inc_max:
-            break
-        
-        c_id, index = ziggle_connection(r, minibatch, num_of_class, con, 1, base_mse)
-        if index>=0:
-            inc = inc + 1
-            inc_list.append((c_id, index))
-        else:
-            noc = noc + 1
-
-    for c_info in inc_list:
-        con = connections[c_info[0]]
-        con.set_index(c_info[1])
-    
-    print "inc : %d, noc : %d, total : %d" % (inc, noc, inc+noc)
-#
-#
-#
-def train_algorhythm_single(r, minibatch, num_of_class):
-    weight_list = r.get_weight_list()
-    w_num = len(weight_list)
-    print "connections=%d" % w_num
-    
-    inc_max = w_num/100
-    dec_max = w_num/100
-    
-    inc = 0
-    dec = 0
-    noc = 0
-    
-    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-    samples = random.sample(weight_list, w_num)
-    
-    # dec loop
-    dif = -1
-    for w in samples:
-        if dec>=dec_max:
-            break
-        
-        p0 = w.get_index()
-        p1 = w.set_index(p0 + dif)
-        if p0==p1:
-            noc = noc + 1
-            w.set_index(p0)
-            continue
-
-        next_mse, next_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-        if next_mse<base_mse: # OK
-            dec = dec + 1
-            base_mse = next_mse
-        else: # noc
-            noc = noc + 1
-            w.set_index(p0)
-    
-    print "dec : %d, noc : %d, total : %d" % (dec, noc, dec+noc)
-
-    # inc loop
-    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-    samples = random.sample(weight_list, w_num)
-    dif = 1
-    noc = 0
-    for w in samples:
-        if inc>=inc_max:
-            break
-        
-        p0 = w.get_index()
-        p1 = w.set_index(p0 + dif)
-        if p0==p1:
-            noc = noc + 1
-            w.set_index(p0)
-            continue
-        
-        next_mse, next_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-        if next_mse<base_mse: # OK
-            inc = inc + 1
-            base_mse = next_mse
-        else: # noc
-            noc = noc + 1
-            w.set_index(p0)
-
-    print "inc : %d, noc : %d, total : %d" % (inc, noc, inc+noc)
-#
-#
-#
-def evaluate_minibatch_new(r, minibatch, num_of_class):
-    sum_of_mse = 0.0
-    num = 0
-    ret = 0.0
-    labels = [0,0,0,0,0,0,0,0,0,0]
-    
-    for j in range(num_of_class):
-        num = num + 1
-        #labels = make_train_label(j, num_of_class)
-        labels[j] = 1
-        data = minibatch[j] #util.loadData(mb[j])
-        r.propagate(data)
-        inf = r.get_inference(1)
-        if inf is None:
-            print "ERROR"
-            print r
-            sys.exit(0)
-            
-        ret = ret + inf[j]
-        mse =  util.mean_absolute_error(inf, len(inf), labels, len(labels))
-        sum_of_mse = sum_of_mse + mse
-        labels[j] = 0
-    
-    ret = ret / num
-    mse = sum_of_mse / num
-    return mse, ret
-#
-#
-#
-def train_algorhythm_new(r, minibatch, num_of_class):
-    weight_list = r.get_weight_list()
-    w_num = len(weight_list)
-    print "weights=%d" % w_num
-    
-    max = w_num / 100
-    #max = max * 1
-    noc = 0
-    cnt = 0
-    dec = 0
-    inc = 0
-
-    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-    samples = random.sample(weight_list, w_num/10)
-    for w in samples:
-        if cnt>=max:
-            break
-        
-        p0 = w.get_index()
-        p1 = p0
-        if p0>core.WEIGHT_INDEX_ZERO and p0<=core.WEIGHT_INDEX_MAX:
-            p1 = p1 - 1
-        elif p0==core.WEIGHT_INDEX_ZERO:
-            k = random.randrange(2)
-            if k==0:
-                p1 = p1 + 1
-            else:
-                p1 = p1 - 1
-        elif p0<core.WEIGHT_INDEX_ZERO and p0>=core.WEIGHT_INDEX_MIN:
-            p1 = p1 + 1
-        
-        w.set_index(p1)
-        #
-        r.update_gpu_weight()
-        #
-        next_mse, next_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-        if next_mse<base_mse: # OK
-            base_mse = next_mse
-            cnt = cnt + 1
-        else: # noc
-            noc = noc + 1
-            w.set_index(p0)
-            #
-            r.update_gpu_weight()
-            #
-
-    dec = cnt
-    print "dec : %d, noc:%d, total : %d" % (dec, noc, dec+noc)
-    
-    noc = 0
-    cnt = 0
-    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-    samples = random.sample(weight_list, w_num/10)
-    for w in samples:
-        if cnt>=max:
-            break
-        
-        p0 = w.get_index()
-        p1 = p0
-        if p0==core.WEIGHT_INDEX_MAX:
-            p1 = p1 - 1
-        elif p0>core.WEIGHT_INDEX_ZERO and p0<core.WEIGHT_INDEX_MAX:
-            p1 = p1 + 1
-        elif p0==core.WEIGHT_INDEX_ZERO:
-            k = random.randrange(2)
-            if k==0:
-                p1 = p1 + 1
-            else:
-                p1 = p1 - 1
-        elif p0<core.WEIGHT_INDEX_ZERO and p0>core.WEIGHT_INDEX_MIN:
-            p1 = p1 - 1
-        else: # elif p0==WEIGHT_INDEX_MIN:
-            p1 = p1 + 1
-
-        w.set_index(p1)
-        #
-        r.update_gpu_weight()
-        #
-        next_mse, next_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-        if next_mse<base_mse: # OK
-            base_mse = next_mse
-            cnt = cnt + 1
-        else: # noc
-            noc = noc + 1
-            w.set_index(p0)
-            #
-            r.update_gpu_weight()
-            #
-    inc = cnt
-    print "inc : %d, noc:%d, total : %d" % (inc, noc, inc+noc)
-
-    return dec + inc
-#
-#
-#
-def train_algorhythm_zero(r, minibatch, num_of_class):
-    start_time = time.time()
-    
-    weight_list = r.get_weight_list()
-    w_num = len(weight_list)
-    max = w_num / 100
-    noc = 0
-    cnt = 0
-    dec = 0
-    inc = 0
-    
-    base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-    samples = random.sample(weight_list, w_num)
-    for w in weight_list:#samples:
-        p0 = w.get_index()
-        p1 = -1
-        for i in range(core.lesserWeightsLen):
-            w.set_index(i)
-            w._layer.update_gpu_weight()
-            next_mse, next_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
-            print "%f / %f" % (base_mse , next_mse)
-            if next_mse<base_mse: # OK
-                p1 = i
-                break
-        if p1<0:
-            w.set_index(WEIGHT_INDEX_ZERO)
-            w._layer.update_gpu_weight()
-            
-            
-        print "%d = %d (%d)" % (cnt, i, p0)
-        cnt = cnt + 1
-
-    elapsed_time = time.time() - start_time
-    t = format(elapsed_time, "0")
-    print "time = %s" % (t)
-#
-#
-#
-def evaluate_gpu(r, data, data_class):
-    sum_of_mse = 0.0
-    num = 0
-    ret = 0.0
-    labels = [0,0,0,0,0,0,0,0,0,0]
-    labels[data_class] = 1
-    
-    r.propagate_gpu(data)
-    inf = r.get_inference_gpu()
-    if inf is None:
-        print "ERROR"
-        print r
-        sys.exit(0)
-    
-    ret = inf[data_class]
-    mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
-    return mse, ret
-#
-#
-#
-def evaluate_gpu_alt(r, data, data_class, w, wi_alt):
-    sum_of_mse = 0.0
-    num = 0
-    ret = 0.0
-    labels = [0,0,0,0,0,0,0,0,0,0]
-    labels[data_class] = 1
+    labels = np.zeros(num_of_class, dtype=np.float32)
+    labels[data_class] = 1.0
     
     r.propagate_gpu_alt(data, w, wi_alt)
     inf = r.get_inference_gpu()
-    #print inf
     if inf is None:
         print "ERROR"
-        print r
         sys.exit(0)
 
     ret = inf[data_class]
     mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
+    return mse, ret
+#
+#
+#
+def evaluate(r, data, data_class, num_of_class):
+    num = float(num_of_class)
+    sum_of_mse = 0.0
+    labels = np.zeros(num_of_class, dtype=np.float32)
+    labels[data_class] = 1.0
+        
+    r.propagate(data)
+    inf = r.get_inference_gpu()
+    if inf is None:
+        print "ERROR"
+        sys.exit(0)
+
+    ret = inf[data_class]
+    mse = util.mean_squared_error(inf, len(inf), labels, len(labels))
     return mse, ret
 #
 #
 #
 def evaluate_minibatch_gpu(r, minibatch, num_of_class):
-    sum_of_mse = 0.0
     num = float(num_of_class)
+    sum_of_mse = 0.0
     ret = 0.0
-    labels = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+    labels = np.zeros(num_of_class, dtype=np.float32)
     
     for j in range(num_of_class):
         labels[j] = 1.0
@@ -630,13 +266,12 @@ def evaluate_minibatch_gpu(r, minibatch, num_of_class):
 #
 #
 def evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt):
-    sum_of_mse = 0.0
     num = float(num_of_class)
+    sum_of_mse = 0.0
     ret = 0.0
-    labels = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+    labels = np.zeros(num_of_class, dtype=np.float32)
     
     for j in range(num_of_class):
-        #num = num + 1
         labels[j] = 1.0
         data = minibatch[j]
         r.propagate_gpu_alt(data, w, wi_alt)
@@ -657,41 +292,7 @@ def evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt):
 #
 #
 #
-def train_gpu(r, data, data_class):
-    weight_list = r.get_weight_list()
-    w_num = len(weight_list)
-
-    c = 0
-    updates = []
-    samples = random.sample(weight_list, w_num)
-    for w in samples:
-        base_mse, base_ret = evaluate_gpu(r, data, data_class, w, w.get_index())
-        #print "%d = %d : %f" % (c, w.get_index(), base_mse)
-        wi_alt = w.get_index() +1
-        if wi_alt>core.WEIGHT_INDEX_MAX:
-            pass
-        else:
-            mse, ret = evaluate_gpu_alt(r, data, data_class, w, wi_alt)
-            if mse<base_mse:
-                print "%d : %d = %f > %d = %f " % (w.get_id(), w.get_index(), base_mse, wi_alt, mse)
-                updates.append(w.get_id())
-#        for wi_alt in range(core.WEIGHT_INDEX_ZERO+2, core.lesserWeightsLen):
-#           mse, ret = evaluate_gpu(r, data, data_class, w, wi_alt)
-#            if mse<base_mse:
-#                print "    %d : %f" % (wi_alt, mse)
-        c += 1
-
-    for i in updates:
-        w = weight_list[i]
-        #print "> %d = %d" % (i, w.get_index())
-        w.set_index(w.get_index()+1)
-
-    #print r.get_inference_gpu()
-    r.update_gpu_weight()
-#
-#
-#
-def weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret):
+def weight_shift_signed(r, minibatch, num_of_class, w, base_mse, base_ret):
     inc = 0
     dec = 0
     wi = w.get_index()
@@ -738,13 +339,13 @@ def weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret):
 #
 #
 #
-def weight_shit_signed_rigid(r, minibatch, num_of_class, w, base_mse, base_ret):
+def weight_shift_signed_rigid(r, minibatch, num_of_class, w, base_mse, base_ret):
     inc = 0
     dec = 0
     wi = w.get_index()
     id = w.get_id()
     
-    if wi==WEIGHT_INDEX_MAX:
+    if wi==core.WEIGHT_INDEX_MAX:
         wi_alt = wi - 1
         mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
         if mse_alt<=base_mse:
@@ -752,7 +353,7 @@ def weight_shit_signed_rigid(r, minibatch, num_of_class, w, base_mse, base_ret):
             dec = dec + 1
             print " - : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
 
-    elif wi==WEIGHT_INDEX_MIN:
+    elif wi==core.WEIGHT_INDEX_MIN:
         wi_alt = wi + 1
         mse_alt, ret_alt = evaluate_minibatch_gpu_alt(r, minibatch, num_of_class, w, wi_alt)
         if mse_alt<=base_mse:
@@ -780,7 +381,49 @@ def weight_shit_signed_rigid(r, minibatch, num_of_class, w, base_mse, base_ret):
 #
 #
 #
-def weight_shit_positive(r, minibatch, num_of_class, w, base_mse, base_ret):
+def weight_shift_signed_rigid_single(r, daya, data_class, num_of_class, w, base_mse, base_ret):
+    inc = 0
+    dec = 0
+    wi = w.get_index()
+    id = w.get_id()
+    
+    if wi==WEIGHT_INDEX_MAX:
+        wi_alt = wi - 1
+        mse_alt, ret_alt = evaluate_alt(r, data, data_class, num_of_class, w, wi_alt)
+        if mse_alt<=base_mse:
+            w.set_index(wi_alt)
+            dec = dec + 1
+            print " - : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+
+    elif wi==WEIGHT_INDEX_MIN:
+        wi_alt = wi + 1
+        mse_alt, ret_alt = evaluate_alt(r, data, data_class, num_of_class, w, wi_alt)
+        if mse_alt<=base_mse:
+            w.set_index(wi_alt)
+            inc = inc + 1
+            print " + : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+
+    else:
+        wi_alt = wi + 1
+        mse_alt, ret_alt = evaluate_alt(r, data, data_class, num_of_class, w, wi_alt)
+        if mse_alt<base_mse:
+            w.set_index(wi_alt)
+            inc = inc + 1
+            print " + : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+
+        else:
+            wi_alt = wi - 1
+            mse_alt, ret_alt = evaluate_alt(r, data, data_class, num_of_class, w, wi_alt)
+            if mse_alt<base_mse:
+                w.set_index(wi_alt)
+                dec = dec + 1
+                print " - : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+
+    return inc, dec
+#
+#
+#
+def weight_shift_positive(r, minibatch, num_of_class, w, base_mse, base_ret):
     inc = 0
     dec = 0
     wi = w.get_index()
@@ -820,7 +463,7 @@ def weight_shit_positive(r, minibatch, num_of_class, w, base_mse, base_ret):
 #
 #
 #
-def weight_shit(r, minibatch, num_of_class, w, base_mse, base_ret):
+def weight_shift(r, minibatch, num_of_class, w, base_mse, base_ret):
     inc = 0
     dec = 0
     wi = w.get_index()
@@ -892,12 +535,6 @@ def weight_scan(r, minibatch, num_of_class, w, base_mse, base_ret):
 #
 #
 #
-#def weight_shit_layer_by_layer(r, minibatch, num_of_class, w, base_mse, base_ret):
-#
-#
-#
-#
-#
 def process_minibatch_layer_by_layer(r, minibatch, num_of_class):
     c = r.countLayers()
     wcnt = 0
@@ -919,8 +556,8 @@ def process_minibatch_layer_by_layer(r, minibatch, num_of_class):
             wi = w.get_index()
             #print "%d : %d/%d (%d, %d) %d" % (index, k, num, n, i, rwi)
             #print "     %f : %f" %(core.WEIGHT_SET[wi], layer.get_weight(n, i))
-            inc, dec = weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
-            #inc, dec = weight_shit_positive(r, minibatch, num_of_class, w, base_mse, base_ret)
+            inc, dec = weight_shift_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
+            #inc, dec = weight_shift_positive(r, minibatch, num_of_class, w, base_mse, base_ret)
             #weight_scan(r, minibatch, num_of_class, w, base_mse, base_ret)
             inc_total = inc_total + inc
             dec_total = dec_total + dec
@@ -952,8 +589,8 @@ def process_minibatch_layer_by_layer_reversed(r, minibatch, num_of_class):
             rwi = n*layer._num_input + i
             w = r._weight_list[wcnt + rwi]
             wi = w.get_index()
-            #inc, dec = weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
-            inc, dec = weight_shit_positive(r, minibatch, num_of_class, w, base_mse, base_ret)
+            #inc, dec = weight_shift_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
+            inc, dec = weight_shift_positive(r, minibatch, num_of_class, w, base_mse, base_ret)
             inc_total = inc_total + inc
             dec_total = dec_total + dec
         
@@ -983,8 +620,11 @@ def process_minibatch_layer_by_layer_reversed_even(r, minibatch, num_of_class):
                 rwi = node_index*layer._num_input + i
                 w = r._weight_list[wcnt + rwi]
                 wi = w.get_index()
-                inc, dec = weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
-                #inc, dec = weight_shit_positive(r, minibatch, num_of_class, w, base_mse, base_ret)
+                #
+                #inc, dec = weight_shift_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
+                #inc, dec = weight_shift_positive(r, minibatch, num_of_class, w, base_mse, base_ret)
+                inc, dec = weight_shift_signed_rigid(r, minibatch, num_of_class, w, base_mse, base_ret)
+                #
                 inc_total = inc_total + inc
                 dec_total = dec_total + dec
         
@@ -1009,14 +649,46 @@ def process_minibatch(r, minibatch, num_of_class):
         base_mse, base_ret = evaluate_minibatch_gpu(r, minibatch, num_of_class)
         #print "%d / %d" % (c, num)
         #weight_scan(r, minibatch, num_of_class, w, base_mse, base_ret)
-        #inc, dec = weight_shit(r, minibatch, num_of_class, w, base_mse, base_ret)
-        inc, dec = weight_shit_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
+        #inc, dec = weight_shift(r, minibatch, num_of_class, w, base_mse, base_ret)
+        inc, dec = weight_shift_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
         c = c + 1
         inc_total = inc_total + inc
         dec_total = dec_total + dec
         r.update_gpu_weight()
 
     #print "inc=%d, dec=%d" % (inc_total, dec_total)
+    return inc_total, dec_total
+#
+#
+#
+def process_single(r, data, data_class, num_of_class):
+    c = r.countLayers()
+    wcnt = 0
+    inc_total = 0
+    dec_total = 0
+    for index in range(c-1, 0, -1):
+        layer = r.getLayerAt(index)
+        num = layer._num_input / 10
+        print num
+        # mse
+        base_mse, base_ret = evaluate(r, data, data_class, num_of_class)
+        for node_index in range(layer._num_node):
+            print node_index
+            for k in range(num):
+                i = random.randint(0, layer._num_input-1)
+                rwi = node_index*layer._num_input + i
+                w = r._weight_list[wcnt + rwi]
+                wi = w.get_index()
+                #
+                inc, dec = weight_shift_signed_rigid_single(r, daya, data_class, num_of_class, w, base_mse, base_ret)
+                #
+                inc_total = inc_total + inc
+                dec_total = dec_total + dec
+        
+        # weight update
+        wcnt = wcnt + layer._num_node * layer._num_input
+        r.update_gpu_weight()
+    
     return inc_total, dec_total
 #
 #
@@ -1028,12 +700,14 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
     inc = 0
     dec = 0
     start = num_of_processed
-    k = 0
+    epoc = 1 # currently, epoch is fixed to 1
+    k = 0 # iteration
+    totak_start_time = time.time()
+    #
     for i in range(start, start+it_train, 1):
         minibatch = train_batch[i]
         start_time = time.time()
-        # currently, epoch is fixed to 1
-        for j in range(1):
+        for j in range(epoc):
             #inc, dec = process_minibatch(r, minibatch, num_of_class)
             #inc, dec = process_minibatch_layer_by_layer(r, minibatch, num_of_class)
             #inc, dec = process_minibatch_layer_by_layer_reversed(r, minibatch, num_of_class)
@@ -1046,6 +720,8 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
         print "[%03d|%03d] %s" % (k, it_train, t)
         k = k + 1
 
+    total_time = time.time() - totak_start_time
+    print "[total time] %s" % (t)
     return k
 #
 #
@@ -1086,16 +762,6 @@ def main():
     my_gpu = gpu.Gpu()
     my_gpu.set_kernel_code()
     #
-    #my_gpu = None
-    #
-    #mode = get_key_input("GPU? yes=1 >")
-    #if mode==1:
-    #    my_gpu = gpu.Gpu()
-    #    my_gpu.set_kernel_code()
-    #
-    #
-    #
-     
     num_of_processed = util.pickle_load(PROCEEDED_PATH)
     if num_of_processed is None:
         num_of_processed = 0
@@ -1112,6 +778,8 @@ def main():
     print "4 : self-test"
     print "5 : debug"
     print "6 : debug 2"
+    print "7 : batch"
+    print "8 : save and quit"
     print "9 : quit"
     mode = get_key_input("input command >")
     if mode==0:
@@ -1145,13 +813,14 @@ def main():
         save_weight(r)
     elif mode==3:
         print ">> test mode"
+        debug = 0
         test_array = util.pickle_load(TEST_BATCH_PATH)
         if test_array is None:
             print "error : no test batch"
             return 0
         #
         it_test = max_it_test
-        test_mode(r, test_array, NUM_OF_CLASS, it_test, minibatch_size)
+        test_mode(r, test_array, NUM_OF_CLASS, it_test, minibatch_size, debug)
     elif mode==4:
         print ">> self-test mode"
         test_mode(r, train_batch, NUM_OF_CLASS, num_of_processed, minibatch_size)
@@ -1172,6 +841,24 @@ def main():
         util.list_to_csv("./test.cvs", wi_list)
         d_list = util.csv_to_list("./test.cvs")
         print len(d_list)
+    elif mode==7:
+        print ">> batch mode"
+        it_batch = 10
+        it_train = 100
+        train_array = util.pickle_load(TRAIN_BATCH_PATH)
+        it_test = max_it_test
+        test_array = util.pickle_load(TEST_BATCH_PATH)
+        #
+        for i in range(it_batch):
+            prosecced = train_mode(r, train_array, it_train, NUM_OF_CLASS, num_of_processed)
+            num_of_processed = num_of_processed + prosecced
+            util.pickle_save(PROCEEDED_PATH, num_of_processed)
+            save_weight(r)
+            #
+            test_mode(r, test_array, NUM_OF_CLASS, it_test, minibatch_size)
+    elif mode==8:
+        print ">> save and quit"
+        save_weight(r)
     elif mode==9:
         print ">> quit"
     else:

@@ -339,7 +339,7 @@ def weight_shift_signed(r, minibatch, num_of_class, w, base_mse, base_ret):
 #
 #
 #
-def weight_shift_signed_rigid(r, minibatch, num_of_class, w, base_mse, base_ret):
+def weight_shift_rigid(r, minibatch, num_of_class, w, base_mse, base_ret):
     inc = 0
     dec = 0
     wi = w.get_index()
@@ -381,7 +381,7 @@ def weight_shift_signed_rigid(r, minibatch, num_of_class, w, base_mse, base_ret)
 #
 #
 #
-def weight_shift_signed_rigid_single(r, daya, data_class, num_of_class, w, base_mse, base_ret):
+def weight_shift_rigid_single(r, daya, data_class, num_of_class, w, base_mse, base_ret):
     inc = 0
     dec = 0
     wi = w.get_index()
@@ -623,7 +623,7 @@ def process_minibatch_layer_by_layer_reversed_even(r, minibatch, num_of_class):
                 #
                 #inc, dec = weight_shift_signed(r, minibatch, num_of_class, w, base_mse, base_ret)
                 #inc, dec = weight_shift_positive(r, minibatch, num_of_class, w, base_mse, base_ret)
-                inc, dec = weight_shift_signed_rigid(r, minibatch, num_of_class, w, base_mse, base_ret)
+                inc, dec = weight_shift_rigid(r, minibatch, num_of_class, w, base_mse, base_ret)
                 #
                 inc_total = inc_total + inc
                 dec_total = dec_total + dec
@@ -680,7 +680,7 @@ def process_single(r, data, data_class, num_of_class):
                 w = r._weight_list[wcnt + rwi]
                 wi = w.get_index()
                 #
-                inc, dec = weight_shift_signed_rigid_single(r, daya, data_class, num_of_class, w, base_mse, base_ret)
+                inc, dec = weight_shift_rigid_single(r, daya, data_class, num_of_class, w, base_mse, base_ret)
                 #
                 inc_total = inc_total + inc
                 dec_total = dec_total + dec
@@ -693,6 +693,39 @@ def process_single(r, data, data_class, num_of_class):
 #
 #
 #
+def train_mode_2(r, train_batch, it_train, num_of_class, num_of_processed):
+    print ">> train mode"
+    print len(train_batch)
+    print "train (%d, %d)" % (num_of_processed, it_train)
+    inc = 0
+    dec = 0
+    start = num_of_processed
+    epoc = 1 # currently, epoch is fixed to 1
+    k = 0 # iteration
+    total_start_time = time.time()
+    #
+    for i in range(start, start+it_train, 1):
+        minibatch = train_batch[i]
+        start_time = time.time()
+        #
+        for data_class in range(num_of_class):
+            for j in range(epoc):
+                data = minibatch[data_class]
+                inc, dec  = process_single(r, data, data_class, num_of_class)
+                print "[%d/%d] inc=%d, dec=%d" % (i, start+it_train, inc, dec)
+        #
+        elapsed_time = time.time() - start_time
+        t = format(elapsed_time, "0")
+        print "[%03d|%03d] %s" % (k, it_train, t)
+        k = k + 1
+    
+    total_time = time.time() - total_start_time
+    t = format(total_time, "0")
+    print "[total time] %s" % (t)
+    return k
+#
+#
+#
 def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
     print ">> train mode"
     print len(train_batch)
@@ -702,7 +735,7 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
     start = num_of_processed
     epoc = 1 # currently, epoch is fixed to 1
     k = 0 # iteration
-    totak_start_time = time.time()
+    total_start_time = time.time()
     #
     for i in range(start, start+it_train, 1):
         minibatch = train_batch[i]
@@ -720,7 +753,8 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
         print "[%03d|%03d] %s" % (k, it_train, t)
         k = k + 1
 
-    total_time = time.time() - totak_start_time
+    total_time = time.time() - total_start_time
+    t = format(total_time, "0")
     print "[total time] %s" % (t)
     return k
 #

@@ -57,9 +57,9 @@ WEIGHT_SET_7 = [0.0078125, 0.01079619, 0.0149194, 0.02061731, 0.02849133, 0.0393
 
 WEIGHT_SET_8 = [0.0078125, 0.015625, 0.0625, 0.125, 0.25, 0.5, 1]
 
-WEIGHT_SET = WEIGHT_SET_2
+WEIGHT_SET = WEIGHT_SET_1
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
-WEIGHT_INDEX_ZERO = 0 #WEIGHT_INDEX_SIZE/2
+WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
 #WEIGHT_RANDOM_RANGE = 6
@@ -103,6 +103,8 @@ class Weight:
         self._i = i
         self._index = 0
         self._id = -1
+        self._lock = 0
+        self._step = 0
     
     def set_id(self, id):
         self._id = id
@@ -170,7 +172,7 @@ class Layer:
         self._gpu_output = self._gpu.dev_malloc(self._output_array)
         #print self._output_array
 
-    def update_gpu_weight(self):
+    def update_weight(self):
         if self._type>0:
             self._gpu.write(self._gpu_weight, self._weight_matrix)
             #print self._weight_matrix
@@ -318,9 +320,9 @@ class Roster:
             c += 1
             #print "restore : %d, %d" % (wi, w.get_index())
 
-    def update_gpu_weight(self):
+    def update_weight(self):
         for layer in self.layers:
-            layer.update_gpu_weight()
+            layer.update_weight()
 
     def get_weight_list(self):
         return self._weight_list

@@ -342,31 +342,35 @@ def weight_shift_signed(r, minibatch, num_of_class, w, base_mse):
 #
 def weight_shift_blaze(r, minibatch, num_of_class, w, base_mse):
     wi = w.get_index()
-    id = w.get_id()
     
-    if wi._lock==1:
+    if w._lock==1:
         return 0, 0
-
-    if wi._step==0:
+    
+    if w._step==0:
+        if wi==core.WEIGHT_INDEX_MAX or wi==core.WEIGHT_INDEX_MIN:
+            w._lock = 1
+            w._step = 0
+            return 0, 0
+        
         wi_alt = wi+1
         mse_alt = evaluate_minibatch_alt(r, minibatch, num_of_class, w, wi_alt)
         if mse_alt<=base_mse:
-            wi._step = 1
+            w._step = 1
             w.set_index(wi_alt)
             return 1, 0
         else:
             wi_alt = wi-1
             mse_alt = evaluate_minibatch_alt(r, minibatch, num_of_class, w, wi_alt)
             if mse_alt<=base_mse:
-                wi._step = -1
+                w._step = -1
                 w.set_index(wi_alt)
                 return 0, 1
             else:
-                wi._lock = 1
-                wi._step = 0
+                w._lock = 1
+                w._step = 0
                 return 0, 0
     
-    return 0
+    return 0, 0
 #
 #
 #
@@ -672,25 +676,25 @@ def process_minibatch_layer_by_layer_reversed_even(r, minibatch, num_of_class):
 def process_minibatch(r, minibatch, num_of_class):
     weight_list = r.get_weight_list()
     w_num = len(weight_list)
-    c = 0
+    #c = 0
     inc_total = 0
     dec_total = 0
     
-    num = w_num / 10
-    samples = random.sample(weight_list, num)
-    for w in samples:
-        base_mse = evaluate_minibatch(r, minibatch, num_of_class)
-        #print "%d / %d" % (c, num)
+    num = w_num/10
+    base_mse = evaluate_minibatch(r, minibatch, num_of_class)
+    
+    for i in range(num):
+        w = weight_list[ random.randrange(w_num) ]
         #weight_scan(r, minibatch, num_of_class, w, base_mse)
         #inc, dec = weight_shift(r, minibatch, num_of_class, w, base_mse)
-        inc, dec = weight_shift_signed(r, minibatch, num_of_class, w, base_mse)
-        #inc, dec = weight_shift_blaze(r, minibatch, num_of_class, w, base_mse)
-        
-        c = c + 1
+        #inc, dec = weight_shift_signed(r, minibatch, num_of_class, w, base_mse)
+        inc, dec = weight_shift_blaze(r, minibatch, num_of_class, w, base_mse)
+        #print "inc=%d, dec=%d" % (inc_total, dec_total)
+        #c = c + 1
         inc_total = inc_total + inc
         dec_total = dec_total + dec
-        r.update_weight()
 
+    r.update_weight()
     #print "inc=%d, dec=%d" % (inc_total, dec_total)
     return inc_total, dec_total
 #
@@ -804,10 +808,10 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
         minibatch = train_batch[i]
         start_time = time.time()
         for j in range(epoc):
-            #inc, dec = process_minibatch(r, minibatch, num_of_class)
+            inc, dec = process_minibatch(r, minibatch, num_of_class)
             #inc, dec = process_minibatch_layer_by_layer(r, minibatch, num_of_class)
             #inc, dec = process_minibatch_layer_by_layer_reversed(r, minibatch, num_of_class)
-            inc, dec = process_minibatch_layer_by_layer_reversed_even(r, minibatch, num_of_class)
+            #inc, dec = process_minibatch_layer_by_layer_reversed_even(r, minibatch, num_of_class)
 
         print "[%d/%d] inc=%d, dec=%d" % (i, start+it_train, inc, dec)
         #

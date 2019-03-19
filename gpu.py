@@ -29,8 +29,8 @@ __kernel void scale(
     const float max)
 {
     int i = get_global_id(0);
-    float v = x[i];
-    y[i] = v/max;
+    float v = x[i] + 1.0;
+    y[i] = v/(max+1.0);
 };
 
 __kernel void multiple_x_by_w_alt(

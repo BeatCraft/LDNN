@@ -344,6 +344,64 @@ def weight_shift_signed(r, minibatch, num_of_class, w, base_mse):
 #
 #
 #
+def weight_shift_blaze_4(r, minibatch, num_of_class, w, base_mse):
+    wi = w.get_index()
+    
+    if w._lock==1:
+        return 0, 0
+    
+    if w._step==0:
+        if wi==core.WEIGHT_INDEX_MAX:
+            #w.set_index(core.WEIGHT_INDEX_ZERO)
+            w._step = -1
+        #return 0, 0
+        elif wi==core.WEIGHT_INDEX_MIN:
+            #w.set_index(core.WEIGHT_INDEX_ZERO)
+            w._step = 1
+        #   return 0, 0
+        else:
+            wi_alt = wi+1
+            mse_alt = evaluate_minibatch_alt(r, minibatch, num_of_class, w, wi_alt)
+            if mse_alt<base_mse:
+                w._step = 1
+                w.set_index(wi_alt)
+                return 1, 0
+            
+            wi_alt = wi-1
+            mse_alt = evaluate_minibatch_alt(r, minibatch, num_of_class, w, wi_alt)
+            if mse_alt<base_mse:
+                w._step = -1
+                w.set_index(wi_alt)
+                return 0, 1
+            else:
+                #w._lock = 1
+                w._step = 0
+                return 0, 0
+
+    if w._step==1 and wi==core.WEIGHT_INDEX_MAX:
+        #w.set_index(core.WEIGHT_INDEX_ZERO)
+        w._step = -1
+        #return 0, 0
+    elif w._step==-1 and wi==core.WEIGHT_INDEX_MIN:
+        #w.set_index(core.WEIGHT_INDEX_ZERO)
+        w._step = 1
+        #return 0, 0
+
+    wi_alt = wi + w._step
+    mse_alt = evaluate_minibatch_alt(r, minibatch, num_of_class, w, wi_alt)
+    if mse_alt<base_mse:
+        w.set_index(wi_alt)
+        if w._step==1:
+            return 1, 0
+        
+        return 0, 1
+
+    #w._lock = 1
+    w._step = 0
+    return 0, 0
+#
+#
+#
 def weight_shift_blaze_3(r, minibatch, num_of_class, w, base_mse):
     wi = w.get_index()
     
@@ -394,15 +452,14 @@ def weight_shift_blaze_3(r, minibatch, num_of_class, w, base_mse):
                 w._step = 0
                 return 0, 0
     
-    # w._step==1 or w._step==-1
     if w._step==1 and wi==core.WEIGHT_INDEX_MAX:
-    #if wi==core.WEIGHT_INDEX_MAX:
-        w._step = -1
-        #return 0, 0
+        w.set_index(core.WEIGHT_INDEX_ZERO)
+        w._step = 0
+        return 0, 0
     elif w._step==-1 and wi==core.WEIGHT_INDEX_MIN:
-    #elif wi==core.WEIGHT_INDEX_MIN:
-        w._step = 1
-        #return 0, 0
+        w.set_index(core.WEIGHT_INDEX_ZERO)
+        w._step = 0
+        return 0, 0
 
     wi_alt = wi + w._step
     mse_alt = evaluate_minibatch_alt(r, minibatch, num_of_class, w, wi_alt)
@@ -710,7 +767,7 @@ def weight_shift_positive(r, minibatch, num_of_class, w, base_mse):
         if mse_alt<base_mse:
             w.set_index(wi_alt)
             dec = dec + 1
-            print " - : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+            #print " - : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
 
     elif wi==core.WEIGHT_INDEX_MIN:
         wi_alt = wi + 1
@@ -718,21 +775,28 @@ def weight_shift_positive(r, minibatch, num_of_class, w, base_mse):
         if mse_alt<=base_mse:
             w.set_index(wi_alt)
             inc = inc + 1
-            print " + : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+            #print " + : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
     else:
         wi_alt = wi + 1
         mse_alt = evaluate_minibatch_alt(r, minibatch, num_of_class, w, wi_alt)
         if mse_alt<base_mse:
             w.set_index(wi_alt)
             inc = inc + 1
-            print " + : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
-        elif mse_alt==base_mse:
-            pass
+            #print " + : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
         else:
             wi_alt = wi - 1
-            w.set_index(wi_alt)
-            dec = dec + 1
-            print " - : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
+            mse_alt = evaluate_minibatch_alt(r, minibatch, num_of_class, w, wi_alt)
+            if mse_alt<base_mse:
+                w.set_index(wi_alt)
+                dec = dec + 1
+                    
+#        elif mse_alt==base_mse:
+#            pass
+#        else:
+#            wi_alt = wi - 1
+#            w.set_index(wi_alt)
+#            dec = dec + 1
+#            #print " - : %d > %d   | %f > %f" % (wi, wi_alt, base_mse, mse_alt)
 
     return inc, dec
 #
@@ -914,29 +978,40 @@ def process_minibatch_layer_by_layer_reversed_even(r, minibatch, num_of_class):
 #
 #
 def process_minibatch(r, minibatch, num_of_class):
-    weight_list = r.get_weight_list()
-    w_num = len(weight_list)
-    #c = 0
     inc_total = 0
     dec_total = 0
-    
+    weight_list = r.get_weight_list()
+    w_num = len(weight_list)
     num = w_num/10
     base_mse = evaluate_minibatch(r, minibatch, num_of_class)
-    print "base_mse=%f" % base_mse
     
-    for i in range(num):
-        w = weight_list[ random.randrange(w_num) ]
+    samples = random.sample(weight_list, num)
+    for w in samples:
+#    for i in range(num):
+#        w = weight_list[ random.randrange(w_num) ]
+        #base_mse = evaluate_minibatch(r, minibatch, num_of_class)
+        #print "base_mse=%f" % base_mse
+        
         #weight_scan(r, minibatch, num_of_class, w, base_mse)
         #inc, dec = weight_shift(r, minibatch, num_of_class, w, base_mse)
         #inc, dec = weight_shift_signed(r, minibatch, num_of_class, w, base_mse)
-        inc, dec = weight_shift_blaze_3(r, minibatch, num_of_class, w, base_mse)
+        #inc, dec = weight_shift_blaze_4(r, minibatch, num_of_class, w, base_mse)
+        inc, dec = weight_shift_positive(r, minibatch, num_of_class, w, base_mse)
         #print "inc=%d, dec=%d" % (inc_total, dec_total)
-        #c = c + 1
         inc_total = inc_total + inc
         dec_total = dec_total + dec
+        #
+        #r.update_weight()
 
     r.update_weight()
     #print "inc=%d, dec=%d" % (inc_total, dec_total)
+
+#    c = 0
+#    for w in weight_list:
+#        if w._lock==1:
+#            c = c + 1
+#
+#    print "lock %d / %d" %(c, w_num)
     return inc_total, dec_total
 #
 #
@@ -1041,7 +1116,7 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
     inc = 0
     dec = 0
     start = num_of_processed
-    epoc = 1 # currently, epoch is fixed to 1
+    epoc = 200 # currently, epoch is fixed to 1
     k = 0 # iteration
     total_start_time = time.time()
     #
@@ -1166,7 +1241,10 @@ def main():
         test_mode(r, test_array, NUM_OF_CLASS, it_test, minibatch_size, debug)
     elif mode==4:
         print ">> self-test mode"
-        test_mode(r, train_batch, NUM_OF_CLASS, num_of_processed, minibatch_size)
+        debug = 0
+        train_array = util.pickle_load(TRAIN_BATCH_PATH)
+        it_test = num_of_processed
+        test_mode(r, train_array, NUM_OF_CLASS, it_test, minibatch_size, debug)
     elif mode==5:
         print ">> debug mode"
         data_list = util.loadData("./data/test/8/06755.png")

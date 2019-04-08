@@ -1116,7 +1116,7 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
     inc = 0
     dec = 0
     start = num_of_processed
-    epoc = 200 # currently, epoch is fixed to 1
+    epoc = 100 # currently, epoch is fixed to 1
     k = 0 # iteration
     total_start_time = time.time()
     #
@@ -1251,7 +1251,40 @@ def main():
         data_array = np.array(data_list)
         #r.propagate(data_array)
         r.propagate_gpu(data_array)
-        print r.get_inference_gpu()
+        inf = r.get_inference_gpu()
+    
+        print "inf"
+        for i in range(NUM_OF_CLASS):
+            print "%d : %f" % (i, inf[i])
+
+        
+        labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
+        labels[8] = 1.0
+        mse = util.mean_squared_error(inf, len(inf), labels, len(labels))
+        print "MSE"
+        print "%f" % (mse)
+        
+        weight_list = r.get_weight_list()
+        w_num = len(weight_list)
+        
+        for j in range(100):
+            k = random.randrange(w_num)
+            w = weight_list[k]
+            wi = w.get_index()
+            print "w : %d, wi : %d" %(k, wi)
+            for i in range(core.WEIGHT_INDEX_MAX):
+                r.propagate_gpu_alt(data_array, w, i)
+                inf_alt = r.get_inference_gpu()
+                mse_alt = util.mean_squared_error(inf_alt, len(inf_alt), labels, len(labels))
+                #print "MSE alt (%d) %f" % (i, mse)
+                if mse_alt<mse:
+                    print "MSE alt (%d) %f [%f]" % (i, mse_alt, mse-mse_alt)
+                elif mse_alt>mse:
+                    print "%d, %f" % (i, mse_alt)
+                else:
+                    print "-"
+                #print inf_alt
+    
     elif mode==6:
         wl = r.get_weight_list()
         wi_list = []

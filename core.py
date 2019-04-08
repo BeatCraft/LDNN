@@ -250,6 +250,9 @@ class Layer:
                                           self._num_input, self._num_node,
                                           w._i, w._node, WEIGHT_SET[wi_alt])
             self._gpu.copy(self._product_matrix, self._gpu_product)
+            #
+            # softmax must be applied below this
+            #
             i = 0
             for row in self._product_matrix:
                 self._sum[i] = relu( np.sum(row) )

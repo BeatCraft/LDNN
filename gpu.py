@@ -29,8 +29,7 @@ __kernel void scale(
     const float max)
 {
     int i = get_global_id(0);
-    float v = x[i] + 1.0;
-    y[i] = v/(max+1.0);
+    y[i] = x[i]/max;
 };
 
 __kernel void multiple_x_by_w_alt(
@@ -53,6 +52,9 @@ const float alt_w)
 };
 
 """
+#    float v = x[i] + 1.0;
+#    y[i] = v/(max+1.0);
+#
 # printf(\"GPU :(%d, %d) = %f\\n\", j, i, x[i]);
 # printf(\"%f\\n\", y[i]);
 #

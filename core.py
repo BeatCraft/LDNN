@@ -314,6 +314,10 @@ class Roster:
             w.set_id(c)
             c += 1
 
+    def unlock_weight_all(self):
+        for w in self._weight_list:
+            w._lock = 0
+
     def restore_weighgt(self, w_list):
         c = 0
         for w in self._weight_list:

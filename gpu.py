@@ -65,9 +65,9 @@ class Gpu:
         # AMD Server
         #device = platform.get_devices()[0]
         # Intel on MBP
-        device = platform.get_devices()[1]
+        #device = platform.get_devices()[1]
         # AMD on eGPU
-        #device = platform.get_devices()[2]
+        device = platform.get_devices()[2]
         print platform
         print device
     

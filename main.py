@@ -78,11 +78,6 @@ def setup_dnn(path, my_gpu):
     input_layer = r.add_layer(0, 784, 784)
     hidden_layer_1 = r.add_layer(1, 784, 32)
     hidden_layer_2 = r.add_layer(1, 32, 32)
-    #hidden_layer_3 = r.add_layer(1, 32, 32)
-    #hidden_layer_4 = r.add_layer(1, 32, 32)
-    #hidden_layer_5 = r.add_layer(1, 32, 32)
-    #hidden_layer_6 = r.add_layer(1, 32, 32)
-    #
     output_layer = r.add_layer(2, 32, 10)
     
     wi = util.csv_to_list(WEIGHT_INDEX_CSV_PATH)
@@ -152,8 +147,8 @@ def test(r, minibatch, num_of_class, debug=0):
 
     for label in range(len(minibatch)):
         data = minibatch[label]
-        r.propagate_gpu(data)
-        inf = r.get_inference_gpu()
+        r.propagate(data)
+        inf = r.get_inference()
         if inf is None:
             print "ERROR"
             continue
@@ -235,8 +230,8 @@ def evaluate_alt(r, data, data_class, num_of_class, w, wi_alt):
     labels = np.zeros(num_of_class, dtype=np.float32)
     labels[data_class] = 1.0
     
-    r.propagate_gpu_alt(data, w, wi_alt)
-    inf = r.get_inference_gpu()
+    r.propagate_alt(data, w, wi_alt)
+    inf = r.get_inference()
     if inf is None:
         print "ERROR"
         sys.exit(0)
@@ -254,7 +249,7 @@ def evaluate(r, data, data_class, num_of_class):
     labels[data_class] = 1.0
         
     r.propagate(data)
-    inf = r.get_inference_gpu()
+    inf = r.get_inference()
     if inf is None:
         print "ERROR"
         sys.exit(0)
@@ -276,7 +271,7 @@ def evaluate_minibatch(r, minibatch, num_of_class):
         data = minibatch[j]
         
         r.propagate(data)
-        inf = r.get_inference_gpu()
+        inf = r.get_inference()
         if inf is None:
             print "ERROR"
             print r
@@ -302,8 +297,8 @@ def evaluate_minibatch_alt(r, minibatch, num_of_class, w, wi_alt):
     for j in range(num_of_class):
         labels[j] = 1.0
         data = minibatch[j]
-        r.propagate_gpu_alt(data, w, wi_alt)
-        inf = r.get_inference_gpu()
+        r.propagate_alt(data, w, wi_alt)
+        inf = r.get_inference()
         if inf is None:
             print "ERROR"
             print r
@@ -1038,43 +1033,52 @@ def process_minibatch_layer_by_layer_reversed_even(r, minibatch, num_of_class):
 #
 #
 #
+def process_minibatch_1st_hidden_layer(r, minibatch, num_of_class):
+    inc_total = 0
+    dec_total = 0
+    c = r.countLayers()
+    wcnt = 0
+    layer = r.getLayerAt(1)
+    w_num = layer._num_node * layer._num_input
+    num = w_num/10
+
+    base_mse = evaluate_minibatch(r, minibatch, num_of_class)
+        #
+    for k in range(num):
+        n = random.randint(0, layer._num_node-1)
+        i = random.randint(0, layer._num_input-1)
+        rwi = n*layer._num_input + i
+        w = r._weight_list[rwi]
+        wi = w.get_index()
+        #inc, dec = weight_shift_signed(r, minibatch, num_of_class, w, base_mse)
+        inc, dec = weight_shift_positive(r, minibatch, num_of_class, w, base_mse)
+        inc_total = inc_total + inc
+        dec_total = dec_total + dec
+
+    r.update_weight()
+    
+    return inc_total, dec_total
+#
+#
+#
 def process_minibatch(r, minibatch, num_of_class):
     inc_total = 0
     dec_total = 0
     weight_list = r.get_weight_list()
     w_num = len(weight_list)
     num = w_num/10
-    base_mse = evaluate_minibatch(r, minibatch, num_of_class)
     
+    base_mse = evaluate_minibatch(r, minibatch, num_of_class)
     samples = random.sample(weight_list, num)
     for w in samples:
         if w._lock==1:
             continue
-#    for i in range(num):
-#        w = weight_list[ random.randrange(w_num) ]
-        #base_mse = evaluate_minibatch(r, minibatch, num_of_class)
-        #print "base_mse=%f" % base_mse
         
-        #weight_scan(r, minibatch, num_of_class, w, base_mse)
-        #inc, dec = weight_shift(r, minibatch, num_of_class, w, base_mse)
-        #inc, dec = weight_shift_signed(r, minibatch, num_of_class, w, base_mse)
-        #inc, dec = weight_shift_blaze_4(r, minibatch, num_of_class, w, base_mse)
         inc, dec = weight_shift_positive(r, minibatch, num_of_class, w, base_mse)
-        #print "inc=%d, dec=%d" % (inc_total, dec_total)
         inc_total = inc_total + inc
         dec_total = dec_total + dec
-        #
-        #r.update_weight()
 
     r.update_weight()
-    #print "inc=%d, dec=%d" % (inc_total, dec_total)
-
-#    c = 0
-#    for w in weight_list:
-#        if w._lock==1:
-#            c = c + 1
-#
-#    print "lock %d / %d" %(c, w_num)
     return inc_total, dec_total
 #
 #
@@ -1224,7 +1228,7 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
     inc = 0
     dec = 0
     start = num_of_processed
-    epoc = 10 # currently, epoch is fixed to 1
+    epoc = 1 # currently, epoch is fixed to 1
     k = 0 # iteration
     
     total_start_time = time.time()
@@ -1232,14 +1236,10 @@ def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
     for i in range(start, start+it_train, 1):
         minibatch = train_batch[i]
         r.unlock_weight_all()
-        #start_time = time.time()
         for j in range(epoc):
             start_time = time.time()
             inc, dec = process_minibatch(r, minibatch, num_of_class)
-            #inc, dec = process_minibatch_mse_sensitive(r, minibatch, num_of_class)
-            #inc, dec = process_minibatch_layer_by_layer(r, minibatch, num_of_class)
-            #inc, dec = process_minibatch_layer_by_layer_reversed(r, minibatch, num_of_class)
-            #inc, dec = process_minibatch_layer_by_layer_reversed_even(r, minibatch, num_of_class)
+            #inc, dec = process_minibatch_1st_hidden_layer(r, minibatch, num_of_class)
             print "(%d) [%d/%d] inc=%d, dec=%d : %d" % (j, i, start+it_train, inc, dec, inc+dec)
             elapsed_time = time.time() - start_time
             t = format(elapsed_time, "0")
@@ -1360,8 +1360,8 @@ def main():
         data_list = util.loadData("./data/test/8/06755.png")
         data_array = np.array(data_list)
         #r.propagate(data_array)
-        r.propagate_gpu(data_array)
-        inf = r.get_inference_gpu()
+        r.propagate(data_array)
+        inf = r.get_inference()
     
         print "inf"
         for i in range(NUM_OF_CLASS):
@@ -1383,8 +1383,8 @@ def main():
             wi = w.get_index()
             print "w : %d, wi : %d" %(k, wi)
             for i in range(core.WEIGHT_INDEX_MAX):
-                r.propagate_gpu_alt(data_array, w, i)
-                inf_alt = r.get_inference_gpu()
+                r.propagate_alt(data_array, w, i)
+                inf_alt = r.get_inference()
                 mse_alt = util.mean_squared_error(inf_alt, len(inf_alt), labels, len(labels))
                 #print "MSE alt (%d) %f" % (i, mse)
                 if mse_alt<mse:

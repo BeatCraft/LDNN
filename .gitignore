@@ -4,4 +4,4 @@
 *.stats
 *.csv
 wi.csv
-./ubyte/
+./MNIST/

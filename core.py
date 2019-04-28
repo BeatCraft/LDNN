@@ -34,7 +34,6 @@ WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078
 
 WEIGHT_SET_2 = [0.0, 0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
 
-
 WEIGHT_SET_3 = [-1, -0.72363462, -0.52364706, -0.37892914, -0.27420624, -0.19842513, -0.14358729, -0.10390474,
                 -0.07518906, -0.05440941, -0.03937253, -0.02849133, -0.02061731, -0.0149194, -0.01079619, -0.0078125,
                 0,
@@ -213,10 +212,16 @@ class Layer:
 #                sum = np.sum(self._weight_matrix[i]*array_in)
 #                self._y_array[i] = np.exp(sum)
 #
-    def propagate(self, array_in):
+    def propagate(self, array_in, debug=0):
         if self._type==0:   # input
             self._gpu.copy(self._gpu_input, array_in)
-            self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node)
+            self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node, 0)
+            if debug==1:
+                self._gpu.copy(self._y_array, self._gpu_output)
+                print "input"
+                print array_in
+                print self._y_array
+            
         elif self._type==1:   # hidden
             self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
                                       self._num_input, self._num_node)
@@ -229,6 +234,10 @@ class Layer:
                 i += 1
             
             self._gpu.copy(self._gpu_output, self._sum)
+            if debug==1:
+                print "hidden"
+                print self._sum
+    
         else: # output
             self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
                                       self._num_input, self._num_node)
@@ -251,7 +260,7 @@ class Layer:
     def propagate_alt(self, array_in, w, wi_alt):
         if self._type==0: # input
             self._gpu.copy(self._gpu_input, array_in)
-            self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node)
+            self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node, 0)
         elif self._type==1: # hidden            
             self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
                                           self._num_input, self._num_node,
@@ -415,13 +424,13 @@ class Roster:
 #            layer.propagate(array_y)
 #            pre = layer
 #
-    def propagate(self, data):
+    def propagate(self, data, debug=0):
         c = self.countLayers()
         pre = self.getLayerAt(0)
-        pre.propagate(data)
+        pre.propagate(data, debug)
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            layer.propagate(pre._gpu_output)
+            layer.propagate(pre._gpu_output, debug)
             pre = layer
 
     def propagate_alt(self, data, w, wi_alt):

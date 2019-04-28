@@ -16,6 +16,7 @@ import copy
 import math
 import multiprocessing as mp
 import numpy as np
+import struct
 #
 #
 # LDNN Modules
@@ -35,6 +36,21 @@ TEST_BASE_PATH   = "./data/test/"
 TEST_BATCH_PATH = "./test_batch.pickle"
 NETWORK_PATH     = "./network.pickle"
 PROCEEDED_PATH   = "./proceeded.pickle"
+
+TRAIN_IMAGE_PATH  = "./MNIST/train-images-idx3-ubyte"
+TRAIN_LABEL_PATH = "./MNIST/train-labels-idx1-ubyte"
+TEST_IMAGE_PATH   = "./MNIST/t10k-images-idx3-ubyte"
+TEST_LABEL_PATH   = "./MNIST/t10k-labels-idx1-ubyte"
+
+MNIST_IMAGE_WIDTH  = 28
+MNIST_IMAGE_HEIGHT = 28
+MNIST_IMAGE_SIZE   = MNIST_IMAGE_WIDTH*MNIST_IMAGE_HEIGHT
+
+TRAIN_BATCH_SIZE  = 60000
+TEST_BATCH_SIZE   = 10000
+IMAGE_HEADER_SIZE = 16
+LABEL_HEADER_SIZE  = 8
+
 
 WEIGHT_INDEX_CSV_PATH   = "./wi.csv"
 
@@ -104,38 +120,24 @@ def get_key_input(prompt):
 #
 #
 #
-def scan_data(path, num, num_of_class):
-    all_files = []
-    for i in range(num_of_class):
-        file_path = path + "%d/" % i
-        print file_path
-        files = []
-        for f in os.listdir(file_path):
-            path_name = os.path.join(file_path, f)
-            file_name, file_extension = os.path.splitext(path_name)
-            if file_extension == ".png":
-                files.append(path_name)
-                if len(files)>=num:
-                    break
-
-        all_files.append(files)
-    
-    return all_files
-#
-# batch > minibatch > block
-# iteration*size_of_minibatch = NUM_OF_SAMPLES = 5000
-#
-def make_batch(num_of_class, iteration, size_of_minibatch, list_of_path):
+def make_batch(size, image_path, label_path):
     batch = []
-    for i in range(iteration):
-        minibatch = []
-        for label in range(num_of_class):
-            path = list_of_path[label][i]
-            print "%d : %s" %(i, path)
-            data = util.loadData(path)
-            minibatch.append(data)
+    
+    file_in = open(label_path)
+    header = file_in.read(LABEL_HEADER_SIZE)
+    data = file_in.read()
+    label_list = [0 for i in range(size)]
+    for i in range(TEST_BATCH_SIZE):
+        label = struct.unpack('>B', data[i])
+        label_list[i] = label[0]
         
-        batch.append(minibatch)
+    file_in = open(image_path)
+    header = file_in.read(IMAGE_HEADER_SIZE)
+    for i in range(size):
+        data = file_in.read(MNIST_IMAGE_SIZE)
+        da = np.frombuffer(data, dtype=np.uint8)
+        a_float = da.astype(np.float32)
+        batch.append((a_float, label_list[i]))
 
     return batch
 #
@@ -174,22 +176,46 @@ def test(r, minibatch, num_of_class, debug=0):
 def test_mode(r, batch, num_of_class, iteration, minibatch_size, debug=0):
     print ">>test mode(%d)" % iteration
     start_time = time.time()
-
+    
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
     stat = [0,0,0,0,0,0,0,0,0,0]
     
-    for minibatch in batch:
-        if it>=iteration:
-            break
-        if debug:
-            print "it : %d" % it
-        d, s = test(r, minibatch, num_of_class, debug)
-        for j in range(len(dist)):
-            dist[j] = dist[j] + d[j]
-            stat[j] = stat[j] + s[j]
-        
+    for entry in batch:
+        data = entry[0]
+        label = entry[1]
+    
+        r.propagate(data)
+        inf = r.get_inference()
+        #print inf
+        if inf is None:
+            print "ERROR"
+            it = it + 1
+            continue
+    
+        index = -1
+        mx = max(inf)
+        if mx>0.0:
+            for k in range(num_of_class):
+                if inf[k] == mx:
+                    index = k
+                                    
+            dist[index] = dist[index] + 1
+        else:
+            print "[%d] ASS HOLE : %d, %f" % (it, label, mx)
+            r.propagate(data, 1)
+            
+            #print float(data)/255
+            
+            
+            it = it + 1
+            continue
+    
+        if label==index:
+            stat[index] = stat[index] + 1
+
         it = it + 1
+                
     
     debug = 1
     print dist
@@ -1276,8 +1302,8 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
 
-    train_batch = []
-    test_batch = []
+#    train_batch = []
+#    test_batch = []
     minibatch_size = 1
     max_it_train = NUM_OF_SAMPLES/minibatch_size
     max_it_test = NUM_OF_TEST/minibatch_size
@@ -1312,43 +1338,38 @@ def main():
     mode = get_key_input("input command >")
     if mode==0:
         print ">> make train batch"
-        train_list = scan_data(TRAIN_BASE_PATH, NUM_OF_SAMPLES, NUM_OF_CLASS)
-        train_batch = make_batch(NUM_OF_CLASS, max_it_train, minibatch_size, train_list)
-        train_array = np.array(train_batch)
-        util.pickle_save(TRAIN_BATCH_PATH, train_array)
+        batch = make_batch(TRAIN_BATCH_SIZE, TRAIN_IMAGE_PATH, TRAIN_LABEL_PATH)
+        util.pickle_save(TRAIN_BATCH_PATH, batch)
     elif mode==1:
         print ">> make test batch"
-        test_list = scan_data(TEST_BASE_PATH, NUM_OF_TEST, NUM_OF_CLASS)
-        test_batch = make_batch(NUM_OF_CLASS, max_it_test, minibatch_size, test_list)
-        test_array = np.array(test_batch)
-        util.pickle_save(TEST_BATCH_PATH, test_array)
+        batch = make_batch(TEST_BATCH_SIZE, TEST_IMAGE_PATH, TEST_LABEL_PATH)
+        util.pickle_save(TEST_BATCH_PATH, batch)
     elif mode==2:
         print ">> train mode : max_it_train = %d" % (num_of_processed)
-        it_train = get_key_input("iteration > ")
-        if it_train<0:
-            print "error : iteration = %d" % it_train
-            return 0
-        
-        train_array = util.pickle_load(TRAIN_BATCH_PATH)
-        if train_array is None:
+#        it_train = get_key_input("iteration > ")
+#        if it_train<0:
+#            print "error : iteration = %d" % it_train
+#            return 0
+#
+        batch = util.pickle_load(TRAIN_BATCH_PATH)
+        if batch is None:
             print "error : no train batch"
             return 0
-        #
-        prosecced = train_mode(r, train_array, it_train, NUM_OF_CLASS, num_of_processed)
+        
+        prosecced = train_mode(r, batch, TRAIN_BATCH_SIZE)
         num_of_processed = num_of_processed + prosecced
         util.pickle_save(PROCEEDED_PATH, num_of_processed)
-        # save weight here
         save_weight(r)
     elif mode==3:
         print ">> test mode"
         debug = 0
-        test_array = util.pickle_load(TEST_BATCH_PATH)
-        if test_array is None:
+        test_batch = util.pickle_load(TEST_BATCH_PATH)
+        if test_batch is None:
             print "error : no test batch"
             return 0
         #
         it_test = max_it_test
-        test_mode(r, test_array, NUM_OF_CLASS, it_test, minibatch_size, debug)
+        test_mode(r, test_batch, NUM_OF_CLASS, it_test, minibatch_size, debug)
     elif mode==4:
         print ">> self-test mode"
         debug = 0
@@ -1359,7 +1380,6 @@ def main():
         print ">> debug mode"
         data_list = util.loadData("./data/test/8/06755.png")
         data_array = np.array(data_list)
-        #r.propagate(data_array)
         r.propagate(data_array)
         inf = r.get_inference()
     
@@ -1367,7 +1387,6 @@ def main():
         for i in range(NUM_OF_CLASS):
             print "%d : %f" % (i, inf[i])
 
-        
         labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
         labels[8] = 1.0
         mse = util.mean_squared_error(inf, len(inf), labels, len(labels))
@@ -1376,7 +1395,6 @@ def main():
         
         weight_list = r.get_weight_list()
         w_num = len(weight_list)
-        
         for j in range(100):
             k = random.randrange(w_num)
             w = weight_list[k]

@@ -24,12 +24,16 @@ __kernel void multiple_x_by_w(
 };
 
 __kernel void scale(
-    __global int* x,
+    __global float* x,
     __global float* y,
-    const float max)
+    const float max,
+    const int debug)
 {
     int i = get_global_id(0);
     y[i] = x[i]/max;
+    if (debug==1){
+        printf(\"[%d] %f, %f\\n\",i,  x[i], y[i]);
+    }
 };
 
 __kernel void multiple_x_by_w_alt(
@@ -52,6 +56,7 @@ const float alt_w)
 };
 
 """
+#    __global unsigned char* x,
 #    float v = x[i] + 1.0;
 #    y[i] = v/(max+1.0);
 #
@@ -104,13 +109,14 @@ class Gpu:
                                              np.float32(w))
         event.wait()
     
-    def scale(self, d_x, d_y, max, row):
+    def scale(self, d_x, d_y, max, row, debug):
         event = self.prg.scale(self._queue, (row,), None,
-                               d_x, d_y, np.float32(max))
+                               d_x, d_y, np.float32(max), np.int32(debug))
         event.wait()
     
     def copy(self, dist, src):
-        cl.enqueue_copy(self._queue, dist, src)
+        event = cl.enqueue_copy(self._queue, dist, src)
+        event.wait()
     
     def read(self, dist, src):
         cl.enqueue_copy(self._queue, dist, src)

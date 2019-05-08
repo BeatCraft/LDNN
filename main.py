@@ -172,7 +172,7 @@ def test(r, minibatch, num_of_class, debug=0):
     return [dist, stat]
 #
 #
-#
+#   test_mode(r, test_batch, NUM_OF_CLASS, it_test, minibatch_size, debug)
 def test_mode(r, batch, num_of_class, iteration, minibatch_size, debug=0):
     print ">>test mode(%d)" % iteration
     start_time = time.time()
@@ -180,14 +180,16 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size, debug=0):
     it = 0
     dist = [0,0,0,0,0,0,0,0,0,0]
     stat = [0,0,0,0,0,0,0,0,0,0]
+    labels = [0,0,0,0,0,0,0,0,0,0]
     
     for entry in batch:
         data = entry[0]
         label = entry[1]
+        
+        labels[label] = labels[label] + 1
     
         r.propagate(data)
         inf = r.get_inference()
-        #print inf
         if inf is None:
             print "ERROR"
             it = it + 1
@@ -204,10 +206,6 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size, debug=0):
         else:
             print "[%d] ASS HOLE : %d, %f" % (it, label, mx)
             r.propagate(data, 1)
-            
-            #print float(data)/255
-            
-            
             it = it + 1
             continue
     
@@ -215,14 +213,14 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size, debug=0):
             stat[index] = stat[index] + 1
 
         it = it + 1
-                
-    
+            
     debug = 1
     print dist
     if debug:
         for d in dist:
             print d
 
+    print labels
     print stat
     sum = 0.0
     for s in stat:
@@ -230,7 +228,9 @@ def test_mode(r, batch, num_of_class, iteration, minibatch_size, debug=0):
             print s
         sum = sum + s
 
-    print "accuracy = %f" % (sum/(iteration*num_of_class))
+    print sum
+    print minibatch_size
+    print "accuracy = %f" % (sum/float(minibatch_size))
 
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
@@ -1247,6 +1247,209 @@ def train_mode_one_by_one(r, train_batch, it_train, num_of_class, num_of_process
 #
 #
 #
+def evaluate_minibatch_alt_2(r, minibatch, size, w, wi_alt):
+    num = float(size)
+    sum_of_mse = 0.0
+    labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
+    
+    for entry in minibatch:
+        data = entry[0]
+        label = entry[1]
+        labels[label] = 1.0
+        r.propagate_alt(data, w, wi_alt)
+        inf = r.get_inference()
+        if inf is None:
+            print "ERROR"
+            print r
+            sys.exit(0)
+        
+        mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
+        #print mse
+        if mse==0.1:
+            print "ASS"
+            mse = 10.0
+        
+        sum_of_mse = sum_of_mse + mse
+        labels[label] = 0.0
+    
+    mse = sum_of_mse / num
+    #print mse
+    return mse
+#
+#
+#
+def weight_shift_positive_2(r, minibatch, size, w, base_mse):
+    inc = 0
+    dec = 0
+    wi = w.get_index()
+    id = w.get_id()
+    
+    if wi==core.WEIGHT_INDEX_MAX:
+        wi_alt = wi - 1
+        mse_alt = evaluate_minibatch_alt_2(r, minibatch, size, w, wi_alt)
+        if mse_alt<base_mse:
+            w.set_index(wi_alt)
+            dec = 1
+
+    elif wi==core.WEIGHT_INDEX_MIN:
+        wi_alt = wi + 1
+        mse_alt = evaluate_minibatch_alt_2(r, minibatch, size, w, wi_alt)
+        if mse_alt<=base_mse:
+            w.set_index(wi_alt)
+            inc = 1
+
+    else:
+        wi_alt = wi + 1
+        mse_alt = evaluate_minibatch_alt_2(r, minibatch, size, w, wi_alt)
+        if mse_alt<base_mse:
+            w.set_index(wi_alt)
+            inc = 1
+        elif mse_alt>base_mse:
+            wi_alt = wi - 1
+            w.set_index(wi_alt)
+            dec = 1
+        else:
+            w._lock = 1
+            print "    << locked >>"
+
+    return inc, dec
+#
+#
+#
+def weight_shift_random(r, minibatch, size, w, base_mse):
+    inc = 0
+    dec = 0
+    wi = w.get_index()
+    id = w.get_id()
+    w._lock = 1
+    
+#    wi_alt = wi
+#    mse_alt = base_mse
+#    for wi_temp in range(core.WEIGHT_INDEX_MAX):
+#        if wi_temp==wi:
+#            continue
+#
+#        mse_tmp = evaluate_minibatch_alt_2(r, minibatch, size, w, wi_temp)
+#        if mse_tmp<mse_alt:
+#            wi_alt = wi_temp
+#            mse_alt = mse_tmp
+#
+#    if wi_alt==wi:
+#        print "  no change (%d, %d) (%f, %f)" % (wi, wi_alt, base_mse, mse_alt)
+#        return 0
+#
+#    w.set_index(wi_alt)
+#    print "  %d > %d (%f, %f)" % (wi, wi_alt, base_mse, mse_alt)
+#    return 1
+
+    wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
+    while wi_alt==wi:
+        wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
+    
+    mse_alt = evaluate_minibatch_alt_2(r, minibatch, size, w, wi_alt)
+    if mse_alt<base_mse:
+        w.set_index(wi_alt)
+        print "  %d > %d (%f, %f)" % (wi, wi_alt, base_mse, mse_alt)
+        return 1
+    else:
+        print "  no change (%d, %d) (%f, %f)" % (wi, wi_alt, base_mse, mse_alt)
+
+    return 0
+#
+#
+#
+def evaluate_minibatch_2(r, minibatch, size):
+    num = float(size)
+    sum_of_mse = 0.0
+    labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
+    
+    for entry in minibatch:
+        data = entry[0]
+        label = entry[1]
+        labels[label] = 1.0
+        r.propagate(data)
+        inf = r.get_inference()
+        if inf is None:
+            print "ERROR"
+            print r
+            sys.exit(0)
+    
+        mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
+        sum_of_mse = sum_of_mse + mse
+        labels[label] = 0.0
+    
+    mse = sum_of_mse / num
+    return mse
+#
+#
+#
+def process_minibatch_2(r, minibatch, size):
+    inc_total = 0
+    dec_total = 0
+    weight_list = r.get_weight_list()
+    w_num = len(weight_list)
+    num = 100000#w_num#*5
+    k = 0
+    
+#    labels = [0,0,0,0,0,0,0,0,0,0]
+#    for entry in minibatch:
+#        data = entry[0]
+#        label = entry[1]
+#        labels[label] = labels[label] + 1
+#
+#    print labels
+#    return 0, 0
+
+    base_mse = evaluate_minibatch_2(r, minibatch, size)
+    #print "---"
+    #print base_mse
+    #print "---"
+    for i in range(num):
+        k = random.randrange(w_num)
+        w = weight_list[k]
+        print "%d of %d : %d" % (i, num, k)
+        if w._lock==1:
+            print "  skip"
+            continue
+#
+        #inc, dec = weight_shift_positive_2(r, minibatch, size, w, base_mse)
+        ret = weight_shift_random(r, minibatch, size, w, base_mse)
+        #inc_total = inc_total + inc
+        #dec_total = dec_total + dec
+        #print "[%d, %d]" % (inc_total, dec_total)
+        if i%1000==0:
+            print "<< unlock >>"
+            r.unlock_weight_all()
+                
+        if i%100==0:
+            print "<< update >>"
+            r.update_weight()
+            #r.unlock_weight_all()
+            base_mse = evaluate_minibatch_2(r, minibatch, size)
+
+    r.update_weight()
+    
+    return inc_total, dec_total
+#
+#
+#
+def train_mode_2(r, batch, size):
+    print ">> train mode"
+    inc = 0
+    dec = 0
+    minibatch = batch[0:size]
+    print len(minibatch)
+    total_start_time = time.time()
+    #
+    inc, dec = process_minibatch_2(r, minibatch, size)
+    #
+    total_time = time.time() - total_start_time
+    t = format(total_time, "0")
+    print "[total time] %s" % (t)
+    #return
+#
+#
+#
 def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
     print ">> train mode"
     print len(train_batch)
@@ -1356,9 +1559,9 @@ def main():
             print "error : no train batch"
             return 0
         
-        prosecced = train_mode(r, batch, TRAIN_BATCH_SIZE)
-        num_of_processed = num_of_processed + prosecced
-        util.pickle_save(PROCEEDED_PATH, num_of_processed)
+        train_mode_2(r, batch, 100)
+        #num_of_processed = num_of_processed + prosecced
+        #util.pickle_save(PROCEEDED_PATH, num_of_processed)
         save_weight(r)
     elif mode==3:
         print ">> test mode"
@@ -1369,7 +1572,7 @@ def main():
             return 0
         #
         it_test = max_it_test
-        test_mode(r, test_batch, NUM_OF_CLASS, it_test, minibatch_size, debug)
+        test_mode(r, test_batch, NUM_OF_CLASS, it_test, 10000, debug)
     elif mode==4:
         print ">> self-test mode"
         debug = 0

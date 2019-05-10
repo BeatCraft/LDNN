@@ -112,7 +112,7 @@ class Weight:
     # layer : Layer class object
     # node  : index of neurons
     # i     : index of neurons in previous layer
-    # index : index of lookup table / weight index
+    # index : index of WEIGHT_SET / weight index
     # id    : seaquencial number assigned by Roster
     def __init__(self, layer, node, i):
         self._layer = layer
@@ -147,6 +147,26 @@ class Weight:
 #
 #
 #
+class Node:
+    # layer : Layer class object
+    # index : index in the parent layer
+    # start : index of the 1st Weghit
+    # num   : number of Weight attached
+    def __init__(self): #, layer, index, start, num):
+#        self._layer = layer
+#        self._index = index
+#        self._start = start
+#        self._num = num
+        self._w_id_list = []
+
+    def get_weight(self, i):
+        return self._w_id_list[i]
+
+    def add_weight(self, w_id):
+        self._w_id_list.append(w_id)
+#
+#
+#
 class Layer:
     # i         : index of layers
     # type      : 0 = input, 1 = hidden, 2 = output
@@ -163,9 +183,7 @@ class Layer:
         self._product_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
         self._sum = np.zeros(self._num_node, dtype=np.float32)
         self._y_array = np.zeros(self._num_node, dtype=np.float32)
-        #self._weight_list = []
-
-        self.nodes = []
+        self._node_list = []
             
         if self._type==0:
             self._input_array = np.zeros(num_node, dtype=int)
@@ -174,7 +192,6 @@ class Layer:
         self._output_array = np.zeros(num_node, dtype=np.float32)
     
     def init_gpu(self):
-        #print "init_gpu()"
         if self._gpu:
             pass
         else:
@@ -185,33 +202,17 @@ class Layer:
         if self._type>0:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
             self._gpu_product = self._gpu.dev_malloc(self._weight_matrix)
-        #self._gpu_sum = self._gpu.dev_malloc(self._output_array)
+
         self._gpu_output = self._gpu.dev_malloc(self._output_array)
-        #print self._output_array
 
     def update_weight(self):
         if self._type>0:
             self._gpu.write(self._gpu_weight, self._weight_matrix)
-            #print self._weight_matrix
-    
-#    def propagate(self, data):
-#        if self._gpu:
-#            self.propagate_gpu(data)
-#        else:
-#            self.propagate_cpu(data)
-#
-#    def propagate_cpu(self, array_in):
-#        if self._type==0:   # input
-#            self._y_array = array_in/255.0
-#        elif self._type==1: # hidden
-#            for i in range(self._num_node):
-#                sum = np.sum(self._weight_matrix[i]*array_in)
-#                self._y_array[i] = relu(sum)
-#        elif self._type==2: # output
-#            for i in range(self._num_node):
-#                sum = np.sum(self._weight_matrix[i]*array_in)
-#                self._y_array[i] = np.exp(sum)
-#
+
+    def add_node(self, node):
+        self._node_list.append(node)
+        return
+
     def propagate(self, array_in, debug=0):
         if self._type==0:   # input
             self._gpu.copy(self._gpu_input, array_in)
@@ -383,24 +384,18 @@ class Roster:
         layer = Layer(c, type, num_input, num_node, self._gpu)
         if c>0:
             for i in range(num_node):
+                node = Node()
+                layer.add_node(node)
                 for j in range(num_input):
-                    self._weight_list.append( Weight(layer, i, j) )
+                    w = Weight(layer, i, j)
+                    self._weight_list.append(w)
+                    k = 0
+                    k = len(self._weight_list) - 1
+                    node.add_weight(k)
 
         self.layers.append(layer)
-
         if self._gpu:
             layer.init_gpu()
-
-#    def get_inference(self, softmax=0):
-#        ret = []
-#        c = self.countLayers()
-#        output = self.getLayerAt(c-1)
-#        y_array = output.get_y_array()
-#        sum = np.sum(y_array)
-#        for a in y_array:
-#            ret.append(a/sum)
-#
-#        return ret
 
     def get_inference(self):
         ret = []
@@ -408,22 +403,6 @@ class Roster:
         output = self.getLayerAt(c-1)
         return output.get_y_array()
     
-#    def propagate(self, data):
-#        if self._gpu:
-#            self.propagate_gpu(data)
-#        else:
-#            self.propagate_cpu(data)
-#
-#    def propagate_cpu(self, data):
-#        c = self.countLayers()
-#        pre = self.getLayerAt(0)
-#        pre.propagate(data)
-#        for i in range(1, c):
-#            array_y = pre.get_y_array()
-#            layer = self.getLayerAt(i)
-#            layer.propagate(array_y)
-#            pre = layer
-#
     def propagate(self, data, debug=0):
         c = self.countLayers()
         pre = self.getLayerAt(0)

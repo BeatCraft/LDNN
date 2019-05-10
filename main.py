@@ -1433,6 +1433,44 @@ def process_minibatch_2(r, minibatch, size):
 #
 #
 #
+def process_minibatch_3(r, minibatch, size):
+    inc_total = 0
+    dec_total = 0
+    total = 0
+    weight_list = r.get_weight_list()
+    w_num = 28*28 #len(weight_list)
+    n = 14
+    start = n*w_num
+    stop = (n+1)*w_num
+    num = 1000 * 3
+    k = 0
+    
+    base_mse = evaluate_minibatch_2(r, minibatch, size)
+    for i in range(num):
+        k = random.randrange(start, stop, 1)
+        w = weight_list[k]
+        print "%d of %d : %d" % (i, num, k)
+#        if w._lock==1:
+#            print "  skip"
+#            continue
+
+        ret = weight_shift_random(r, minibatch, size, w, base_mse)
+        total = total + ret
+#        if i%1000==0:
+#            print "<< unlock >>"
+#            r.unlock_weight_all()
+        
+        if i%100==0:
+            print "<< update >>"
+            r.update_weight()
+            base_mse = evaluate_minibatch_2(r, minibatch, size)
+
+    r.update_weight()
+    print "tatal = %d" % (total)
+    return inc_total, dec_total
+#
+#
+#
 def train_mode_2(r, batch, size):
     print ">> train mode"
     inc = 0
@@ -1441,12 +1479,12 @@ def train_mode_2(r, batch, size):
     print len(minibatch)
     total_start_time = time.time()
     #
-    inc, dec = process_minibatch_2(r, minibatch, size)
+    #inc, dec = process_minibatch_2(r, minibatch, size)
+    inc, dec = process_minibatch_3(r, minibatch, size)
     #
     total_time = time.time() - total_start_time
     t = format(total_time, "0")
     print "[total time] %s" % (t)
-    #return
 #
 #
 #

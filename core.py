@@ -211,7 +211,9 @@ class Layer:
 
     def add_node(self, node):
         self._node_list.append(node)
-        return
+    
+    def get_node(self, i):
+        return self._node_list[i]
 
     def propagate(self, array_in, debug=0):
         if self._type==0:   # input
@@ -382,7 +384,7 @@ class Roster:
     def add_layer(self, type, num_input, num_node):
         c = self.countLayers()
         layer = Layer(c, type, num_input, num_node, self._gpu)
-        if c>0:
+        if c>0: # skip input layer
             for i in range(num_node):
                 node = Node()
                 layer.add_node(node)

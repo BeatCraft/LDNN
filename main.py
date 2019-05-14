@@ -1471,16 +1471,52 @@ def process_minibatch_3(r, minibatch, size):
 #
 #
 #
+def process_minibatch_4(r, minibatch, size):
+    total = 0
+    weight_list = r.get_weight_list()
+    
+    base_mse = evaluate_minibatch_2(r, minibatch, size)
+    c = r.countLayers()
+    for i in range(1, c):
+        layer = r.getLayerAt(i)
+        num_node = layer._num_node
+        #
+        node_l = list(range(num_node))
+        random.shuffle(node_l)
+        for k in node_l:
+#        for k in range(num_node):
+            node = layer.get_node(k)
+            num_w = len(node._w_id_list)
+            l = list(range(num_w))
+            random.shuffle(l)
+            for p in l:
+                print "layer: %d, node: %d, weight: %d" % (i, k, p)
+                w_index = node.get_weight(p)
+                w = weight_list[w_index]
+                ret = weight_shift_random(r, minibatch, size, w, base_mse)
+                total = total + ret
+
+            r.update_weight()
+            base_mse = evaluate_minibatch_2(r, minibatch, size)
+
+    r.update_weight()
+    print "tatal = %d" % (total)
+    return total
+#
+#
+#
 def train_mode_2(r, batch, size):
     print ">> train mode"
     inc = 0
     dec = 0
+    total = 0
     minibatch = batch[0:size]
     print len(minibatch)
     total_start_time = time.time()
     #
     #inc, dec = process_minibatch_2(r, minibatch, size)
-    inc, dec = process_minibatch_3(r, minibatch, size)
+    #inc, dec = process_minibatch_3(r, minibatch, size)
+    total = process_minibatch_4(r, minibatch, size)
     #
     total_time = time.time() - total_start_time
     t = format(total_time, "0")
@@ -1525,7 +1561,6 @@ def save_weight(r):
     wl = r.get_weight_list()
     wi_list = []
     for w in wl:
-        #print w.get_index()
         wi_list.append( w.get_index() )
 
     util.list_to_csv(WEIGHT_INDEX_CSV_PATH, wi_list)
@@ -1542,15 +1577,8 @@ def load_weight(r):
 def main():
     argvs = sys.argv
     argc = len(argvs)
-
-#    train_batch = []
-#    test_batch = []
-    minibatch_size = 1
-    max_it_train = NUM_OF_SAMPLES/minibatch_size
-    max_it_test = NUM_OF_TEST/minibatch_size
-    it_train = 0
-    it_test = 0
- 
+    #
+    minibatch_size = 100
     #
     # GPU
     #
@@ -1587,19 +1615,12 @@ def main():
         util.pickle_save(TEST_BATCH_PATH, batch)
     elif mode==2:
         print ">> train mode : max_it_train = %d" % (num_of_processed)
-#        it_train = get_key_input("iteration > ")
-#        if it_train<0:
-#            print "error : iteration = %d" % it_train
-#            return 0
-#
         batch = util.pickle_load(TRAIN_BATCH_PATH)
         if batch is None:
             print "error : no train batch"
             return 0
         
-        train_mode_2(r, batch, 100)
-        #num_of_processed = num_of_processed + prosecced
-        #util.pickle_save(PROCEEDED_PATH, num_of_processed)
+        train_mode_2(r, batch, minibatch_size)
         save_weight(r)
     elif mode==3:
         print ">> test mode"
@@ -1609,7 +1630,7 @@ def main():
             print "error : no test batch"
             return 0
         #
-        it_test = max_it_test
+        it_test = TEST_BATCH_SIZE
         test_mode(r, test_batch, NUM_OF_CLASS, it_test, 10000, debug)
     elif mode==4:
         print ">> self-test mode"
@@ -1619,7 +1640,9 @@ def main():
         test_mode(r, train_array, NUM_OF_CLASS, it_test, minibatch_size, debug)
     elif mode==5:
         print ">> debug mode"
-        data_list = util.loadData("./data/test/8/06755.png")
+  
+  
+  
         data_array = np.array(data_list)
         r.propagate(data_array)
         inf = r.get_inference()

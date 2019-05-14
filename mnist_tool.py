@@ -15,6 +15,8 @@ import struct
 import csv
 import pickle
 
+import util
+
 path_train_image = "./MNIST/train-images-idx3-ubyte"
 path_train_label = "./MNIST/train-labels-idx1-ubyte"
 path_test_image  = "./MNIST/t10k-images-idx3-ubyte"
@@ -180,18 +182,71 @@ def get_pixmap(path):
     for y in range(h):
         for x in range(w):
             print pix[x, y]
+
+#
+#
+#
+def process_data():
+    
+    base_path = "/Users/lesser/ldnn/data/train/"
+    for i in range(10):
+        path = base_path + "%d/" % i
+        print path
+        
+        files = []
+        save_list = [0 for p in range(28*28)]
+        cnt = 0
+        for f in os.listdir(path):
+            file_path = os.path.join(path, f)
+            file_name, file_extension = os.path.splitext(f)
+            #print file_name
+            #print file_extension
+            if file_extension == ".png":
+                cnt = cnt + 1
+                data_list = util.loadData(file_path)
+                for p in range(28*28):
+                    save_list[p] = save_list[p] + data_list[p]
+    
+        #print save_list
+        #print cnt
+        for j in range(28*28):
+            save_list[j] = save_list[j]/cnt
+        #print save_list
+        
+        save_img = Image.new('L', (28, 28))
+        pix = save_img.load()
+
+
+        k = 0
+        for y in range(28):
+            for x in range(28):
+                pix[x, y] = save_list[k]
+                k = k + 1
+
+        save_name = "%d.png" % (i)
+        save_path = os.path.join("/Users/lesser/ldnn/mini/", save_name)
+        print save_path
+        save_img.save(save_path)
+
+
+
+#print len(files)
+
 #
 #
 #
 def main():
     argvs = sys.argv
     argc = len(argvs)
-#
+
+    process_data()
+    
+    
+    
 #
 #    prepare_samples()
-
-    get_pixmap("./data/train/0/00001.png")
-
+#    get_pixmap("./data/train/0/00001.png")
+#
     return 0
 #
 #

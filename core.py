@@ -55,26 +55,24 @@ WEIGHT_SET_4 = [0.0, 0.0078125, 0.01079619, 0.0149194, 0.02061731, 0.02849133, 0
 #WEIGHT_SET_3 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0]
 #WEIGHT_SET_9 = [0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
 
-WEIGHT_SET = WEIGHT_SET_2
+WEIGHT_SET = WEIGHT_SET_1
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
-WEIGHT_INDEX_ZERO = 0#WEIGHT_INDEX_SIZE/2
+WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
-#WEIGHT_RANDOM_RANGE = 6
 #
 #
 #
 def sigmoid(x):
     a = 0.0
     try:
-        a = np.exp(-x)#math.exp(-x)
+        a = np.exp(-x)
     except OverflowError:
         a = float('inf')
         print "sigmoid(fuck)"
     
     ret = 1.0 / (1.0 + a)
-    #print "sigmoid(%f)=%f" % (x, ret)
-    return ret#1.0 / (1.0 + a)
+    return ret
 
 #def sigmoid(a):
 #    s = 1 / (1 + e**-a)
@@ -231,9 +229,9 @@ class Layer:
             self._gpu.copy(self._product_matrix, self._gpu_product)
             i = 0
             for row in self._product_matrix:
-                #self._sum[i] = relu( np.sum(row) )
+                self._sum[i] = relu( np.sum(row) )
                 #self._sum[i] = sigmoid(np.sum(row))
-                self._sum[i] = np.sum(row)
+                #self._sum[i] = np.sum(row)
                 i += 1
             
             self._gpu.copy(self._gpu_output, self._sum)
@@ -250,6 +248,7 @@ class Layer:
                 self._sum[i] = np.sum(row)
                 i += 1
 
+            # softmax
             sum = np.sum(self._sum)
             i = 0
             for row in self._sum:
@@ -257,7 +256,7 @@ class Layer:
                     self._y_array[i] = row/sum
                 else:
                     self._y_array[i] = 0.0
-                    print "FUCK"
+                
                 i += 1
 
     def propagate_alt(self, array_in, w, wi_alt):
@@ -271,9 +270,9 @@ class Layer:
             self._gpu.copy(self._product_matrix, self._gpu_product)
             i = 0
             for row in self._product_matrix:
-                #self._sum[i] = relu( np.sum(row) )
+                self._sum[i] = relu( np.sum(row) )
                 #self._sum[i] = sigmoid(np.sum(row))
-                self._sum[i] = np.sum(row)
+                #self._sum[i] = np.sum(row)
                 i += 1
 
             self._gpu.copy(self._gpu_output, self._sum)
@@ -289,7 +288,8 @@ class Layer:
             for row in self._product_matrix:
                 self._sum[i] = np.sum(row)
                 i += 1
-                                      
+            
+            # softmax
             sum = np.sum(self._sum)
             i = 0
             for row in self._sum:
@@ -297,8 +297,7 @@ class Layer:
                     self._y_array[i] = row/sum
                 else:
                     self._y_array[i] = 0.0
-                    print "FUCK"
-        
+                
                 i += 1
 
     def get_weight(self, node, i):

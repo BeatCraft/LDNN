@@ -250,6 +250,10 @@ class Layer:
 
             # softmax
             sum = np.sum(self._sum)
+            if debug==1:
+                print "output"
+                print self._sum
+
             i = 0
             for row in self._sum:
                 if sum>0.0:
@@ -258,6 +262,9 @@ class Layer:
                     self._y_array[i] = 0.0
                 
                 i += 1
+            
+            if debug==1:
+                print self._y_array
 
     def propagate_alt(self, array_in, w, wi_alt):
         if self._type==0: # input

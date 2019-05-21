@@ -1738,7 +1738,7 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    minibatch_size = 100
+    minibatch_size = 200
     #
     # GPU
     #
@@ -1795,7 +1795,7 @@ def main():
         print ">> self-test mode"
         debug = 0
         train_array = util.pickle_load(TRAIN_BATCH_PATH)
-        test_mode(r, train_array, NUM_OF_CLASS, 100, debug)
+        test_mode(r, train_array, NUM_OF_CLASS, minibatch_size, debug)
     elif mode==5:
         print ">> debug mode"
   

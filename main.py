@@ -1090,74 +1090,7 @@ def process_minibatch_1st_hidden_layer(r, minibatch, num_of_class):
 
     r.update_weight()
     
-    return inc_total, dec_total
-#
-#
-#
-def process_minibatch(r, minibatch, num_of_class):
-    inc_total = 0
-    dec_total = 0
-    weight_list = r.get_weight_list()
-    w_num = len(weight_list)
-    num = w_num/10
-    
-    base_mse = evaluate_minibatch(r, minibatch, num_of_class)
-    samples = random.sample(weight_list, num)
-    for w in samples:
-        if w._lock==1:
-            continue
-        
-        inc, dec = weight_shift_positive(r, minibatch, num_of_class, w, base_mse)
-        inc_total = inc_total + inc
-        dec_total = dec_total + dec
-
-    r.update_weight()
-    return inc_total, dec_total
-#
-#
-#
-def process_minibatch_mse_sensitive(r, minibatch, num_of_class):
-    inc_total = 0
-    dec_total = 0
-    weight_list = r.get_weight_list()
-    w_num = len(weight_list)
-    num = w_num/10
-    uw_list = []
-    wi_list = []
-    mse_list = []
-    
-    base_mse = evaluate_minibatch(r, minibatch, num_of_class)
-    print base_mse
-#    print "----"
-    
-    samples = random.sample(weight_list, num)
-    for w in samples:
-#    for i in range(num):
-#        w = weight_list[ random.randrange(w_num) ]
-        #inc, dec = weight_shift_positive(r, minibatch, num_of_class, w, base_mse)
-        wi_alt, mse_alt = weight_shift_mse(r, minibatch, num_of_class, w, base_mse)
-#        print mse_alt
-        if wi_alt>0:
-            uw_list.append(w.get_id())
-            wi_list.append(wi_alt)
-            mse_list.append(mse_alt)
-        
-        #inc_total = inc_total + inc
-        #dec_total = dec_total + dec
-
-#    print "----"
-    n = len(uw_list)
-#    mse_avg = 0.0
-#    for i in range(n):
-#        mse_avg = mse_avg + mse_list[i]
-#    mse_avg = mse_avg / float(n)
-#    print mse_avg
-    for i in range(n):
-        w = weight_list[i]
-        w.set_index(wi_list[i])
-
-    r.update_weight()
-    return inc_total, dec_total
+    return inc_total, dec_totalweight_shift_randomweight_shift_random
 #
 #
 #
@@ -1371,95 +1304,7 @@ def evaluate_minibatch_2(r, minibatch, size):
 #
 #
 #
-def process_minibatch_2(r, minibatch, size):
-    inc_total = 0
-    dec_total = 0
-    weight_list = r.get_weight_list()
-    w_num = len(weight_list)
-    num = 100000#w_num#*5
-    k = 0
-    
-#    labels = [0,0,0,0,0,0,0,0,0,0]
-#    for entry in minibatch:
-#        data = entry[0]
-#        label = entry[1]
-#        labels[label] = labels[label] + 1
-#
-#    print labels
-#    return 0, 0
-
-    base_mse = evaluate_minibatch_2(r, minibatch, size)
-    #print "---"
-    #print base_mse
-    #print "---"
-    for i in range(num):
-        k = random.randrange(w_num)
-        w = weight_list[k]
-        print "%d of %d : %d" % (i, num, k)
-        if w._lock==1:
-            print "  skip"
-            continue
-#
-        #inc, dec = weight_shift_positive_2(r, minibatch, size, w, base_mse)
-        ret = weight_shift_random(r, minibatch, size, w, base_mse)
-        #inc_total = inc_total + inc
-        #dec_total = dec_total + dec
-        #print "[%d, %d]" % (inc_total, dec_total)
-        if i%1000==0:
-            print "<< unlock >>"
-            r.unlock_weight_all()
-                
-        if i%100==0:
-            print "<< update >>"
-            r.update_weight()
-            #r.unlock_weight_all()
-            base_mse = evaluate_minibatch_2(r, minibatch, size)
-
-    r.update_weight()
-    
-    return inc_total, dec_total
-#
-#
-#
-def process_minibatch_3(r, minibatch, size):
-    inc_total = 0
-    dec_total = 0
-    total = 0
-    weight_list = r.get_weight_list()
-    w_num = 28*28 #len(weight_list)
-    n = 14
-    start = n*w_num
-    stop = (n+1)*w_num
-    num = 1000 * 3
-    k = 0
-    
-    base_mse = evaluate_minibatch_2(r, minibatch, size)
-    for i in range(num):
-        k = random.randrange(start, stop, 1)
-        w = weight_list[k]
-        print "%d of %d : %d" % (i, num, k)
-#        if w._lock==1:
-#            print "  skip"
-#            continue
-
-        ret = weight_shift_random(r, minibatch, size, w, base_mse)
-        total = total + ret
-#        if i%1000==0:
-#            print "<< unlock >>"
-#            r.unlock_weight_all()
-        
-        if i%100==0:
-            print "<< update >>"
-            r.update_weight()
-            base_mse = evaluate_minibatch_2(r, minibatch, size)
-
-    r.update_weight()
-    print "tatal = %d" % (total)
-    return inc_total, dec_total
-#
-#
-#
-def process_minibatch_4(r, minibatch, size):
+def process_minibatch(r, minibatch, size):
     total = 0
     weight_list = r.get_weight_list()
     
@@ -1502,7 +1347,7 @@ def process_minibatch_4(r, minibatch, size):
 #
 #
 #
-def train_mode_2(r, batch, size):
+def train_mode(r, batch, size):
     print ">> train mode"
     inc = 0
     dec = 0
@@ -1511,10 +1356,8 @@ def train_mode_2(r, batch, size):
     print len(minibatch)
     total_start_time = time.time()
     #
-    #inc, dec = process_minibatch_2(r, minibatch, size)
-    #inc, dec = process_minibatch_3(r, minibatch, size)
     for j in range(1):
-        total = process_minibatch_4(r, minibatch, size)
+        total = process_minibatch(r, minibatch, size)
     #
     total_time = time.time() - total_start_time
     t = format(total_time, "0")
@@ -1522,198 +1365,84 @@ def train_mode_2(r, batch, size):
 #
 #
 #
-def train_mode(r, train_batch, it_train, num_of_class, num_of_processed):
-    print ">> train mode"
-    print len(train_batch)
-    print "train (%d, %d)" % (num_of_processed, it_train)
-    inc = 0
-    dec = 0
-    start = num_of_processed
-    epoc = 1 # currently, epoch is fixed to 1
-    k = 0 # iteration
-    
-    total_start_time = time.time()
+def batch_evaluate(r, batch, batch_size, labels):
+    num = float(NUM_OF_CLASS)
+    sum = 0.0
+    for i in range(batch_size):
+        entry = batch[i]
+        data_class = entry[1]
+        labels[data_class] = 1.0
+        inf = r._batch_out[i]
+        mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
+        sum = sum + mse
+        labels[data_class] = 0.0
+
+    return sum/float(batch_size)
+#
+#
+#
+def batch_train_mode(r, batch, batch_size):
+    r.makeBatchBufferIn(28*28, batch_size)
+    r.makeBatchBufferOut(NUM_OF_CLASS, batch_size)
+    labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
+
+    for i in range(batch_size):
+        entry = batch[i]
+        r._batch_in[i] = entry[0].copy()
+
+    r._gpu.copy(r._gpu_batch_in, r._batch_in)
     #
-    for i in range(start, start+it_train, 1):
-        minibatch = train_batch[i]
-        r.unlock_weight_all()
-        for j in range(epoc):
-            start_time = time.time()
-            inc, dec = process_minibatch(r, minibatch, num_of_class)
-            #inc, dec = process_minibatch_1st_hidden_layer(r, minibatch, num_of_class)
-            print "(%d) [%d/%d] inc=%d, dec=%d : %d" % (j, i, start+it_train, inc, dec, inc+dec)
-            elapsed_time = time.time() - start_time
-            t = format(elapsed_time, "0")
-            print "  %s" % (t)
-        #print "[%03d|%03d] %s" % (k, it_train, t)
-        k = k + 1
-
-    total_time = time.time() - total_start_time
-    t = format(total_time, "0")
-    print "[total time] %s" % (t)
-    return k
-#
-#
-#
-def weight_shift_random_new(r, minibatch, size, w, base_mse):
-    inc = 0
-    dec = 0
-    wi = w.get_index()
-    id = w.get_id()
-    w._lock = 1
-    
-    wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
-    while wi_alt==wi:
-        wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
-    
-    mse_alt = evaluate_minibatch_alt(r, minibatch, size, w, wi_alt) # size = 10
-    if mse_alt<base_mse:
-        w.set_index(wi_alt)
-        print " %d > %d : %f, %f ---<>" % (wi, wi_alt, base_mse, mse_alt)
-        return 1
-    else:
-        print " x : %d, %d : %f, %f" % (wi, wi_alt, base_mse, mse_alt)
-    
-    return 0
-#
-#
-#
-def weight_shift_positive_new(r, minibatch, size, w, base_mse):
-    inc = 0
-    dec = 0
-    wi = w.get_index()
-    id = w.get_id()
-    
-    if wi==core.WEIGHT_INDEX_MAX:
-        wi_alt = wi - 1
-        mse_alt = evaluate_minibatch_alt(r, minibatch, 10, w, wi_alt)
-        if mse_alt<base_mse:
-            w.set_index(wi_alt)
-            dec = 1
-
-    elif wi==core.WEIGHT_INDEX_MIN:
-        wi_alt = wi + 1
-        mse_alt = evaluate_minibatch_alt(r, minibatch, 10, w, wi_alt)
-        if mse_alt<=base_mse:
-            w.set_index(wi_alt)
-            inc = 1
-
-    else:
-        wi_alt = wi + 1
-        mse_alt = evaluate_minibatch_alt(r, minibatch, 10, w, wi_alt)
-        if mse_alt<base_mse:
-            w.set_index(wi_alt)
-            inc = 1
-        elif mse_alt>base_mse:
-            wi_alt = wi - 1
-            w.set_index(wi_alt)
-            dec = 1
-        else:
-            w._lock = 1
-            print "    << locked >>"
-
-    return inc, dec
-#
-#
-#
-def weight_scan_new(r, minibatch, num_of_class, w, base_mse):
-    wi = w.get_index()
-    id = w.get_id()
-    min = base_mse
-    min_index = -1
-
-    min = base_mse
-    #print base_mse
-    for i in range(core.WEIGHT_INDEX_SIZE):
-        #print i
-        if i==wi:
-            continue
-        
-        mse_alt = evaluate_minibatch_alt(r, minibatch, num_of_class, w, i)
-        #print "%d : %f "% (i, mse_alt)
-        #print mse_alt
-        if mse_alt<min:
-            min = mse_alt
-            min_index = i
-
-    if min_index>=0:
-        if min_index!=wi:
-            print "     %d -> %d, %f" % (wi, min_index, min)
-            w.set_index(min_index)
-            return 1
-
-    print "     no change (%d)" % (wi)
-    return 0
-#
-#
-#
-def process_new_minibatch(r, minibatch, size):
-    total = 0
+    start_time = time.time()
+    r.batch_propagate_all(None, None, 0)
+    mse_base = batch_evaluate(r, batch, batch_size, labels)
+    print mse_base
+    #
     weight_list = r.get_weight_list()
-    #base_mse = evaluate_minibatch(r, minibatch, 10)
     c = r.countLayers()
     for i in range(1, c):
         layer = r.getLayerAt(i)
         num_node = layer._num_node
         #
-        node_list = list(range(num_node))
-        random.shuffle(node_list)
-        for k in node_list:
+        node_index_list = list(range(num_node))
+        random.shuffle(node_index_list)
+        cnt0 = 0
+        cnt1 = 1
+        for k in node_index_list:
             node = layer.get_node(k)
-            num_w = len(node._w_id_list)
-            base_mse = evaluate_minibatch(r, minibatch, 10)
-            l = list(range(num_w))
-            random.shuffle(l)
+            num_w = len(node._w_id_list)# / 10 / i
+            w_id_list = list(range(num_w))
+            random.shuffle(w_id_list)
             #
-            patial = num_w/10/i
-            l = l[0:patial]
+            patial = num_w/5/i
+            w_id_list = w_id_list[0:patial]
             #
-            for p in l:
-                print "layer: %d, node: %d, weight: %d" % (i, k, p)
+            for p in w_id_list:
+                print "[%d, %d] layer: %d, node: %d, weight: %d" % (cnt0, cnt1, i, k, p)
                 w_index = node.get_weight(p)
                 w = weight_list[w_index]
                 #
-                #ret = weight_scan_new(r, minibatch, 10, w, base_mse)
-                for q in range(3):
-                    ret = weight_shift_random_new(r, minibatch, 10, w, base_mse)
-                    if ret>0:
-                        break
-                #
-                total = total + ret
-        
-            print "<update>"
-            r.update_weight()
-            #base_mse = evaluate_minibatch(r, minibatch, 10)
+                wi = w.get_index()
+                wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
+                while wi_alt==wi:
+                    wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
 
-    print "<update>"
-    r.update_weight()
-    print "tatal = %d" % (total)
-    return total
-#
-#
-#
-def train_mode_new_minibatch(r):
-    print ">> train mode with new minibatch"
-    #print len(train_batch)
-    inc = 0
-    dec = 0
-    batch = []
-    total_start_time = time.time()
+                r.batch_propagate_all(w, wi_alt, 0)
+                mse_alt = batch_evaluate(r, batch, batch_size, labels)
+                print "  %d > %d : %f > %f : %d" % (wi, wi_alt, mse_base, mse_alt, mse_base>mse_alt)
+                if mse_alt<mse_base:
+                    w.set_index(wi_alt)
+                    r.update_weight()
+                    mse_base = mse_alt
+        
+                cnt1 = cnt1 + 1
+
+            cnt0 = cnt0 + 1
+    
     #
-    base_path = "/Users/lesser/ldnn/mini/"
-    for name in range(10):
-        file_path = base_path + "%d.png" % (name)
-        print file_path
-        data_list = util.loadData(file_path)
-        data_array = np.array(data_list)
-        batch.append(data_array)
-    #
-    process_new_minibatch(r, batch, 1)
-    #
-    total_time = time.time() - total_start_time
-    t = format(total_time, "0")
-    print "[total time] %s" % (t)
-    return 0
+    elasped_time = time.time() - start_time
+    t = format(elasped_time, "0")
+    print "[elasped time] %s" % (t)
+
 #
 #
 #
@@ -1780,7 +1509,7 @@ def main():
             print "error : no train batch"
             return 0
         
-        train_mode_2(r, batch, minibatch_size)
+        train_mode(r, batch, minibatch_size)
         save_weight(r)
     elif mode==3:
         print ">> test mode"
@@ -1798,57 +1527,14 @@ def main():
         test_mode(r, train_array, NUM_OF_CLASS, minibatch_size, debug)
     elif mode==5:
         print ">> batch on GPU"
-        r.makeBatchBufferIn(28*28, 100)
-        r.makeBatchBufferOut(10, 100)
         batch = util.pickle_load(TRAIN_BATCH_PATH)
         if batch is None:
             print "error : no train batch"
             return 0
-        
-        for i in range(100):
-            entry = batch[i]
-            r._batch_in[i] = entry[0].copy()
 
-        r._gpu.copy(r._gpu_batch_in, r._batch_in)
-        #
-        start_time = time.time()
-        r.batch_propagate_all(None, None, 0)
-        
-        num = 10.0
-        sum_of_mse = 0.0
-        labels = np.zeros(10, dtype=np.float32)
-        
-        for i in range(100):
-            entry = batch[i]
-            data_class = entry[1]
-            labels[data_class] = 1.0
-            inf = r._batch_out[i]
-            mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
-            sum_of_mse = sum_of_mse + mse
-            labels[data_class] = 0.0
-        
-        print sum_of_mse/100.0
-        #
-        wl = r.get_weight_list()
-        w = wl[0]
-        wi_alt = 0
-        r.batch_propagate_all(w, wi_alt, 0)
-        #
-        for i in range(100):
-            entry = batch[i]
-            data_class = entry[1]
-            labels[data_class] = 1.0
-            inf = r._batch_out[i]
-            mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
-            sum_of_mse = sum_of_mse + mse
-            labels[data_class] = 0.0
-        
-        print sum_of_mse/100.0
-        #
-        elasped_time = time.time() - start_time
-        t = format(elasped_time, "0")
-        print "[elasped time] %s" % (t)
-            
+        batch_size = 100
+        batch_train_mode(r, batch, batch_size)
+        save_weight(r)
     elif mode==6:
         print ">> export weight to CSV"
         wl = r.get_weight_list()

@@ -503,7 +503,6 @@ class Roster:
             layer = self.getLayerAt(i)
             layer.batch_propagate(pre._gpu_output, index, w, wi_alt, debug)
             pre = layer
-
         #
         self._batch_out[index] = pre._y_array
         #

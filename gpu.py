@@ -6,23 +6,6 @@ import numpy as np
 #
 #
 KERNEL_CODE = """
-
-__kernel void multiple_x_by_w(
-    __global float* x,
-    __global float* w,
-    __global float* y,
-    const int num_w)
-{
-    int i = get_global_id(0);
-    int j = get_global_id(1);
-    
-    //printf(\"(%d, %d)\\n\", i, j);
-    y[j*num_w + i] = x[i] * w[j*num_w + i];
-//    printf(\"%f\\n\", x[i]);
-//
-//    printf(\"%f\\n\", y[j*num_w + i]);
-};
-
 __kernel void scale(
     __global float* x,
     __global float* y,
@@ -34,6 +17,32 @@ __kernel void scale(
     if (debug==1){
         printf(\"[%d] %f, %f\\n\",i,  x[i], y[i]);
     }
+};
+
+__kernel void batch_scale(
+    __global float* x,
+    __global float* y,
+    const int index,
+    const int stride,
+    const float max,
+    const int debug)
+{
+    int i = get_global_id(0);
+    y[i] = x[stride*index+i]/max;
+    if (debug==1){
+        printf(\"[%d] %f, %f\\n\",i,  x[stride*index+i], y[i]);
+    }
+};
+
+__kernel void multiple_x_by_w(
+__global float* x,
+__global float* w,
+__global float* y,
+const int num_w)
+{
+    int i = get_global_id(0);
+    int j = get_global_id(1);
+    y[j*num_w + i] = x[i] * w[j*num_w + i];
 };
 
 __kernel void multiple_x_by_w_alt(
@@ -56,6 +65,13 @@ const float alt_w)
 };
 
 """
+#//printf(\"(%d, %d)\\n\", i, j);
+#y[j*num_w + i] = x[i] * w[j*num_w + i];
+#//    printf(\"%f\\n\", x[i]);
+#             //
+#             //    printf(\"%f\\n\", y[j*num_w + i]);
+#
+#
 #    __global unsigned char* x,
 #    float v = x[i] + 1.0;
 #    y[i] = v/(max+1.0);
@@ -114,15 +130,21 @@ class Gpu:
                                d_x, d_y, np.float32(max), np.int32(debug))
         event.wait()
     
+    def batch_scale(self, d_x, d_y, index, stride, max, row, debug):
+        event = self.prg.batch_scale(self._queue, (row,), None,
+                                     d_x, d_y, np.int32(index), np.int32(stride),
+                                     np.float32(max), np.int32(debug))
+        event.wait()
+    
     def copy(self, dist, src):
         event = cl.enqueue_copy(self._queue, dist, src)
         event.wait()
     
-    def read(self, dist, src):
-        cl.enqueue_copy(self._queue, dist, src)
-
-    def write(self, dist, src):
-        cl.enqueue_copy(self._queue, dist, src)
+#    def read(self, dist, src):
+#        cl.enqueue_copy(self._queue, dist, src)
+#
+#    def write(self, dist, src):
+#        cl.enqueue_copy(self._queue, dist, src)
 
 #
 #        host_data = np.array([0.0, 0.0, 0.0, 0.0]).astype(np.float32)

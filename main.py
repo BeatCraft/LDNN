@@ -136,7 +136,7 @@ def make_batch(size, image_path, label_path):
     for i in range(size):
         data = file_in.read(MNIST_IMAGE_SIZE)
         da = np.frombuffer(data, dtype=np.uint8)
-        a_float = da.astype(np.float32)
+        a_float = da.astype(np.float32) # convert from uint8 to float32
         batch.append((a_float, label_list[i]))
 
     return batch
@@ -172,7 +172,7 @@ def test(r, minibatch, num_of_class, debug=0):
     return [dist, stat]
 #
 #
-#   test_mode(r, test_batch, NUM_OF_CLASS, it_test, minibatch_size, debug)
+#
 def test_mode(r, batch, num_of_class, iteration, debug=0):
     print ">>test mode(%d)" % iteration
     start_time = time.time()
@@ -1759,8 +1759,8 @@ def main():
     print "2 : train"
     print "3 : test"
     print "4 : self-test"
-    print "5 : debug"
-    print "6 : debug 2"
+    print "5 : ..."
+    print "6 : export weight to CSV"
     print "7 : new minibatch"
     print "8 : save and quit"
     print "9 : weight distribution"
@@ -1797,42 +1797,60 @@ def main():
         train_array = util.pickle_load(TRAIN_BATCH_PATH)
         test_mode(r, train_array, NUM_OF_CLASS, minibatch_size, debug)
     elif mode==5:
-        print ">> debug mode"
-  
-        data_array = np.array(data_list)
-        r.propagate(data_array)
-        inf = r.get_inference()
-        print "inf"
-        for i in range(NUM_OF_CLASS):
-            print "%d : %f" % (i, inf[i])
-
-        labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
-        labels[8] = 1.0
-        mse = util.mean_squared_error(inf, len(inf), labels, len(labels))
-        print "MSE"
-        print "%f" % (mse)
+        print ">> batch on GPU"
+        r.makeBatchBufferIn(28*28, 100)
+        r.makeBatchBufferOut(10, 100)
+        batch = util.pickle_load(TRAIN_BATCH_PATH)
+        if batch is None:
+            print "error : no train batch"
+            return 0
         
-        weight_list = r.get_weight_list()
-        w_num = len(weight_list)
-        for j in range(100):
-            k = random.randrange(w_num)
-            w = weight_list[k]
-            wi = w.get_index()
-            print "w : %d, wi : %d" %(k, wi)
-            for i in range(core.WEIGHT_INDEX_MAX):
-                r.propagate_alt(data_array, w, i)
-                inf_alt = r.get_inference()
-                mse_alt = util.mean_squared_error(inf_alt, len(inf_alt), labels, len(labels))
-                #print "MSE alt (%d) %f" % (i, mse)
-                if mse_alt<mse:
-                    print "MSE alt (%d) %f [%f]" % (i, mse_alt, mse-mse_alt)
-                elif mse_alt>mse:
-                    print "%d, %f" % (i, mse_alt)
-                else:
-                    print "-"
-                #print inf_alt
-    
+        for i in range(100):
+            entry = batch[i]
+            r._batch_in[i] = entry[0].copy()
+
+        r._gpu.copy(r._gpu_batch_in, r._batch_in)
+        #
+        start_time = time.time()
+        r.batch_propagate_all(None, None, 0)
+        
+        num = 10.0
+        sum_of_mse = 0.0
+        labels = np.zeros(10, dtype=np.float32)
+        
+        for i in range(100):
+            entry = batch[i]
+            data_class = entry[1]
+            labels[data_class] = 1.0
+            inf = r._batch_out[i]
+            mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
+            sum_of_mse = sum_of_mse + mse
+            labels[data_class] = 0.0
+        
+        print sum_of_mse/100.0
+        #
+        wl = r.get_weight_list()
+        w = wl[0]
+        wi_alt = 0
+        r.batch_propagate_all(w, wi_alt, 0)
+        #
+        for i in range(100):
+            entry = batch[i]
+            data_class = entry[1]
+            labels[data_class] = 1.0
+            inf = r._batch_out[i]
+            mse =  util.mean_squared_error(inf, len(inf), labels, len(labels))
+            sum_of_mse = sum_of_mse + mse
+            labels[data_class] = 0.0
+        
+        print sum_of_mse/100.0
+        #
+        elasped_time = time.time() - start_time
+        t = format(elasped_time, "0")
+        print "[elasped time] %s" % (t)
+            
     elif mode==6:
+        print ">> export weight to CSV"
         wl = r.get_weight_list()
         wi_list = []
         for w in wl:

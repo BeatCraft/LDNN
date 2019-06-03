@@ -1381,7 +1381,103 @@ def batch_evaluate(r, batch, batch_size, labels):
 #
 #
 #
-def batch_train_mode(r, batch, batch_size):
+def batch_weight_shift(r, batch, batch_size, labels, w, mse_base):
+    wi = w.get_index()
+    wi_alt = wi
+    if w._lock==1:
+        print "  locked"
+        return mse_base
+    
+    step = 0
+    #
+    if w._step==0:
+        if wi==core.WEIGHT_INDEX_MAX:
+            w._step  = -1
+        else:
+            w._step  = 1
+
+        r.batch_propagate_all(w, wi+w._step, 0)
+        mse_alt = batch_evaluate(r, batch, batch_size, labels)
+        if mse_alt<mse_base:
+            #w._step = step
+            w.set_index(wi+w._step)
+            r.update_weight()
+            print "  %d > %d : %f > %f" % (wi, wi+w._step , mse_base, mse_alt)
+            return mse_alt
+        else:
+            w._lock = 1
+            print "  lock at initial eval. (%d)" % (wi)
+            return mse_base
+        
+#        if mse_alt==mse_base:
+#            w._lock = 1
+#            print "  lock (0)"
+#            return mse_base
+#        elif mse_alt<mse_base:
+#            w._step = step
+#            w.set_index(wi+step)
+#            r.update_weight()
+#            print "  %d > %d : %f > %f : %d" % (wi, step, mse_base, mse_alt, mse_alt<mse_base)
+#            return mse_alt
+#
+#        w._step = step * -1
+#        print "  reversed" # need to revise
+#        return mse_base
+
+#
+#        if wi==core.WEIGHT_INDEX_MAX:
+#            w._lock = 1
+#            print "  lock at MAX"
+#            return mse_base
+#
+#        elif wi==core.WEIGHT_INDEX_MIN:
+#            w._lock = 1
+#            print "  lock at MIN"
+#            return mse_base
+#
+#        w._step = step * -1
+#        r.batch_propagate_all(w, wi+step, 0)
+#        mse_alt = batch_evaluate(r, batch, batch_size, labels)
+#        if mse_alt<mse_base:
+#            print "  reversed" # need to revise
+#            w.set_index(wi+step)
+#            r.update_weight()
+#            print "  %d > %d : %f > %f : %d" % (wi, step, mse_base, mse_alt, mse_alt<mse_base)
+#            return mse_alt
+#
+#        print "  lock (1)"
+#        w._step = 0
+#        w._lock = 1
+#        return mse_base
+                    
+    #step = w._step
+    if wi==core.WEIGHT_INDEX_MAX:
+        w._step = -1
+        print "  reversed at %d" % (wi)
+    elif wi==core.WEIGHT_INDEX_MIN:
+#        w._lock = 1
+#        print "  lock (2)"
+#        return mse_base
+        w._step = 1
+        print "  reversed at %d" % (wi)
+
+    r.batch_propagate_all(w, wi+step, 0)
+    mse_alt = batch_evaluate(r, batch, batch_size, labels)
+    if  mse_alt<mse_base:
+        #w._step = step
+        w.set_index(wi+w._step)
+        r.update_weight()
+        print "  %d > %d : %f > %f" % (wi, wi+w._step, mse_base, mse_alt)
+        return mse_alt
+    else:
+        w._lock = 1
+        print "  lock at %d" % (wi)
+
+    return mse_base
+#
+#
+#
+def batch_train_mode(it, r, batch, batch_size):
     r.makeBatchBufferIn(28*28, batch_size)
     r.makeBatchBufferOut(NUM_OF_CLASS, batch_size)
     labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
@@ -1417,25 +1513,14 @@ def batch_train_mode(r, batch, batch_size):
             w_id_list = w_id_list[0:patial]
             #
             for p in w_id_list:
-                print "[%d, %d] layer: %d, node: %d, weight: %d" % (cnt0, cnt1, i, k, p)
+                print "%d [%d, %d] layer: %d, node: %d, weight: %d" % (it, cnt0, cnt1, i, k, p)
                 w_index = node.get_weight(p)
                 w = weight_list[w_index]
                 #
-                wi = w.get_index()
-                wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
-                while wi_alt==wi:
-                    wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
-
-                r.batch_propagate_all(w, wi_alt, 0)
-                mse_alt = batch_evaluate(r, batch, batch_size, labels)
-                print "  %d > %d : %f > %f : %d" % (wi, wi_alt, mse_base, mse_alt, mse_base>mse_alt)
-                if mse_alt<mse_base:
-                    w.set_index(wi_alt)
-                    r.update_weight()
-                    mse_base = mse_alt
-        
+                mse_base = batch_weight_shift(r, batch, batch_size, labels, w, mse_base)
+                #
                 cnt1 = cnt1 + 1
-
+            #
             cnt0 = cnt0 + 1
     
     #
@@ -1467,7 +1552,7 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    minibatch_size = 200
+    minibatch_size = 1000
     #
     # GPU
     #
@@ -1527,14 +1612,21 @@ def main():
         test_mode(r, train_array, NUM_OF_CLASS, minibatch_size, debug)
     elif mode==5:
         print ">> batch on GPU"
+        start_time = time.time()
+        #
         batch = util.pickle_load(TRAIN_BATCH_PATH)
         if batch is None:
             print "error : no train batch"
             return 0
 
-        batch_size = 100
-        batch_train_mode(r, batch, batch_size)
-        save_weight(r)
+        batch_size = 1000
+        for i in range(5):
+            batch_train_mode(i, r, batch, batch_size)
+            save_weight(r)
+        #
+        elasped_time = time.time() - start_time
+        t = format(elasped_time, "0")
+        print "[total elasped time] %s" % (t)
     elif mode==6:
         print ">> export weight to CSV"
         wl = r.get_weight_list()

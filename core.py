@@ -102,7 +102,11 @@ def relu(x):
 #
 #
 def softmax(x):
-    return np.exp(x)
+    c = np.max(x)
+    exp_x = np.exp(x-c)
+    sum_exp_x = np.sum(exp_x)
+    y = exp_x / sum_exp_x
+    return y
 #
 #
 #
@@ -255,21 +259,22 @@ class Layer:
                 self._sum[i] = np.sum(row)
                 i += 1
         
+            self._y_array = softmax(self._sum)
             # softmax
-            sum = np.sum(self._sum)
-            if debug==1:
-                print "output"
-                print self._sum
-                print sum
-            
-            i = 0
-            for row in self._sum:
-                if sum>0.0:
-                    self._y_array[i] = row/sum
-                else:
-                    self._y_array[i] = 0.0
-                i += 1
-
+#            sum = np.sum(self._sum)
+#            if debug==1:
+#                print "output"
+#                print self._sum
+#                print sum
+#
+#            i = 0
+#            for row in self._sum:
+#                if sum>0.0:
+#                    self._y_array[i] = row/sum
+#               else:
+#                    self._y_array[i] = 0.0
+#                i += 1
+#
             if debug==1:
                 print self._y_array
     
@@ -307,22 +312,23 @@ class Layer:
             for row in self._product_matrix:
                 self._sum[i] = np.sum(row)
                 i += 1
-
+                    
+            self._y_array = softmax(self._sum)
             # softmax
-            sum = np.sum(self._sum)
-            if debug==1:
-                print "output"
-                print self._sum
-
-            i = 0
-            for row in self._sum:
-                if sum>0.0:
-                    self._y_array[i] = row/sum
-                else:
-                    self._y_array[i] = 0.0
-                
-                i += 1
-            
+#            sum = np.sum(self._sum)
+#            if debug==1:
+#                print "output"
+#                print self._sum
+#
+#            i = 0
+#            for row in self._sum:
+#                if sum>0.0:
+#                    self._y_array[i] = row/sum
+#                else:
+#                    self._y_array[i] = 0.0
+#
+#                i += 1
+#
             if debug==1:
                 print self._y_array
 
@@ -356,16 +362,17 @@ class Layer:
                 self._sum[i] = np.sum(row)
                 i += 1
             
+            self._y_array = softmax(self._sum)
             # softmax
-            sum = np.sum(self._sum)
-            i = 0
-            for row in self._sum:
-                if sum>0.0:
-                    self._y_array[i] = row/sum
-                else:
-                    self._y_array[i] = 0.0
-                
-                i += 1
+#            sum = np.sum(self._sum)
+#            i = 0
+#            for row in self._sum:
+#                if sum>0.0:
+#                    self._y_array[i] = row/sum
+#                else:
+#                    self._y_array[i] = 0.0
+#
+#                i += 1
 
     def get_weight(self, node, i):
         return self._weight_matrix[node][i]

@@ -260,21 +260,6 @@ class Layer:
                 i += 1
         
             self._y_array = softmax(self._sum)
-            # softmax
-#            sum = np.sum(self._sum)
-#            if debug==1:
-#                print "output"
-#                print self._sum
-#                print sum
-#
-#            i = 0
-#            for row in self._sum:
-#                if sum>0.0:
-#                    self._y_array[i] = row/sum
-#               else:
-#                    self._y_array[i] = 0.0
-#                i += 1
-#
             if debug==1:
                 print self._y_array
     
@@ -314,21 +299,6 @@ class Layer:
                 i += 1
                     
             self._y_array = softmax(self._sum)
-            # softmax
-#            sum = np.sum(self._sum)
-#            if debug==1:
-#                print "output"
-#                print self._sum
-#
-#            i = 0
-#            for row in self._sum:
-#                if sum>0.0:
-#                    self._y_array[i] = row/sum
-#                else:
-#                    self._y_array[i] = 0.0
-#
-#                i += 1
-#
             if debug==1:
                 print self._y_array
 
@@ -336,10 +306,15 @@ class Layer:
         if self._type==0: # input
             self._gpu.copy(self._gpu_input, array_in)
             self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node, 0)
-        elif self._type==1: # hidden            
-            self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-                                          self._num_input, self._num_node,
-                                          w._i, w._node, WEIGHT_SET[wi_alt])
+        elif self._type==1: # hidden
+            if w!=None and w._layer._index==self._index:
+                self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
+                                              self._num_input, self._num_node,
+                                              w._i, w._node, WEIGHT_SET[wi_alt])
+            else:
+                self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
+                                         self._num_input, self._num_node)
+            
             self._gpu.copy(self._product_matrix, self._gpu_product)
             i = 0
             for row in self._product_matrix:
@@ -363,16 +338,43 @@ class Layer:
                 i += 1
             
             self._y_array = softmax(self._sum)
-            # softmax
-#            sum = np.sum(self._sum)
-#            i = 0
-#            for row in self._sum:
-#                if sum>0.0:
-#                    self._y_array[i] = row/sum
-#                else:
-#                    self._y_array[i] = 0.0
-#
-#                i += 1
+                    
+    def propagate_2(self, array_in, index, w, wi_alt, debug):
+        if self._type==0: # input
+            self._gpu.copy(self._gpu_input, array_in)
+            self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node, 0)
+        elif self._type==1: # hidden
+            self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
+                                          self._num_input, self._num_node,
+                                          w._i, w._node, WEIGHT_SET[wi_alt])
+            self._gpu.copy(self._product_matrix, self._gpu_product)
+            i = 0
+            for row in self._product_matrix:
+                self._sum[i] = relu( np.sum(row) )
+                #self._sum[i] = sigmoid(np.sum(row))
+                #self._sum[i] = np.sum(row)
+                i += 1
+
+            self._gpu.copy(self._gpu_output, self._sum)
+        else: # output
+            if w!=None and w._layer._index==self._index:
+                self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
+                                              self._num_input, self._num_node,
+                                              w._i, w._node, WEIGHT_SET[wi_alt])
+            else:
+                self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
+                                          self._num_input, self._num_node)
+            
+            self._gpu.copy(self._product_matrix, self._gpu_product)
+   
+            i = 0
+            for row in self._product_matrix:
+                self._sum[i] = np.sum(row)
+                i += 1
+
+            self._y_array = softmax(self._sum)
+            if debug==1:
+                print self._y_array
 
     def get_weight(self, node, i):
         return self._weight_matrix[node][i]

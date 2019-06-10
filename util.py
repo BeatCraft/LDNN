@@ -33,6 +33,24 @@ COLOR_PALLET = [C_BLUE, C_RIGHT_BLUE, C_GREEN, C_RIGHT_GREEN,
 #
 #
 #
+def cross_emtropy_error(y, y_len, t, t_len):
+    if y_len != t_len:
+        return None
+
+    s = 0.0
+    for i in range(y_len):
+        s += (np.log(y[i])*t[i])
+
+    s = s * -1
+    return s
+#
+#
+#
+def cross_emtropy_error_fast(y, t_class):
+    return np.log(y[t_class]) * t[t_class] * -1
+#
+#
+#
 def mean_squared_error(y, y_len, t, t_len):
     if y_len != t_len:
         return None

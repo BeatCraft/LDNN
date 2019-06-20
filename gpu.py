@@ -28,10 +28,23 @@ __kernel void batch_scale(
     const int debug)
 {
     int i = get_global_id(0);
-    y[i] = x[stride*index+i]/max;
+    y[stride*index+i] = x[stride*index+i]/max;
     if (debug==1){
         printf(\"[%d] %f, %f\\n\",i,  x[stride*index+i], y[i]);
     }
+};
+
+__kernel void batch_multiple_x_by_w(
+    __global float* x,
+    __global float* w,
+    __global float* y,
+    const int num_w,
+    const int index,
+    const int stride)
+{
+    int i = get_global_id(0);
+    int j = get_global_id(1);
+    y[stride*index+j*num_w + i] = x[i] * w[j*num_w + i];
 };
 
 __kernel void multiple_x_by_w(
@@ -65,6 +78,7 @@ const float alt_w)
 };
 
 """
+#y[i] = x[stride*index+i]/max;
 #//printf(\"(%d, %d)\\n\", i, j);
 #y[j*num_w + i] = x[i] * w[j*num_w + i];
 #//    printf(\"%f\\n\", x[i]);

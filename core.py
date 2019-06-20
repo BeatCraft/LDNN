@@ -176,23 +176,30 @@ class Layer:
     # num_node  : numbers of neurons
     def __init__(self, i, type, num_input, num_node, gpu=None):
         self._gpu = gpu
+        #self._batch_size = batch_size
         self._id = -1
         self._index = i
         self._type = type
         self._num_input = num_input
         self._num_node = num_node
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
-        self._product_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        #self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
         self._sum = np.zeros(self._num_node, dtype=np.float32)
-        self._y_array = np.zeros(self._num_node, dtype=np.float32)
+        self._y_array = np.zeros(self._num_node*self._batch_size, dtype=np.float32)
         self._node_list = []
-            
-        if self._type==0:
-            self._input_array = np.zeros(num_node, dtype=int)
-        else:
-            self._input_array = np.zeros(num_node, dtype=np.float32)
-        self._output_array = np.zeros(num_node, dtype=np.float32)
     
+    def set_batch(self, batch_size):
+        self._batch_size = batch_size
+        #
+        if self._type==0: # input
+            self._input_array = np.zeros((self._batch_size, self._num_node), dtype=int)
+        else:
+            self._input_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+            self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
+        
+        self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+    
+
     def init_gpu(self):
         if self._gpu:
             pass
@@ -203,10 +210,17 @@ class Layer:
         self._gpu_input = self._gpu.dev_malloc(self._input_array)
         if self._type>0:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
-            self._gpu_product = self._gpu.dev_malloc(self._weight_matrix)
+            self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
 
         self._gpu_output = self._gpu.dev_malloc(self._output_array)
 
+
+#    def makeBatchBuffer(self, size, num):
+#        self._batch_size = size # ie. 28*28
+#        self._batch_num = num   # ie. 100
+#        self._batch_array = np.zeros( (num, size), dtype=np.float32)
+#        self._gpu_batch_mem = self._gpu.dev_malloc(self._batch_array)
+    
     def update_weight(self):
         if self._type>0:
             self._gpu.copy(self._gpu_weight, self._weight_matrix)
@@ -219,12 +233,13 @@ class Layer:
 
     def batch_propagate(self, array_in, index, w, wi_alt, debug):
         if self._type==0: # input
-            self._gpu.batch_scale(array_in, self._gpu_output, index, 28*28, float(255.0), self._num_node, 0)
-            if debug==1:
-                self._gpu.copy(self._y_array, self._gpu_output)
-                print "input"
-                print array_in
-                print self._y_array
+#            self._gpu.batch_scale(array_in, self._gpu_output, index, 28*28, float(255.0), self._num_node, 0)
+#            if debug==1:
+#                self._gpu.copy(self._y_array, self._gpu_output)
+#               print "input"
+#               print array_in
+#                print self._y_array
+            pass
         elif self._type==1: # hidden
             if w!=None and w._layer._index==self._index:
                 self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
@@ -403,30 +418,47 @@ class Roster:
     def __init__(self):
         self._weight_list = []
         self._gpu = None
-
         self.layers = []
-        self._batch_in = None
-        self._batch_in_size = 0
-        self._batch_in_num = 0
-        self._gpu_batch_in = None
-        self._batch_out = None
-        self._batch_out_size = 0
-        self._batch_out_num = 0
-        self._gpu_batch_out = None
-
+        self._batch_size = 1
+#        self._batch_in = None
+#        self._batch_in_size = 0
+#        self._batch_in_num = 0
+#        self._gpu_batch_in = None
+#        self._batch_out = None
+#        self._batch_out_size = 0
+#        self._batch_out_num = 0
+#        self._gpu_batch_out = None
+    
+    def set_batch(self, batch, num, size):
+        self._batch_data = np.zeros( (num, size), dtype=np.float32)
+        self._batch_class = np.zeros(num, dtype=int)
+        #
+        for layer in self.layers:
+            layer.set_batch(num)
+        
+        for i in range(num):
+            entry = batch[i]
+            r._batch_data[i] = entry[0].copy()
+            r._batch_class[i] = entry[1].copy()
+    
+        layer = r.getLayerAt(0)
+        r._gpu.copy(layer._gpu_input, r._batch_data)
+        for i in range(batch_size):
+            layer._gpu.batch_scale(layer._gpu_input, layer._gpu_output, i, 28*28, float(255.0), layer._num_node, 0)
+    
     def set_gpu(self, my_gpu):
         self._gpu = my_gpu
     
-    def makeBatchBufferIn(self, size, num):
-        self._batch_in_size = size
-        self._batch_in_num = num
-        self._batch_in = np.zeros( (num, size), dtype=np.float32)
-        self._gpu_batch_in = self._gpu.dev_malloc(self._batch_in)
+#    def makeBatchBufferIn(self, size, num):
+#        self._batch_in_size = size
+#        self._batch_in_num = num
+#        self._batch_in = np.zeros( (num, size), dtype=np.float32)
+#        self._gpu_batch_in = self._gpu.dev_malloc(self._batch_in)
     
-    def makeBatchBufferOut(self, size, num):
-        self._batch_out_size = size
-        self._batch_out_num = num
-        self._batch_out = np.zeros( (num, size), dtype=np.float32)
+#    def makeBatchBufferOut(self, size, num):
+#        self._batch_out_size = size
+#        self._batch_out_num = num
+#        self._batch_out = np.zeros( (num, size), dtype=np.float32)
         #self._gpu_batch_out = self._gpu.dev_malloc(self._batch_out)
     
     def init_weight(self):
@@ -507,9 +539,13 @@ class Roster:
     def batch_propagate(self, index, w, wi_alt, debug):
         c = self.countLayers()
         pre = self.getLayerAt(0)
-        pre.batch_propagate(self._gpu_batch_in, index, w, wi_alt, debug)
+        
+        pre._gpu_output = pre._gpu_batch_mem[28*28*index]
+        
+        #pre.batch_propagate(self._gpu_batch_in, index, w, wi_alt, debug)
         for i in range(1, c):
             layer = self.getLayerAt(i)
+            #layer.batch_propagate(pre._gpu_output, index, w, wi_alt, debug)
             layer.batch_propagate(pre._gpu_output, index, w, wi_alt, debug)
             pre = layer
         #

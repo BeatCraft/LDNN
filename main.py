@@ -1452,16 +1452,29 @@ def batch_weight_random(r, batch, batch_size, labels, w, mse_base):
 #
 #
 def batch_train_mode(it, r, batch, batch_size):
-    r.makeBatchBufferIn(28*28, batch_size)
-    r.makeBatchBufferOut(NUM_OF_CLASS, batch_size)
+#    r.makeBatchBufferIn(28*28, batch_size)
+#    r.makeBatchBufferOut(NUM_OF_CLASS, batch_size)
     labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
     cnt_update = 0
-
-    for i in range(batch_size):
-        entry = batch[i]
-        r._batch_in[i] = entry[0].copy()
-
-    r._gpu.copy(r._gpu_batch_in, r._batch_in)
+#
+#    for i in range(batch_size):
+#        entry = batch[i]
+#        r._batch_data[i] = entry[0].copy()
+#        r._batch_class[i] = entry[1].copy()
+#
+    #r._gpu.copy(r._gpu_batch_in, r._batch_in)
+    #
+    #
+#    layer = r.getLayerAt(0)
+#    r._gpu.copy(layer._gpu_input, r._batch_data)
+#
+#    layer.makeBatchBuffer(28*28, batch_size)
+#    for i in range(batch_size):
+#        layer._gpu.batch_scale(r._gpu_batch_in, layer._gpu_batch_mem, i, 28*28, float(255.0), layer._num_node, 0)
+#
+    #
+    r.set_batch(batch, batch_size, 28*28):
+    #
     #
     start_time = time.time()
     r.batch_propagate_all(None, None, 0)
@@ -1531,7 +1544,7 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    minibatch_size = 500
+    minibatch_size = 100
     #
     # GPU
     #
@@ -1598,10 +1611,9 @@ def main():
             print "error : no train batch"
             return 0
 
-        batch_size = 500
         cnt = 0
         for i in range(1):
-            cnt = cnt + batch_train_mode(i, r, batch, batch_size)
+            cnt = cnt + batch_train_mode(i, r, batch, minibatch_size)
             save_weight(r)
         #
         elasped_time = time.time() - start_time

@@ -41,13 +41,17 @@ def cross_emtropy_error(y, y_len, t, t_len):
     for i in range(y_len):
         s += (np.log(y[i])*t[i])
 
-    s = s * -1
+    s = s * -1.0
     return s
 #
 #
 #
+#def cross_emtropy_error_fast(y, t, t_class):
+#    return np.log(y[t_class]) * t[t_class] * -1
+
 def cross_emtropy_error_fast(y, t_class):
-    return np.log(y[t_class]) * t[t_class] * -1
+    return np.log(y[t_class]) * -1.0
+
 #
 #
 #

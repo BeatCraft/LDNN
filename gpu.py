@@ -6,6 +6,61 @@ import numpy as np
 #
 #
 KERNEL_CODE = """
+__kernel void batch_scale(
+    __global float* x,
+    __global float* y,
+    const int stride,
+    const float max,
+    const int debug)
+{
+    int i = get_global_id(0);
+    int j = get_global_id(1);
+    
+    y[stride*i+j] = x[stride*i+j]/max;
+    if (debug==1){
+        printf(\"[%d][%d] %f, %f\\n\", j, stride*i+j, x[stride*i+j], y[stride*i+j]);
+    }
+};
+
+__kernel void batch_multiple_x_by_w(
+    __global float* x,
+    __global float* w,
+    __global float* y,
+    const int index,
+    const int stride,
+    const int num_w)
+{
+    int i = get_global_id(0); // num_input
+    int j = get_global_id(1); // num_node
+    
+    y[stride*index + j*num_w + i] = x[stride*index + i] * w[j*num_w + i];
+    
+//    printf(\"num_w=%d\\n\", num_w);
+//    printf(\"%d, %d, %f\\n\",  i, j, y[stride*index + j*num_w + i]);
+//    printf(\"(%d, %d) %f, %f, %d, %f\\n\", i, j, x[stride*index+i], w[j*num_w + i], num_w, y[stride*index + j*num_w + i]);
+};
+
+__kernel void batch_multiple_x_by_w_alt(
+    __global float* x,
+    __global float* w,
+    __global float* y,
+    const int index,
+    const int stride,
+    const int num_w,
+    const int alt_row,
+    const int alt_col,
+    const float alt_w)
+{
+    int i = get_global_id(0);
+    int j = get_global_id(1);
+
+    if (j==alt_col && i==alt_row){
+        y[stride*index+j*num_w + i] = x[stride*index+i] * alt_w;
+    }else{
+        y[stride*index+j*num_w + i] = x[stride*index+i] * w[j*num_w + i];
+    }
+};
+
 __kernel void scale(
     __global float* x,
     __global float* y,
@@ -19,39 +74,11 @@ __kernel void scale(
     }
 };
 
-__kernel void batch_scale(
-    __global float* x,
-    __global float* y,
-    const int index,
-    const int stride,
-    const float max,
-    const int debug)
-{
-    int i = get_global_id(0);
-    y[stride*index+i] = x[stride*index+i]/max;
-    if (debug==1){
-        printf(\"[%d] %f, %f\\n\",i,  x[stride*index+i], y[i]);
-    }
-};
-
-__kernel void batch_multiple_x_by_w(
+__kernel void multiple_x_by_w(
     __global float* x,
     __global float* w,
     __global float* y,
-    const int num_w,
-    const int index,
-    const int stride)
-{
-    int i = get_global_id(0);
-    int j = get_global_id(1);
-    y[stride*index+j*num_w + i] = x[i] * w[j*num_w + i];
-};
-
-__kernel void multiple_x_by_w(
-__global float* x,
-__global float* w,
-__global float* y,
-const int num_w)
+    const int num_w)
 {
     int i = get_global_id(0);
     int j = get_global_id(1);
@@ -59,13 +86,13 @@ const int num_w)
 };
 
 __kernel void multiple_x_by_w_alt(
-__global float* x,
-__global float* w,
-__global float* y,
-const int num_w,
-const int alt_row,
-const int alt_col,
-const float alt_w)
+    __global float* x,
+    __global float* w,
+    __global float* y,
+    const int num_w,
+    const int alt_row,
+    const int alt_col,
+    const float alt_w)
 {
     int i = get_global_id(0);
     int j = get_global_id(1);
@@ -78,6 +105,7 @@ const float alt_w)
 };
 
 """
+#printf(\"(%d, %d) %f, %f, %f\\n\", i, j, x[stride*index+i], w[j*num_w + i], y[stride*index+i]);
 #y[i] = x[stride*index+i]/max;
 #//printf(\"(%d, %d)\\n\", i, j);
 #y[j*num_w + i] = x[i] * w[j*num_w + i];
@@ -126,7 +154,12 @@ class Gpu:
                         size=host_array.nbytes)
         self._bufs.append(buf)
         return buf
-    
+
+    def scale(self, d_x, d_y, max, row, debug):
+        event = self.prg.scale(self._queue, (row,), None,
+                               d_x, d_y, np.float32(max), np.int32(debug))
+        event.wait()
+                    
     def multiple_x_by_w(self, d_x, d_w, d_y, row, col):
         event = self.prg.multiple_x_by_w(self._queue,(row,col), None,
                                          d_x, d_w, d_y, np.int32(row))
@@ -138,16 +171,30 @@ class Gpu:
                                              np.int32(layer_i), np.int32(node_i),
                                              np.float32(w))
         event.wait()
-    
-    def scale(self, d_x, d_y, max, row, debug):
-        event = self.prg.scale(self._queue, (row,), None,
-                               d_x, d_y, np.float32(max), np.int32(debug))
-        event.wait()
-    
-    def batch_scale(self, d_x, d_y, index, stride, max, row, debug):
-        event = self.prg.batch_scale(self._queue, (row,), None,
-                                     d_x, d_y, np.int32(index), np.int32(stride),
+
+#    def batch_scale(self, d_x, d_y, index, stride, max, row, debug):
+#        event = self.prg.batch_scale(self._queue, (row,), None,
+#                                     d_x, d_y, np.int32(index), np.int32(stride),
+#                                     np.float32(max), np.int32(debug))
+#                event.wait()
+#
+    def batch_scale(self, d_x, d_y, stride, max, row, debug):
+        event = self.prg.batch_scale(self._queue, (row, stride), None,
+                                     d_x, d_y, np.int32(stride),
                                      np.float32(max), np.int32(debug))
+        event.wait()
+
+    def batch_multiple_x_by_w(self, d_x, d_w, d_y, index, stride, row, col):
+        event = self.prg.batch_multiple_x_by_w(self._queue,(row,col), None,
+                                               d_x, d_w, d_y,
+                                               np.int32(index), np.int32(stride), np.int32(row))
+        event.wait()
+
+    def batch_multiple_x_by_w_alt(self, d_x, d_w, d_y, index, stride, row, col, layer_i, node_i, w):
+        event = self.prg.batch_multiple_x_by_w_alt(self._queue,(row,col), None,
+                                                   d_x, d_w, d_y,
+                                                   np.int32(index), np.int32(stride), np.int32(row),
+                                                   np.int32(layer_i), np.int32(node_i), np.float32(w))
         event.wait()
     
     def copy(self, dist, src):

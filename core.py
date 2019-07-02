@@ -107,6 +107,13 @@ def softmax(x):
     sum_exp_x = np.sum(exp_x)
     y = exp_x / sum_exp_x
     return y
+
+def softmax_no_exp(x):
+    sum_x = np.sum(x)
+    if sum_x==0.0:
+        return np.zeros_like((x))
+    y = x / sum_x
+    return y
 #
 #
 #
@@ -174,6 +181,7 @@ class Layer:
         self._num_input = num_input
         self._num_node = num_node
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        
         self._sum = np.zeros(self._num_node, dtype=np.float32)
         self._node_list = []
     
@@ -210,170 +218,85 @@ class Layer:
         return self._node_list[i]
 
     def batch_propagate(self, array_in, w, wi_alt, debug):
-        stride = self._num_input*self._num_node
         if self._type==0: # input
             pass
-        elif self._type==1: # hidden
+        else:
+            stride_1 = self._num_input * self._num_node
+            stride_2 = self._num_input
+            stride_3 = self._num_node
+            num_w = self._num_input
             if w!=None and w._layer._index==self._index:
                 for bi in range(self._batch_size):
                     self._gpu.batch_multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-                                                        bi, stride, self._num_input, self._num_node,
-                                                        w._i, w._node, WEIGHT_SET[wi_alt])
+                                                        bi, stride_1, stride_2, stride_3, num_w,
+                                                        w._i, w._node, WEIGHT_SET[wi_alt],
+                                                        self._num_input, self._num_node)
             else:
                 for bi in range(self._batch_size):
                     self._gpu.batch_multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-                                                    bi, stride, self._num_input, self._num_node)
+                                                    bi, stride_1, stride_2, stride_3, num_w,
+                                                    self._num_input, self._num_node)
             #
             self._gpu.copy(self._product_matrix, self._gpu_product)
+            #
             for bi in range(self._batch_size):
-                for i in range(len(self._product_matrix[bi])):
-                    self._output_array[bi][i] = relu( np.sum(self._product_matrix[bi][i]) )
-
-            self._gpu.copy(self._gpu_output, self._output_array)
-            #if self._index==-1:
-            #    for k in self._product_matrix[bi][0]:
-            #        print "%f," % (k)
-            #
-            #    print "layert : %d" % (self._index)
-            #    print self._output_array[0]
-        else: # output
-            if w!=None and w._layer._index==self._index:
-                for bi in range(self._batch_size):
-                    self._gpu.batch_multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-                                                        bi, stride, self._num_input, self._num_node,
-                                                        w._i, w._node, WEIGHT_SET[wi_alt])
-            else:
-                for bi in range(self._batch_size):
-                    self._gpu.batch_multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-                                                    bi, stride, self._num_input, self._num_node)
-            #
-            self._gpu.copy(self._product_matrix, self._gpu_product)
-            for bi in range(self._batch_size):
-                product_matrix = self._product_matrix[bi]
-                output_array = self._output_array[bi]
-                i = 0
-                sum = np.zeros(len(product_matrix), dtype=np.float32)
-                for row in product_matrix:
-                    sum[i] = np.sum(row)
-                    i = i+1
-
-                self._output_array[bi] = softmax(sum)
-            #
-            #print "output :"
-            #print self._output_array#[0]
-    
-    def propagate(self, array_in, debug=0):
-        if self._type==0:   # input
-            self._gpu.copy(self._gpu_input, array_in)
-            self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node, 0)
-            if debug==1:
-                self._gpu.copy(self._y_array, self._gpu_output)
-                print "input"
-                print array_in
-                print self._y_array
+                if self._type==1:
+                    for i in range(len(self._product_matrix[bi])):
+                        self._output_array[bi][i] = relu( np.sum(self._product_matrix[bi][i]) )
             
-        elif self._type==1:   # hidden
-            self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-                                      self._num_input, self._num_node)
-            self._gpu.copy(self._product_matrix, self._gpu_product)
-            i = 0
-            for row in self._product_matrix:
-                self._sum[i] = relu( np.sum(row) )
-                #self._sum[i] = sigmoid(np.sum(row))
-                #self._sum[i] = np.sum(row)
-                i += 1
+                    self._gpu.copy(self._gpu_output, self._output_array)
             
-            self._gpu.copy(self._gpu_output, self._sum)
-            if debug==1:
-                print "hidden"
-                print self._sum
-    
-        else: # output
-            self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-                                      self._num_input, self._num_node)
-            self._gpu.copy(self._product_matrix, self._gpu_product)
-            i = 0
-            for row in self._product_matrix:
-                self._sum[i] = np.sum(row)
-                i += 1
-                    
-            self._y_array = softmax(self._sum)
-            if debug==1:
-                print self._y_array
+                else:
+                    sum = np.zeros(len(self._product_matrix[bi]), dtype=np.float32)
+                    for i in range(len(self._product_matrix[bi])):
+                        sum[i] = np.sum(self._product_matrix[bi][i])
 
-    def propagate_alt(self, array_in, w, wi_alt):
-        if self._type==0: # input
-            self._gpu.copy(self._gpu_input, array_in)
-            self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node, 0)
-        elif self._type==1: # hidden
-            if w!=None and w._layer._index==self._index:
-                self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-                                              self._num_input, self._num_node,
-                                              w._i, w._node, WEIGHT_SET[wi_alt])
-            else:
-                self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-                                         self._num_input, self._num_node)
-            
-            self._gpu.copy(self._product_matrix, self._gpu_product)
-            i = 0
-            for row in self._product_matrix:
-                self._sum[i] = relu( np.sum(row) )
-                #self._sum[i] = sigmoid(np.sum(row))
-                #self._sum[i] = np.sum(row)
-                i += 1
+                    self._output_array[bi] = softmax(sum)
 
-            self._gpu.copy(self._gpu_output, self._sum)
-        else: # output
-            self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-                                          self._num_input, self._num_node,
-                                          w._i, w._node, WEIGHT_SET[wi_alt])
-            self._gpu.copy(self._product_matrix, self._gpu_product)
-            #
-            # softmax must be applied below this
-            #
-            i = 0
-            for row in self._product_matrix:
-                self._sum[i] = np.sum(row)
-                i += 1
-            
-            self._y_array = softmax(self._sum)
-                    
-    def propagate_2(self, array_in, index, w, wi_alt, debug):
-        if self._type==0: # input
-            self._gpu.copy(self._gpu_input, array_in)
-            self._gpu.scale(self._gpu_input, self._gpu_output, float(255.0), self._num_node, 0)
-        elif self._type==1: # hidden
-            self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-                                          self._num_input, self._num_node,
-                                          w._i, w._node, WEIGHT_SET[wi_alt])
-            self._gpu.copy(self._product_matrix, self._gpu_product)
-            i = 0
-            for row in self._product_matrix:
-                self._sum[i] = relu( np.sum(row) )
-                #self._sum[i] = sigmoid(np.sum(row))
-                #self._sum[i] = np.sum(row)
-                i += 1
-
-            self._gpu.copy(self._gpu_output, self._sum)
-        else: # output
-            if w!=None and w._layer._index==self._index:
-                self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-                                              self._num_input, self._num_node,
-                                              w._i, w._node, WEIGHT_SET[wi_alt])
-            else:
-                self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-                                          self._num_input, self._num_node)
-            
-            self._gpu.copy(self._product_matrix, self._gpu_product)
-   
-            i = 0
-            for row in self._product_matrix:
-                self._sum[i] = np.sum(row)
-                i += 1
-
-            self._y_array = softmax(self._sum)
-            if debug==1:
-                print self._y_array
+#        elif self._type==1: # hidden
+#            stride = self._num_input * self._num_node
+#            #print "hidden"
+#            if w!=None and w._layer._index==self._index:
+#                for bi in range(self._batch_size):
+#                    self._gpu.batch_multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
+#                                                        bi, stride, self._num_input, self._num_node,
+#                                                        w._i, w._node, WEIGHT_SET[wi_alt])
+#            else:
+#                for bi in range(self._batch_size):
+#                    self._gpu.batch_multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
+#                                                    bi, stride, self._num_input, self._num_node)
+#            #
+#            self._gpu.copy(self._product_matrix, self._gpu_product)
+#            for bi in range(self._batch_size):
+#                for i in range(len(self._product_matrix[bi])):
+#                    self._output_array[bi][i] = relu( np.sum(self._product_matrix[bi][i]) )
+#
+#            self._gpu.copy(self._gpu_output, self._output_array)
+#        else: # output
+#            #print "output : %d" % self._batch_size
+#            stride = self._num_input * self._num_node
+#            if w!=None and w._layer._index==self._index:
+#                for bi in range(self._batch_size):
+#                    self._gpu.batch_multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
+#                                                        bi, stride, self._num_input, self._num_node,
+#                                                        w._i, w._node, WEIGHT_SET[wi_alt])
+#            else:
+#                for bi in range(self._batch_size):
+#                    self._gpu.batch_multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
+#                                                    bi, stride, self._num_input, self._num_node)
+#            #
+#            self._gpu.copy(self._product_matrix, self._gpu_product)
+#            for bi in range(self._batch_size):
+#                sum = np.zeros(len(self._product_matrix[bi]), dtype=np.float32)
+#                for i in range(len(self._product_matrix[bi])):
+#                    sum[i] = np.sum(self._product_matrix[bi][i])
+#
+#                #print sum
+#                self._output_array[bi] = softmax(sum)
+#            #
+#            #print self._output_array[0]
+#            #for k in range(10):
+#            #    print "%f" % self._output_array[0][k]
 
     def get_weight(self, node, i):
         return self._weight_matrix[node][i]
@@ -391,10 +314,10 @@ class Layer:
     def getType(self):
         return self._type
 
-    def get_y_array(self):
-        #if self._gpu:
-        #    return self._gpu_output
-        return self._y_array
+#    def get_y_array(self):
+#        #if self._gpu:
+#        #    return self._gpu_output
+#        return self._y_array
 #
 #
 #
@@ -406,6 +329,7 @@ class Roster:
         self._batch_size = 1
     
     def set_batch(self, batch, batch_size, data_size):
+        print "set_batch"
         self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
         self._gpu_input = self._gpu.dev_malloc(self._batch_data)
         self._batch_class = np.zeros(batch_size, dtype=int)
@@ -420,18 +344,18 @@ class Roster:
             self._batch_data[i] = entry[0].copy()
             self._batch_class[i] = entry[1]
         #
+        #print "input"
+        #print self._batch_data[0][153]
         self._gpu.copy(self._gpu_input, self._batch_data)
+        layer._gpu.batch_scale(self._gpu_input, layer._gpu_output, 28*28, float(255.0), layer._num_node, batch_size, 0)
+        ### debug use ###
+        self._gpu.copy(layer._output_array, layer._gpu_output)
+        #for i in range(batch_size):
+        #    print layer._output_array[i]
+        #print layer._output_array[99]#[153]
+        #print self._batch_class
+        
         #
-        # pre-process for batch propagation
-        #
-#        for i in range(batch_size): # num is batch size
-#            layer._gpu.batch_scale(self._gpu_input, layer._gpu_output, i, 28*28, float(255.0), layer._num_node, 0)
-
-        layer._gpu.batch_scale(self._gpu_input, layer._gpu_output, 28*28, float(255.0), layer._num_node, 0)
-        #
-        # debug use
-        #self._gpu.copy(layer._output_array, layer._gpu_output)
-        #print layer._output_array
         
     def set_gpu(self, my_gpu):
         self._gpu = my_gpu
@@ -441,8 +365,6 @@ class Roster:
         for w in self._weight_list:
             i = random.randrange(WEIGHT_INDEX_SIZE)
             w.set_index(i)
-            #w.set_index(WEIGHT_INDEX_ZERO)
-            #
             w.set_id(c)
             c += 1
 
@@ -454,12 +376,9 @@ class Roster:
         c = 0
         for w in self._weight_list:
             wi = int(w_list[c])
-            #print wi
-            #w.set( WEIGHT_SET[int(wi)] )
             w.set_index(wi)
             w.set_id(c)
             c += 1
-            #print "restore : %d, %d" % (wi, w.get_index())
 
     def update_weight(self):
         for layer in self.layers:
@@ -501,20 +420,17 @@ class Roster:
         if self._gpu:
             layer.init_gpu()
 
-    def get_inference(self):
-        ret = []
-        c = self.countLayers()
-        output = self.getLayerAt(c-1)
-        return output.get_y_array()
+#    def get_inference(self):
+#        ret = []
+#        c = self.countLayers()
+#        output = self.getLayerAt(c-1)
+#        return output.get_y_array()
  
     def get_batch_inference(self):
         ret = []
         c = self.countLayers()
         output = self.getLayerAt(c-1)
         return output._output_array
-
-    def batch_propagate_all(self, w, wi_alt, debug):
-        self.batch_propagate(w, wi_alt, debug)
     
     def batch_propagate(self, w, wi_alt, debug):
         c = self.countLayers()
@@ -527,31 +443,6 @@ class Roster:
         for i in range(1, c):
             layer = self.getLayerAt(i)
             layer.batch_propagate(pre._gpu_output, w, wi_alt, debug)
-            pre = layer
-    
-    def propagate(self, data, debug=0):
-        c = self.countLayers()
-        pre = self.getLayerAt(0)
-        pre.propagate(data, debug)
-        for i in range(1, c):
-            layer = self.getLayerAt(i)
-            layer.propagate(pre._gpu_output, debug)
-            pre = layer
-
-    def propagate_alt(self, data, w, wi_alt):
-        c = self.countLayers()
-        pre = self.getLayerAt(0)
-        pre.propagate_alt(data, w, wi_alt)
-        #if w._layer._index==0:
-        #    pre.propagate_gpu_alt(data, w, wi_alt)
-        #else:
-        #    pre.propagate(data)
-        for i in range(1, c):
-            layer = self.getLayerAt(i)
-            if w._layer._index==i:
-                layer.propagate_alt(pre._gpu_output, w, wi_alt)
-            else:
-                layer.propagate(pre._gpu_output)
             pre = layer
 #
 #

@@ -253,20 +253,20 @@ def make_train_label(label, num):
 #
 def batch_evaluate(r, batch_size, labels):
     infs = r.get_batch_inference()
-    #
-    #num = float(NUM_OF_CLASS)
     sum = 0.0
     for i in range(batch_size):
         data_class = r._batch_class[i]
         labels[data_class] = 1.0
         inf = infs[i]
         #print inf
-        #mse =  util.cross_emtropy_error(inf, len(inf), labels, len(labels))
+        #
+        mse =  util.cross_emtropy_error(inf, len(inf), labels, len(labels))
         #mse =  util.cross_emtropy_error_fast(inf, labels, data_class)
         #mse =  util.cross_emtropy_error_fast(inf, data_class)
+        #print mse
         #
-        mse = util.mean_squared_error(inf, len(inf), labels, len(labels))
-        
+        #mse = util.mean_squared_error(inf, len(inf), labels, len(labels))
+        #
         sum = sum + mse
         labels[data_class] = 0.0
 
@@ -296,7 +296,8 @@ def batch_weight_shift(r, batch, batch_size, labels, w, mse_base):
             return mse_alt, 1
         else:
             w._lock = 1
-            print "  lock at initial eval. (%d)" % (wi)
+            print "  lock at initial eval. (%d) [%f]" % (wi, mse_alt)
+            r.batch_propagate(None, None, 0) #
             return mse_base, 0
 
     if wi==core.WEIGHT_INDEX_MAX:
@@ -315,8 +316,9 @@ def batch_weight_shift(r, batch, batch_size, labels, w, mse_base):
         return mse_alt, 1
     else:
         w._lock = 1
-        print "  lock at %d" % (wi)
+        print "  lock (%d) [%f]" % (wi, mse_alt)
 
+    r.batch_propagate(None, None, 0) #
     return mse_base, 0
 #
 #
@@ -350,16 +352,18 @@ def batch_weight_random(r, batch, batch_size, labels, w, mse_base):
 #
 def batch_test_mode(r, batch, batch_size):
     print ">>batch test mode (%d)" % (batch_size)
-    r.set_batch(batch, batch_size, 28*28)
-    start_time = time.time()
+    dist = [0,0,0,0,0,0,0,0,0,0] # data_class
+    stat = [0,0,0,0,0,0,0,0,0,0] # result
     #
+    start_time = time.time()
+    r.set_batch(batch, batch_size, 28*28)
     r.batch_propagate(None, None, 0)
     infs = r.get_batch_inference()
-    
+    #
     ca = 0
     for i in range(batch_size):
+        dist[r._batch_class[i]] = dist[r._batch_class[i]] + 1
         inf = infs[i]
-        #print inf
         index = -1
         mx = max(inf)
         if mx>0.0:
@@ -368,11 +372,21 @@ def batch_test_mode(r, batch, batch_size):
                     index = k
 
         if index==r._batch_class[i]:
+            stat[index] = stat[index] +1
             ca = ca + 1
 
     print "result : %d / %d" % (ca, batch_size)
     accuracy = float(ca) / float(batch_size)
     print "accuracy : %f" % (accuracy)
+    print dist
+    print stat
+    print "---------------------------------"
+    print "class\t|dist\t|stat"
+    print "---------------------------------"
+    for i in range(10):
+        print "%d\t| %d\t| %d"  % (i, dist[i], stat[i])
+    
+    print "---------------------------------"
     #
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
@@ -411,13 +425,19 @@ def batch_train_mode(it, r, batch, batch_size, data_size):
             w_id_list = w_id_list[0:patial]
             #
             for p in w_id_list:
-                print "%d, %d [%d, %d] layer: %d, node: %d, weight: %d : %f" % (it, cnt_update, cnt0, cnt1, i, k, p, mse_base)
+                print "[%d] %d, %d [%d, %d] layer: %d, node: %d, weight: %d : %f" % (cnt_update, it, cnt_update, cnt0, cnt1, i, k, p, mse_base)
                 w_index = node.get_weight(p)
                 w = weight_list[w_index]
                 #
-                mse_base, c = batch_weight_shift(r, batch, batch_size, labels, w, mse_base)
-                cnt_update = cnt_update + c
+                #mse_base, c = batch_weight_random(r, batch, batch_size, labels, w, mse_base)
                 #
+                mse_base, c = batch_weight_shift(r, batch, batch_size, labels, w, mse_base)
+                #if c==0:
+                #    r.batch_propagate(None, None, 0)
+                #    mse_base = batch_evaluate(r, batch_size, labels)
+                #    print mse_base
+                #
+                cnt_update = cnt_update + c
                 cnt1 = cnt1 + 1
             #
             cnt0 = cnt0 + 1
@@ -498,7 +518,7 @@ def main():
             return 0
 
         cnt = 0
-        for i in range(5):
+        for i in range(1):
             cnt = cnt + batch_train_mode(i, r, batch, batch_size, data_size)
             save_weight(r)
             r.unlock_weight_all()
@@ -511,17 +531,18 @@ def main():
     elif mode==3:
         print ">> test mode"
         debug = 0
-        test_batch = util.pickle_load(TEST_BATCH_PATH)
+        batch = util.pickle_load(TEST_BATCH_PATH)
         if test_batch is None:
             print "error : no test batch"
             return 0
-        
-        test_mode(r, test_batch, NUM_OF_CLASS, TEST_BATCH_SIZE, debug)
+    
+        batch_size = TEST_BATCH_SIZE
+        batch_test_mode(r, batch, batch_size)
     elif mode==4:
         print ">> self-test mode"
         debug = 0
-        train_array = util.pickle_load(TRAIN_BATCH_PATH)
-        test_mode(r, train_array, NUM_OF_CLASS, batch_size, debug)
+        batch = util.pickle_load(TRAIN_BATCH_PATH)
+        batch_test_mode(r, batch, batch_size)
     elif mode==5:
         print ">> ??"
         batch = util.pickle_load(TRAIN_BATCH_PATH)

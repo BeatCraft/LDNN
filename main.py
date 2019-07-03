@@ -144,8 +144,8 @@ def make_batch(size, image_path, label_path):
 #
 #
 #
-def batch_evaluate(r, batch_size, labels):
-    infs = r.get_batch_inference()
+def evaluate(r, batch_size, labels):
+    infs = r.get_inference()
     sum = 0.0
     for i in range(batch_size):
         data_class = r._batch_class[i]
@@ -167,7 +167,7 @@ def batch_evaluate(r, batch_size, labels):
 #
 #
 #
-def batch_weight_shift(r, batch, batch_size, labels, w, mse_base):
+def weight_shift(r, batch, batch_size, labels, w, mse_base):
     wi = w.get_index()
     wi_alt = wi
     if w._lock==1:
@@ -180,8 +180,8 @@ def batch_weight_shift(r, batch, batch_size, labels, w, mse_base):
         else:
             w._step  = 1
 
-        r.batch_propagate(w, wi+w._step, 0)
-        mse_alt = batch_evaluate(r, batch_size, labels)
+        r.propagate(w, wi+w._step, 0)
+        mse_alt = evaluate(r, batch_size, labels)
         if mse_alt<mse_base:
             w.set_index(wi+w._step)
             r.update_weight()
@@ -190,7 +190,7 @@ def batch_weight_shift(r, batch, batch_size, labels, w, mse_base):
         else:
             w._lock = 1
             print "  lock at initial eval. (%d) [%f]" % (wi, mse_alt)
-            r.batch_propagate(None, None, 0) #
+            r.propagate(None, None, 0) #
             return mse_base, 0
 
     if wi==core.WEIGHT_INDEX_MAX:
@@ -200,8 +200,8 @@ def batch_weight_shift(r, batch, batch_size, labels, w, mse_base):
         w._step = 1
         print "  reversed at %d" % (wi)
 
-    r.batch_propagate(w, wi+w._step, 0)
-    mse_alt = batch_evaluate(r, batch_size, labels)
+    r.propagate(w, wi+w._step, 0)
+    mse_alt = evaluate(r, batch_size, labels)
     if  mse_alt<mse_base:
         w.set_index(wi+w._step)
         r.update_weight()
@@ -211,12 +211,12 @@ def batch_weight_shift(r, batch, batch_size, labels, w, mse_base):
         w._lock = 1
         print "  lock (%d) [%f]" % (wi, mse_alt)
 
-    r.batch_propagate(None, None, 0) #
+    r.propagate(None, None, 0) #
     return mse_base, 0
 #
 #
 #
-def batch_weight_random(r, batch, batch_size, labels, w, mse_base):
+def weight_random(r, batch, batch_size, labels, w, mse_base):
     inc = 0
     dec = 0
     wi = w.get_index()
@@ -229,8 +229,8 @@ def batch_weight_random(r, batch, batch_size, labels, w, mse_base):
     while wi_alt==wi:
         wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
     
-    r.batch_propagate(w, wi_alt, 0)
-    mse_alt = batch_evaluate(r, batch_size, labels)
+    r.propagate(w, wi_alt, 0)
+    mse_alt = evaluate(r, batch_size, labels)
     if mse_alt<mse_base:
         w.set_index(wi_alt)
         r.update_weight()
@@ -243,7 +243,7 @@ def batch_weight_random(r, batch, batch_size, labels, w, mse_base):
 #
 #
 #
-def batch_test_mode(r, batch, batch_size):
+def test_mode(r, batch, batch_size):
     print ">>batch test mode (%d)" % (batch_size)
     dist = [0,0,0,0,0,0,0,0,0,0] # data_class
     rets = [0,0,0,0,0,0,0,0,0,0] # result of infs
@@ -251,8 +251,8 @@ def batch_test_mode(r, batch, batch_size):
     #
     start_time = time.time()
     r.set_batch(batch, batch_size, 28*28)
-    r.batch_propagate(None, None, 0)
-    infs = r.get_batch_inference()
+    r.propagate(None, None, 0)
+    infs = r.get_inference()
     #
     ca = 0
     for i in range(batch_size):
@@ -289,14 +289,14 @@ def batch_test_mode(r, batch, batch_size):
 #
 #
 #
-def batch_train_mode(it, r, batch, batch_size, data_size):
+def train_mode(it, r, batch, batch_size, data_size):
     labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
     cnt_update = 0
     r.set_batch(batch, batch_size, data_size)
     #
     start_time = time.time()
-    r.batch_propagate(None, None, 0)
-    mse_base = batch_evaluate(r, batch_size, labels)
+    r.propagate(None, None, 0)
+    mse_base = evaluate(r, batch_size, labels)
     print mse_base
     #
     weight_list = r.get_weight_list()
@@ -324,9 +324,9 @@ def batch_train_mode(it, r, batch, batch_size, data_size):
                 w_index = node.get_weight(p)
                 w = weight_list[w_index]
                 #
-                #mse_base, c = batch_weight_random(r, batch, batch_size, labels, w, mse_base)
+                #mse_base, c = weight_random(r, batch, batch_size, labels, w, mse_base)
                 #
-                mse_base, c = batch_weight_shift(r, batch, batch_size, labels, w, mse_base)
+                mse_base, c = weight_shift(r, batch, batch_size, labels, w, mse_base)
                 #
                 cnt_update = cnt_update + c
                 cnt1 = cnt1 + 1
@@ -363,7 +363,7 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    batch_size = 1000
+    batch_size = 100
     data_size = 28*28
     #
     # GPU
@@ -410,7 +410,7 @@ def main():
 
         cnt = 0
         for i in range(1):
-            cnt = cnt + batch_train_mode(i, r, batch, batch_size, data_size)
+            cnt = cnt + train_mode(i, r, batch, batch_size, data_size)
             save_weight(r)
             r.unlock_weight_all()
         #
@@ -428,16 +428,14 @@ def main():
             return 0
     
         batch_size = TEST_BATCH_SIZE
-        batch_test_mode(r, batch, batch_size)
+        test_mode(r, batch, batch_size)
     elif mode==4:
         print ">> self-test mode"
         debug = 0
         batch = util.pickle_load(TRAIN_BATCH_PATH)
-        batch_test_mode(r, batch, batch_size)
+        test_mode(r, batch, batch_size)
     elif mode==5:
         print ">> ??"
-        batch = util.pickle_load(TRAIN_BATCH_PATH)
-        batch_test_mode(r, batch, batch_size)
     elif mode==6:
         print ">> export weight to CSV"
         wl = r.get_weight_list()

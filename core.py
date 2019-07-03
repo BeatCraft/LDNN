@@ -214,7 +214,7 @@ class Layer:
     def get_node(self, i):
         return self._node_list[i]
 
-    def batch_propagate(self, array_in, w, wi_alt, debug):
+    def propagate(self, array_in, w, wi_alt, debug):
         if self._type==0: # input
             pass
         else:
@@ -224,15 +224,15 @@ class Layer:
             num_w = self._num_input
             if w!=None and w._layer._index==self._index:
                 for bi in range(self._batch_size):
-                    self._gpu.batch_multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-                                                        bi, stride_1, stride_2, stride_3, num_w,
-                                                        w._i, w._node, WEIGHT_SET[wi_alt],
-                                                        self._num_input, self._num_node)
+                    self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
+                                                  bi, stride_1, stride_2, stride_3, num_w,
+                                                  w._i, w._node, WEIGHT_SET[wi_alt],
+                                                  self._num_input, self._num_node)
             else:
                 for bi in range(self._batch_size):
-                    self._gpu.batch_multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-                                                    bi, stride_1, stride_2, stride_3, num_w,
-                                                    self._num_input, self._num_node)
+                    self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
+                                              bi, stride_1, stride_2, stride_3, num_w,
+                                              self._num_input, self._num_node)
             #
             self._gpu.copy(self._product_matrix, self._gpu_product)
             #
@@ -293,7 +293,7 @@ class Roster:
             self._batch_class[i] = entry[1]
         #
         self._gpu.copy(self._gpu_input, self._batch_data)
-        layer._gpu.batch_scale(self._gpu_input, layer._gpu_output, 28*28, float(255.0), layer._num_node, batch_size, 0)
+        layer._gpu.scale(self._gpu_input, layer._gpu_output, 28*28, float(255.0), layer._num_node, batch_size, 0)
         ### debug use ###
         if debug:
             self._gpu.copy(layer._output_array, layer._gpu_output)
@@ -363,23 +363,23 @@ class Roster:
         if self._gpu:
             layer.init_gpu()
 
-    def get_batch_inference(self):
+    def get_inference(self):
         ret = []
         c = self.countLayers()
         output = self.getLayerAt(c-1)
         return output._output_array
     
-    def batch_propagate(self, w, wi_alt, debug):
+    def propagate(self, w, wi_alt, debug):
         c = self.countLayers()
         pre = self.getLayerAt(0)
         # this line can be deleted later
-        pre.batch_propagate(pre._gpu_output, w, wi_alt, debug)
+        pre.propagate(pre._gpu_output, w, wi_alt, debug)
         #
         # input layer is pre-prosessed
         #
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            layer.batch_propagate(pre._gpu_output, w, wi_alt, debug)
+            layer.propagate(pre._gpu_output, w, wi_alt, debug)
             pre = layer
 #
 #

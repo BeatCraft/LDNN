@@ -20,9 +20,7 @@ __kernel void batch_scale(
     
     if (debug==1){
         printf(\"%d, %d\\n\",i, j);
-//        printf(\"[%d][%d] %f, %f\\n\", j, stride*i+j, x[stride*i+j], y[stride*i+j]);
     }
-    //printf(\"%d, %d\\n\",i, j);
 };
 
 __kernel void batch_multiple_x_by_w(
@@ -39,11 +37,6 @@ __kernel void batch_multiple_x_by_w(
     int j = get_global_id(1); // num_node
     
     y[stride_1*index + j*stride_2 + i] = x[stride_2*index + i] * w[j*num_w + i];
-    
-    //printf(\"%d, %d, %f\\n\", i, j, w[j*num_w + i]);
-//    printf(\"num_w=%d\\n\", num_w);
-//    printf(\"%d, %d, %f\\n\",  i, j, y[stride*index + j*num_w + i]);
-//    printf(\"(%d, %d) %f, %f, %d, %f\\n\", i, j, x[stride*index+i], w[j*num_w + i], num_w, y[stride*index + j*num_w + i]);
 };
 
 __kernel void batch_multiple_x_by_w_alt(
@@ -63,13 +56,10 @@ __kernel void batch_multiple_x_by_w_alt(
     int j = get_global_id(1);
 
     if (j==alt_col && i==alt_row){
-        //y[stride_1*index + j*stride_2 + i] = x[stride_2*index + i] * alt_w;
         y[stride_1*index + j*stride_2 + i] = x[stride_2*index + i] * alt_w;
     }else{
-        //y[stride_1*index + j*stride_2 + i] = x[stride_2*index + i] * w[j*num_w + i];
         y[stride_1*index + j*stride_2 + i] = x[stride_2*index + i] * w[j*num_w + i];
     }
-    //printf(\"%d, %d, %f\\n\", i, j, w[j*num_w + i]);
 };
 
 __kernel void scale(
@@ -116,21 +106,8 @@ __kernel void multiple_x_by_w_alt(
 };
 
 """
-#printf(\"(%d, %d) %f, %f, %f\\n\", i, j, x[stride*index+i], w[j*num_w + i], y[stride*index+i]);
-#y[i] = x[stride*index+i]/max;
-#//printf(\"(%d, %d)\\n\", i, j);
-#y[j*num_w + i] = x[i] * w[j*num_w + i];
-#//    printf(\"%f\\n\", x[i]);
-#             //
-#             //    printf(\"%f\\n\", y[j*num_w + i]);
 #
 #
-#    __global unsigned char* x,
-#    float v = x[i] + 1.0;
-#    y[i] = v/(max+1.0);
-#
-# printf(\"GPU :(%d, %d) = %f\\n\", j, i, x[i]);
-# printf(\"%f\\n\", y[i]);
 #
 class Gpu:
     def __init__(self):
@@ -186,7 +163,7 @@ class Gpu:
     #
     #
     def batch_scale(self, d_x, d_y, stride, max, row, batch_size, debug):
-        print "batch_scale(%d, %d)" % (stride, batch_size)
+        #print "batch_scale(%d, %d)" % (stride, batch_size)
         event = self.prg.batch_scale(self._queue, (row, batch_size), None,
                                      d_x, d_y, np.int32(stride),
                                      np.float32(max), np.int32(debug))

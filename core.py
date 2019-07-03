@@ -187,12 +187,9 @@ class Layer:
     
     def set_batch(self, batch_size):
         self._batch_size = batch_size
-        #self._input_array = np.zeros((self._batch_size, self._num_input), dtype=np.float32)
-        #self._gpu_input = self._gpu.dev_malloc(self._input_array)
         if self._type>0:
             self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
             self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
-            #print self._product_matrix
 
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
         self._gpu_output = self._gpu.dev_malloc(self._output_array)
@@ -252,51 +249,7 @@ class Layer:
                         sum[i] = np.sum(self._product_matrix[bi][i])
 
                     self._output_array[bi] = softmax(sum)
-
-#        elif self._type==1: # hidden
-#            stride = self._num_input * self._num_node
-#            #print "hidden"
-#            if w!=None and w._layer._index==self._index:
-#                for bi in range(self._batch_size):
-#                    self._gpu.batch_multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-#                                                        bi, stride, self._num_input, self._num_node,
-#                                                        w._i, w._node, WEIGHT_SET[wi_alt])
-#            else:
-#                for bi in range(self._batch_size):
-#                    self._gpu.batch_multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-#                                                    bi, stride, self._num_input, self._num_node)
-#            #
-#            self._gpu.copy(self._product_matrix, self._gpu_product)
-#            for bi in range(self._batch_size):
-#                for i in range(len(self._product_matrix[bi])):
-#                    self._output_array[bi][i] = relu( np.sum(self._product_matrix[bi][i]) )
-#
-#            self._gpu.copy(self._gpu_output, self._output_array)
-#        else: # output
-#            #print "output : %d" % self._batch_size
-#            stride = self._num_input * self._num_node
-#            if w!=None and w._layer._index==self._index:
-#                for bi in range(self._batch_size):
-#                    self._gpu.batch_multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-#                                                        bi, stride, self._num_input, self._num_node,
-#                                                        w._i, w._node, WEIGHT_SET[wi_alt])
-#            else:
-#                for bi in range(self._batch_size):
-#                    self._gpu.batch_multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-#                                                    bi, stride, self._num_input, self._num_node)
-#            #
-#            self._gpu.copy(self._product_matrix, self._gpu_product)
-#            for bi in range(self._batch_size):
-#                sum = np.zeros(len(self._product_matrix[bi]), dtype=np.float32)
-#                for i in range(len(self._product_matrix[bi])):
-#                    sum[i] = np.sum(self._product_matrix[bi][i])
-#
-#                #print sum
-#                self._output_array[bi] = softmax(sum)
-#            #
-#            #print self._output_array[0]
-#            #for k in range(10):
-#            #    print "%f" % self._output_array[0][k]
+        #
 
     def get_weight(self, node, i):
         return self._weight_matrix[node][i]
@@ -314,10 +267,6 @@ class Layer:
     def getType(self):
         return self._type
 
-#    def get_y_array(self):
-#        #if self._gpu:
-#        #    return self._gpu_output
-#        return self._y_array
 #
 #
 #
@@ -328,8 +277,7 @@ class Roster:
         self.layers = []
         self._batch_size = 1
     
-    def set_batch(self, batch, batch_size, data_size):
-        print "set_batch"
+    def set_batch(self, batch, batch_size, data_size, debug=0):
         self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
         self._gpu_input = self._gpu.dev_malloc(self._batch_data)
         self._batch_class = np.zeros(batch_size, dtype=int)
@@ -344,18 +292,13 @@ class Roster:
             self._batch_data[i] = entry[0].copy()
             self._batch_class[i] = entry[1]
         #
-        #print "input"
-        #print self._batch_data[0][153]
         self._gpu.copy(self._gpu_input, self._batch_data)
         layer._gpu.batch_scale(self._gpu_input, layer._gpu_output, 28*28, float(255.0), layer._num_node, batch_size, 0)
         ### debug use ###
-        self._gpu.copy(layer._output_array, layer._gpu_output)
-        #for i in range(batch_size):
-        #    print layer._output_array[i]
-        #print layer._output_array[99]#[153]
-        #print self._batch_class
-        
-        #
+        if debug:
+            self._gpu.copy(layer._output_array, layer._gpu_output)
+            for i in range(batch_size):
+                print layer._output_array[i]
         
     def set_gpu(self, my_gpu):
         self._gpu = my_gpu
@@ -420,12 +363,6 @@ class Roster:
         if self._gpu:
             layer.init_gpu()
 
-#    def get_inference(self):
-#        ret = []
-#        c = self.countLayers()
-#        output = self.getLayerAt(c-1)
-#        return output.get_y_array()
- 
     def get_batch_inference(self):
         ret = []
         c = self.countLayers()

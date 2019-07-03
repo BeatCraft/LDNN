@@ -144,113 +144,6 @@ def make_batch(size, image_path, label_path):
 #
 #
 #
-def test(r, minibatch, num_of_class, debug=0):
-    dist = [0,0,0,0,0,0,0,0,0,0]
-    stat = [0,0,0,0,0,0,0,0,0,0]
-
-    for label in range(len(minibatch)):
-        data = minibatch[label]
-        r.propagate(data)
-        inf = r.get_inference()
-        if inf is None:
-            print "ERROR"
-            continue
-            
-        index = -1
-        mx = max(inf)
-        if mx>0.0:
-            for k in range(num_of_class):
-                if inf[k] == mx:
-                    index = k
-            
-            dist[index] = dist[index] + 1
-        else:
-            print "ASS HOLE : %d, %f" % (label, mx)
-        
-        if label==index:
-            stat[index] = stat[index] + 1
-         
-    return [dist, stat]
-#
-#
-#
-def test_mode(r, batch, num_of_class, iteration, debug=0):
-    print ">>test mode(%d)" % iteration
-    start_time = time.time()
-    
-    it = 0
-    dist = [0,0,0,0,0,0,0,0,0,0]
-    stat = [0,0,0,0,0,0,0,0,0,0]
-    labels = [0,0,0,0,0,0,0,0,0,0]
-    
-    for entry in batch:
-        if it >= iteration:
-            break
-    
-        data = entry[0]
-        label = entry[1]
-        labels[label] = labels[label] + 1
-        r.propagate(data)
-        inf = r.get_inference()
-        if inf is None:
-            print "ERROR"
-            it = it + 1
-            continue
-    
-        index = -1
-        mx = max(inf)
-        if mx>0.0:
-            for k in range(num_of_class):
-                if inf[k] == mx:
-                    index = k
-                                    
-            dist[index] = dist[index] + 1
-        else:
-            print "[%d] ASS HOLE : %d, %f" % (it, label, mx)
-            r.propagate(data, 1)
-            it = it + 1
-            continue
-    
-        if label==index:
-            stat[index] = stat[index] + 1
-
-        it = it + 1
-
-    print "---------------------------------"
-    print "class\t|label\t|dist\t|stat"
-    print "---------------------------------"
-    for i in range(num_of_class):
-        print "%d\t| %d\t| %d\t| %d"  % (i, labels[i], dist[i], stat[i])
-    
-    print "---------------------------------"
-
-    sum = 0.0
-    for s in stat:
-        sum = sum + s
-
-    print "ok : %d" % (sum)
-    print "it : %d" %(iteration)
-    print "accuracy = %f" % (sum/float(iteration))
-
-    elapsed_time = time.time() - start_time
-    t = format(elapsed_time, "0")
-    print "test time = %s" % (t)
-#
-#
-#
-def make_train_label(label, num):
-    labelList = []
-    
-    for i in range(num):
-        if label is i:
-            labelList.append(1)
-        else:
-            labelList.append(0)
-
-    return labelList
-#
-#
-#
 def batch_evaluate(r, batch_size, labels):
     infs = r.get_batch_inference()
     sum = 0.0
@@ -353,7 +246,8 @@ def batch_weight_random(r, batch, batch_size, labels, w, mse_base):
 def batch_test_mode(r, batch, batch_size):
     print ">>batch test mode (%d)" % (batch_size)
     dist = [0,0,0,0,0,0,0,0,0,0] # data_class
-    stat = [0,0,0,0,0,0,0,0,0,0] # result
+    rets = [0,0,0,0,0,0,0,0,0,0] # result of infs
+    oks  = [0,0,0,0,0,0,0,0,0,0] # num of correct
     #
     start_time = time.time()
     r.set_batch(batch, batch_size, 28*28)
@@ -370,21 +264,22 @@ def batch_test_mode(r, batch, batch_size):
             for k in range(10):
                 if inf[k] == mx:
                     index = k
-
+        #
+        rets[index] = rets[index] + 1
+        #
         if index==r._batch_class[i]:
-            stat[index] = stat[index] +1
+            oks[index] = oks[index] +1
             ca = ca + 1
-
+    #
+    print "---------------------------------"
     print "result : %d / %d" % (ca, batch_size)
     accuracy = float(ca) / float(batch_size)
     print "accuracy : %f" % (accuracy)
-    print dist
-    print stat
     print "---------------------------------"
-    print "class\t|dist\t|stat"
+    print "class\t|dist\t|infs\t|ok"
     print "---------------------------------"
     for i in range(10):
-        print "%d\t| %d\t| %d"  % (i, dist[i], stat[i])
+        print "%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i])
     
     print "---------------------------------"
     #
@@ -432,10 +327,6 @@ def batch_train_mode(it, r, batch, batch_size, data_size):
                 #mse_base, c = batch_weight_random(r, batch, batch_size, labels, w, mse_base)
                 #
                 mse_base, c = batch_weight_shift(r, batch, batch_size, labels, w, mse_base)
-                #if c==0:
-                #    r.batch_propagate(None, None, 0)
-                #    mse_base = batch_evaluate(r, batch_size, labels)
-                #    print mse_base
                 #
                 cnt_update = cnt_update + c
                 cnt1 = cnt1 + 1
@@ -472,7 +363,7 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    batch_size = 100
+    batch_size = 1000
     data_size = 28*28
     #
     # GPU
@@ -532,7 +423,7 @@ def main():
         print ">> test mode"
         debug = 0
         batch = util.pickle_load(TEST_BATCH_PATH)
-        if test_batch is None:
+        if batch is None:
             print "error : no test batch"
             return 0
     

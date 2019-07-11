@@ -8,54 +8,40 @@ import copy
 import multiprocessing as mp
 import pickle
 import numpy as np
+import csv
 
 # LDNN Modules
 import gpu
+import util
 
-#from PIL import Image
-#from PIL import ImageFile
-#from PIL import JpegImagePlugin
-#from PIL import ImageFile
-#from PIL import PngImagePlugin
-#import zlib
-
+#
+#
+#
 sys.setrecursionlimit(10000)
 #
 # constant values
 #
-WEIGHT_SET_0 = [-0.90, -0.85, -0.80, -0.75, -0.70, -0.65, -0.60, -0.55, -0.50,
-                -0.45, -0.40, -0.35, -0.30, -0.25, -0.20, -0.15, -0.10, -0.05,
-                0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50,
-                0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90]
-
-WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078125,
+WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078125,
                 0.0,
                 0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
 
-WEIGHT_SET_2 = [0.0, 0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
+# won't work at all
+WEIGHT_SET_1 = [0.0, 0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
 
-WEIGHT_SET_3 = [-1, -0.72363462, -0.52364706, -0.37892914, -0.27420624, -0.19842513, -0.14358729, -0.10390474,
+WEIGHT_SET_2 = [-1, -0.72363462, -0.52364706, -0.37892914, -0.27420624, -0.19842513, -0.14358729, -0.10390474,
                 -0.07518906, -0.05440941, -0.03937253, -0.02849133, -0.02061731, -0.0149194, -0.01079619, -0.0078125,
                 0,
                 0.0078125, 0.01079619, 0.0149194, 0.02061731, 0.02849133, 0.03937253, 0.05440941, 0.07518906,
                 0.10390474, 0.14358729, 0.19842513, 0.27420624, 0.37892914, 0.52364706, 0.72363462, 1]
 
-WEIGHT_SET_4 = [0.0, 0.0078125, 0.01079619, 0.0149194, 0.02061731, 0.02849133, 0.03937253, 0.05440941, 0.07518906,
-                0.10390474, 0.14358729, 0.19842513, 0.27420624, 0.37892914, 0.52364706, 0.72363462, 1.0]
+# upto 59 %
+WEIGHT_SET_3 = [-1.0, -0.5, -0.25, -0.125, 0.125, 0.25, 0.5, 1.0]
 
+# upto 50 %
+WEIGHT_SET_4 = [-1.0, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0.0,
+                0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
-#WEIGHT_SET_5 = [-1.00, -0.95, -0.90, -0.85, -0.80, -0.75, -0.70, -0.65, -0.60, -0.55,
-#                -0.50, -0.45, -0.40, -0.35, -0.30, -0.25, -0.20, -0.15, -0.10, -0.05,
-#                0.00,
-#                0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50,
-#                0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00]
-#
-#WEIGHT_SET_6 = [0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50,
-#                0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00]
-#WEIGHT_SET_3 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0]
-#WEIGHT_SET_9 = [0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
-
-WEIGHT_SET = WEIGHT_SET_1
+WEIGHT_SET = WEIGHT_SET_0
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -180,10 +166,12 @@ class Layer:
         self._type = type
         self._num_input = num_input
         self._num_node = num_node
+        self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        #self._weight_property = np.ones( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
-        
         self._sum = np.zeros(self._num_node, dtype=np.float32)
-        self._node_list = []
+        #self._node_list = []
     
     def set_batch(self, batch_size):
         self._batch_size = batch_size
@@ -204,34 +192,27 @@ class Layer:
         if self._type>0:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
 
-    def update_weight(self):
+    def update_weight_gpu(self):
         if self._type>0:
             self._gpu.copy(self._gpu_weight, self._weight_matrix)
 
-    def add_node(self, node):
-        self._node_list.append(node)
-    
-    def get_node(self, i):
-        return self._node_list[i]
-
-    def propagate(self, array_in, w, wi_alt, debug):
+    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         if self._type==0: # input
             pass
         else:
-            stride_1 = self._num_input * self._num_node
+            stride_1 = self._num_node * self._num_input
             stride_2 = self._num_input
-            stride_3 = self._num_node
-            num_w = self._num_input
-            if w!=None and w._layer._index==self._index:
+            #print self._weight_matrix
+            if ni>=0:
                 for bi in range(self._batch_size):
                     self._gpu.multiple_x_by_w_alt(array_in, self._gpu_weight, self._gpu_product,
-                                                  bi, stride_1, stride_2, stride_3, num_w,
-                                                  w._i, w._node, WEIGHT_SET[wi_alt],
-                                                  self._num_input, self._num_node)
+                                                  bi, stride_1, stride_2,
+                                                  self._num_input, self._num_node,
+                                                  ni, ii, WEIGHT_SET[wi])
             else:
                 for bi in range(self._batch_size):
                     self._gpu.multiple_x_by_w(array_in, self._gpu_weight, self._gpu_product,
-                                              bi, stride_1, stride_2, stride_3, num_w,
+                                              bi, stride_1, stride_2,
                                               self._num_input, self._num_node)
             #
             self._gpu.copy(self._product_matrix, self._gpu_product)
@@ -242,20 +223,47 @@ class Layer:
                         self._output_array[bi][i] = relu( np.sum(self._product_matrix[bi][i]) )
             
                     self._gpu.copy(self._gpu_output, self._output_array)
-            
+                    
                 else:
                     sum = np.zeros(len(self._product_matrix[bi]), dtype=np.float32)
                     for i in range(len(self._product_matrix[bi])):
                         sum[i] = np.sum(self._product_matrix[bi][i])
 
                     self._output_array[bi] = softmax(sum)
-        #
 
-    def get_weight(self, node, i):
-        return self._weight_matrix[node][i]
+                #print self._output_array[bi]
+        #
+    def get_weight_index(self, ni, ii):
+        return self._weight_index_matrix[ni][ii]
     
-    def set_weight(self, node, i, w):
-        self._weight_matrix[node][i] = w
+    def get_weight_property(self, ni, ii):
+        return self._weight_property[ni][ii]
+    
+    def set_weight_property(self, ni, ii, p):
+        self._weight_property[ni][ii] = p
+    
+    def set_weight_index(self, ni, ii, wi): # weight index
+        self._weight_index_matrix[ni][ii] = wi
+        self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
+    
+    def init_weight_with_random_index(self):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                #wi = WEIGHT_INDEX_SIZE-1
+                wi = random.randrange(WEIGHT_INDEX_SIZE)
+                self.set_weight_index(ni, ii, wi)
+
+    def export_weight_index(self):
+        return self._weight_index_matrix.tolist()
+    
+    def import_weight_index(self, wi_list):
+        self._weight_index_matrix = np.array(wi_list, dtype=np.int32).copy()
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                #print "(%d, %d) = %d" % (ni, ii, self._weight_index_matrix[ni][ii])
+                self.set_weight_index(ni, ii, self._weight_index_matrix[ni][ii])
+        #
+        #print self._weight_index_matrix
 
     def set_id(self, id):
         if id>=0:
@@ -266,7 +274,6 @@ class Layer:
     
     def getType(self):
         return self._type
-
 #
 #
 #
@@ -304,12 +311,10 @@ class Roster:
         self._gpu = my_gpu
     
     def init_weight(self):
-        c = 0
-        for w in self._weight_list:
-            i = random.randrange(WEIGHT_INDEX_SIZE)
-            w.set_index(i)
-            w.set_id(c)
-            c += 1
+        c = self.countLayers()
+        for i in range(1, c):
+            layer = self.getLayerAt(i)
+            layer.init_weight_with_random_index()
 
     def unlock_weight_all(self):
         for w in self._weight_list:
@@ -325,7 +330,7 @@ class Roster:
 
     def update_weight(self):
         for layer in self.layers:
-            layer.update_weight()
+            layer.update_weight_gpu()
 
     def get_weight_list(self):
         return self._weight_list
@@ -348,17 +353,17 @@ class Roster:
     def add_layer(self, type, num_input, num_node):
         c = self.countLayers()
         layer = Layer(c, type, num_input, num_node, self._gpu)
-        if c>0: # skip input layer
-            for i in range(num_node):
-                node = Node()
-                layer.add_node(node)
-                for j in range(num_input):
-                    w = Weight(layer, i, j)
-                    self._weight_list.append(w)
-                    k = 0
-                    k = len(self._weight_list) - 1
-                    node.add_weight(k)
-
+        #if c>0: # skip input layer
+        #    for i in range(num_node):
+        #        node = Node()
+        #        layer.add_node(node)
+                #for j in range(num_input):
+                #    w = Weight(layer, i, j)
+                #    self._weight_list.append(w)
+                #    k = 0
+                #    k = len(self._weight_list) - 1
+                #    node.add_weight(k)
+        #
         self.layers.append(layer)
         if self._gpu:
             layer.init_gpu()
@@ -369,30 +374,92 @@ class Roster:
         output = self.getLayerAt(c-1)
         return output._output_array
     
-    def propagate(self, w, wi_alt, debug):
+    def export_weight_index(self, path):
+        print "Roster : export_weight_index(%s)" % path
+        with open(path, "w") as f:
+            writer = csv.writer(f, lineterminator='\n')
+            c = self.countLayers()
+            for i in range(1, c):
+                layer = self.getLayerAt(i)
+                writer.writerows(layer.export_weight_index())
+
+    def import_weight_index(self, path):
+        print "Roster : import_weight_index(%s)" % path
+        with open(path, "r") as f:
+            reader = csv.reader(f)
+            lc = self.countLayers()
+            for i in range(1, lc):
+                layer = self.getLayerAt(i)
+                nc  = layer._num_node
+                block = []
+                for row in reader:
+                    line = []
+                    for cell in row:
+                        line.append(cell)
+            
+                    block.append(line)
+                    if len(block)==nc:
+                        break
+                #
+                layer.import_weight_index(block)
+
+
+    def load_weight_index_legacy(self, path):
+        wlist = util.csv_to_list(path)
+        #print wlist
+        lc = self.countLayers()
+        for li in range(1, lc):
+            layer = self.getLayerAt(li)
+            block = []
+            for n in range(layer._num_node):
+                s = layer._num_input * n
+                e = layer._num_input * n + layer._num_input
+                #print "(%d, %d, %d, %d)" % (li, n, s,e)
+                line =  wlist[s:e]
+                #print line
+                block.append(line)
+
+        ol = self.getLayerAt(3)
+        for k in ol._weight_index_matrix:
+            print k
+                
+        #for j in range(ol._num_input):
+        #    print ol.get_weight_index(9, j)
+            
+            
+            #layer.import_weight_index(block)
+            #print block
+        #
+    
+    def propagate(self, li=-1, ni=-1, ii=-1, wi=-1, debug=0):
         c = self.countLayers()
         pre = self.getLayerAt(0)
         # this line can be deleted later
-        pre.propagate(pre._gpu_output, w, wi_alt, debug)
+        pre.propagate(pre._gpu_output, -1, -1, -1, debug)
         #
         # input layer is pre-prosessed
         #
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            layer.propagate(pre._gpu_output, w, wi_alt, debug)
+            #layer.propagate(pre._gpu_output, ni, ii, wi, debug)
+            if i==li:
+                layer.propagate(pre._gpu_output, ni, ii, wi, debug)
+            else:
+                layer.propagate(pre._gpu_output, -1, -1, -1, debug)
+            
             pre = layer
 #
 #
 #
 def main():
     r = Roster()
-    
+    #
     input_layer = r.add_layer(0, 196, 196)
     hidden_layer_1 = r.add_layer(1, 196, 32)
     hidden_layer_2 = r.add_layer(1, 32, 32)
     output_layer = r.add_layer(2, 32, 10)
     r.init_weight()
-    
+    #
     return 0
 #
 #

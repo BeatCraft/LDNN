@@ -44,7 +44,7 @@ def cross_emtropy_error(y, y_len, t, t_len):
     s = s * -1.0
     return s
 
-def cross_emtropy_error_2(y, t):
+def cross_emtropy_error_2(y, y_len, t, t_len):
     delta = 1e-7
     return -np.sum(t * np.log(y + delta))
 #

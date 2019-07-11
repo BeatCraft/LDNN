@@ -27,40 +27,41 @@ __kernel void multiple_x_by_w(
     __global float* x,
     __global float* w,
     __global float* y,
-    const int index,
+    const int bi,
     const int stride_1,
-    const int stride_2,
-    const int stride_3,
-    const int num_w)
+    const int stride_2)
 {
     int i = get_global_id(0); // num_input
     int j = get_global_id(1); // num_node
     
-    y[stride_1*index + j*stride_2 + i] = x[stride_2*index + i] * w[j*num_w + i];
+    y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
+    
+//    if (j==9){
+//        printf(\"gpu(%f)(%f) [%d]\\n\", x[stride_2*bi + i], w[stride_2*j+i], i);
+//    }
 };
 
 __kernel void multiple_x_by_w_alt(
     __global float* x,
     __global float* w,
     __global float* y,
-    const int index,
+    const int bi,
     const int stride_1,
     const int stride_2,
-    const int stride_3,
-    const int num_w,
-    const int alt_row,
-    const int alt_col,
+    const int alt_ni,
+    const int alt_ii,
     const float alt_w)
 {
-    int i = get_global_id(0);
-    int j = get_global_id(1);
+    int i = get_global_id(0); // num_input
+    int j = get_global_id(1); // num_node
 
-    if (j==alt_col && i==alt_row){
-        y[stride_1*index + j*stride_2 + i] = x[stride_2*index + i] * alt_w;
+    if (j==alt_ni && i==alt_ii){
+        y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * alt_w;
     }else{
-        y[stride_1*index + j*stride_2 + i] = x[stride_2*index + i] * w[j*num_w + i];
+        y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * w[stride_2*j + i];
     }
 };
+
 """
 #
 #
@@ -107,19 +108,17 @@ class Gpu:
                                np.float32(max), np.int32(debug))
         event.wait()
 
-    def multiple_x_by_w(self, d_x, d_w, d_y, index, stride_1, stride_2, stride_3, num_w, row, col):
+    def multiple_x_by_w(self, d_x, d_w, d_y, bi, stride_1, stride_2, row, col):
         event = self.prg.multiple_x_by_w(self._queue,(row,col), None,
-                                         d_x, d_w, d_y, np.int32(index),
-                                         np.int32(stride_1), np.int32(stride_2), np.int32(stride_3),
-                                         np.int32(num_w))
+                                         d_x, d_w, d_y, np.int32(bi),
+                                         np.int32(stride_1), np.int32(stride_2))
         event.wait()
 
-    def multiple_x_by_w_alt(self, d_x, d_w, d_y, index, stride_1, stride_2, stride_3, num_w, layer_i, node_i, w, row, col):
+    def multiple_x_by_w_alt(self, d_x, d_w, d_y, bi, stride_1, stride_2, row, col, ni, ii, wv):
         event = self.prg.multiple_x_by_w_alt(self._queue,(row,col), None,
-                                             d_x, d_w, d_y, np.int32(index),
-                                             np.int32(stride_1), np.int32(stride_2), np.int32(stride_3),
-                                             np.int32(num_w),
-                                             np.int32(layer_i), np.int32(node_i), np.float32(w))
+                                             d_x, d_w, d_y, np.int32(bi),
+                                             np.int32(stride_1), np.int32(stride_2),
+                                             np.int32(ni), np.int32(ii), np.float32(wv))
         event.wait()
     
     def copy(self, dist, src):

@@ -96,10 +96,10 @@ def setup_dnn(path, my_gpu):
     hidden_layer_2 = r.add_layer(1, 32, 32)
     output_layer = r.add_layer(2, 32, 10)
     
-    wi = util.csv_to_list(WEIGHT_INDEX_CSV_PATH)
-    if len(wi)>0:
-        print "restore weights"
-        r.restore_weighgt(wi)
+    #wi = util.csv_to_list(WEIGHT_INDEX_CSV_PATH)
+    
+    if os.path.isfile(WEIGHT_INDEX_CSV_PATH):
+        r.import_weight_index(WEIGHT_INDEX_CSV_PATH)
     else:
         print "init weights"
         r.init_weight()
@@ -107,7 +107,7 @@ def setup_dnn(path, my_gpu):
     if my_gpu:
         r.update_weight()
     
-    save_weight(r)
+    r.export_weight_index(WEIGHT_INDEX_CSV_PATH)
     return r
 #
 #
@@ -153,7 +153,15 @@ def evaluate(r, batch_size, labels):
         inf = infs[i]
         #print inf
         #
-        mse =  util.cross_emtropy_error(inf, len(inf), labels, len(labels))
+        mse =  util.cross_emtropy_error_2(inf, len(inf), labels, len(labels))
+        #if mse==np.nan:
+        #    #print mse
+        #    #mse = 100.0
+        #    print mse
+        #    sum = sum + 100.0
+        #else:
+        #    sum = sum + mse
+    
         #mse =  util.cross_emtropy_error_fast(inf, labels, data_class)
         #mse =  util.cross_emtropy_error_fast(inf, data_class)
         #print mse
@@ -163,7 +171,36 @@ def evaluate(r, batch_size, labels):
         sum = sum + mse
         labels[data_class] = 0.0
 
+    #print infs[0]
     return sum/float(batch_size)
+#
+#
+#
+#def weight_random(r, batch, batch_size, labels, w, mse_base):
+#    inc = 0
+#    dec = 0
+#    wi = w.get_index()
+#    id = w.get_id()
+#    if w._lock==1:
+#        print "  locked"
+#        return mse_base, 0
+#
+#    wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
+#    while wi_alt==wi:
+#        wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
+#
+#    #r.propagate(w, wi_alt, 0)
+#    r.propagate()
+#    mse_alt = evaluate(r, batch_size, labels)
+#    if mse_alt<mse_base:
+#        w.set_index(wi_alt)
+#        r.update_weight()
+#        w._lock=1
+#        print "  %d > %d (%f, %f)" % (wi, wi_alt, mse_base, mse_alt)
+#        return mse_alt, 1
+#
+#    print "  no change (%d, %d) (%f, %f)" % (wi, wi_alt, mse_base, mse_alt)
+#    return mse_base, 0
 #
 #
 #
@@ -180,17 +217,17 @@ def weight_shift(r, batch, batch_size, labels, w, mse_base):
         else:
             w._step  = 1
 
-        r.propagate(w, wi+w._step, 0)
+        r.propagate()
         mse_alt = evaluate(r, batch_size, labels)
         if mse_alt<mse_base:
-            w.set_index(wi+w._step)
+            #w.set_index(wi+w._step)
             r.update_weight()
             print "  %d > %d : %f > %f" % (wi, wi+w._step , mse_base, mse_alt)
             return mse_alt, 1
         else:
             w._lock = 1
             print "  lock at initial eval. (%d) [%f]" % (wi, mse_alt)
-            r.propagate(None, None, 0) #
+ 
             return mse_base, 0
 
     if wi==core.WEIGHT_INDEX_MAX:
@@ -200,7 +237,7 @@ def weight_shift(r, batch, batch_size, labels, w, mse_base):
         w._step = 1
         print "  reversed at %d" % (wi)
 
-    r.propagate(w, wi+w._step, 0)
+    r.propagate()
     mse_alt = evaluate(r, batch_size, labels)
     if  mse_alt<mse_base:
         w.set_index(wi+w._step)
@@ -211,35 +248,136 @@ def weight_shift(r, batch, batch_size, labels, w, mse_base):
         w._lock = 1
         print "  lock (%d) [%f]" % (wi, mse_alt)
 
-    r.propagate(None, None, 0) #
     return mse_base, 0
 #
 #
 #
-def weight_random(r, batch, batch_size, labels, w, mse_base):
-    inc = 0
-    dec = 0
-    wi = w.get_index()
-    id = w.get_id()
-    if w._lock==1:
+def weight_shift_2(r, batch, batch_size, li, ni, ii, mse_base, labels):
+    layer = r.getLayerAt(li)
+    wp = layer.get_weight_property(ni, ii)
+    wi = layer.get_weight_index(ni, ii)
+    wi_alt = wi
+    
+    if wp==0:
+        if wi==core.WEIGHT_INDEX_MAX:
+            layer.set_weight_property(ni, ii, -1)
+            wp = - 1
+        else:
+            layer.set_weight_property(ni, ii,  1)
+            wp = 1
+    
+        wi_alt = wi + wp
+        r.propagate(li, ni, ii, wi+wp, 0)
+        mse_alt = evaluate(r, batch_size, labels)
+        print "  - %d > %d : %f > %f" % (wi, wi + wp , mse_base, mse_alt)
+        if mse_alt<mse_base:
+            layer.set_weight_index(ni, ii, wi + wp)
+            layer.update_weight_gpu()
+            return mse_alt, 1
+        else:
+            print "  reversed A %d" % (wi)
+            layer.set_weight_property(ni, ii, wp*-1)
+            return mse_base, 0
+
+    if wi==core.WEIGHT_INDEX_MAX:
+        layer.set_weight_property(ni, ii, -1)
+        wp = -1
+        print "  reversed B %d" % (wi)
+        return mse_base, 0
+    elif wi==core.WEIGHT_INDEX_MIN:
+        layer.set_weight_property(ni, ii, 1)
+        wp = 1
+        print "  reversed C %d" % (wi)
+        return mse_base, 0
+
+    wi_alt = wi + wp
+    r.propagate(li, ni, ii, wi_alt, 0)
+    mse_alt = evaluate(r, batch_size, labels)
+    print "  = %d > %d : %f > %f" % (wi, wi_alt , mse_base, mse_alt)
+    if  mse_alt<mse_base:
+        layer.set_weight_index(ni, ii, wi_alt)
+        layer.update_weight_gpu()
+        return mse_alt, 1
+    #
+    return mse_base, 0
+#
+#
+#
+def weight_shift_3(r, batch, batch_size, li, ni, ii, mse_base, labels):
+    layer = r.getLayerAt(li)
+    wp = layer.get_weight_property(ni, ii) # initial value is 1
+    wi = layer.get_weight_index(ni, ii)
+    wi_alt = wi
+    
+    if wp==0:
         print "  locked"
         return mse_base, 0
-    
-    wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
-    while wi_alt==wi:
-        wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
-    
-    r.propagate(w, wi_alt, 0)
+
+    if wi==core.WEIGHT_INDEX_MAX or wi==core.WEIGHT_INDEX_MIN:
+        wp = wp + 1
+        layer.set_weight_property(ni, ii, wp)
+        print "  reversed at (%d)" % (wi)
+        return mse_base, 0
+
+    if wp % 2==1:
+        wi_alt = wi + 1
+    else:
+        wi_alt = wi - 1
+
+    r.propagate(li, ni, ii, wi_alt, 0)
     mse_alt = evaluate(r, batch_size, labels)
-    if mse_alt<mse_base:
-        w.set_index(wi_alt)
-        r.update_weight()
-        w._lock=1
-        print "  %d > %d (%f, %f)" % (wi, wi_alt, mse_base, mse_alt)
+    print "  = %d > %d : %f > %f" % (wi, wi_alt , mse_base, mse_alt)
+    if  mse_alt<mse_base:
+        layer.set_weight_index(ni, ii, wi_alt)
+        layer.update_weight_gpu()
         return mse_alt, 1
-        
-    print "  no change (%d, %d) (%f, %f)" % (wi, wi_alt, mse_base, mse_alt)
+    #
+    if wp>1:
+        print "  lock (%d)" % wi
+        layer.set_weight_property(ni, ii, 0)
+
     return mse_base, 0
+
+#
+#
+#
+def train_mode(it, r, batch, batch_size, data_size):
+    labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
+    cnt_update = 0
+    r.set_batch(batch, batch_size, data_size)
+    #
+    start_time = time.time()
+    r.propagate()
+    mse_base = evaluate(r, batch_size, labels)
+    print mse_base
+    
+    #
+    #weight_list = r.get_weight_list()
+    cnt0 = 0
+    c = r.countLayers()
+    #for li in range(1, c):
+    for li in range(c-1, 0, -1):
+        layer = r.getLayerAt(li)
+        num_node = layer._num_node
+        num_w = layer._num_input
+        #
+        node_index_list = list(range(num_node))
+        random.shuffle(node_index_list)
+        for ni in node_index_list:
+            patial = num_w/5/li
+            for p in range(patial):
+                ii = random.randrange(num_w)
+                print "%d [%d] (%d, %d, %d) %f" % (cnt0, cnt_update, li, ni, ii, mse_base)
+                mse_base, c = weight_shift_2(r, batch, batch_size, li, ni, ii, mse_base, labels)
+                #
+                cnt_update = cnt_update + c
+                cnt0 = cnt0 + 1
+            #
+    #
+    elasped_time = time.time() - start_time
+    t = format(elasped_time, "0")
+    print "[elasped time] %s" % (t)
+    return cnt_update
 #
 #
 #
@@ -250,14 +388,29 @@ def test_mode(r, batch, batch_size):
     oks  = [0,0,0,0,0,0,0,0,0,0] # num of correct
     #
     start_time = time.time()
-    r.set_batch(batch, batch_size, 28*28)
-    r.propagate(None, None, 0)
+    r.set_batch(batch, batch_size, 28*28, 0)
+
+    r.propagate(-1, -1, -1, -1, 0)
     infs = r.get_inference()
+    #print infs
+    #r.propagate(3, 0, 0, 1)
+    #infs = r.get_inference()
+    #print infs
+    #
+    #layer = r.getLayerAt(3)
+    #layer.set_weight_index(0, 0, 1)
+    #layer.update_weight_gpu()
+    #r.propagate()
+    #infs = r.get_inference()
+    #print infs
+    
+    
     #
     ca = 0
     for i in range(batch_size):
         dist[r._batch_class[i]] = dist[r._batch_class[i]] + 1
         inf = infs[i]
+        #print inf
         index = -1
         mx = max(inf)
         if mx>0.0:
@@ -286,59 +439,6 @@ def test_mode(r, batch, batch_size):
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
     print "test time = %s" % (t)
-#
-#
-#
-def train_mode(it, r, batch, batch_size, data_size):
-    labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
-    cnt_update = 0
-    r.set_batch(batch, batch_size, data_size)
-    #
-    start_time = time.time()
-    r.propagate(None, None, 0)
-    mse_base = evaluate(r, batch_size, labels)
-    print mse_base
-    #
-    weight_list = r.get_weight_list()
-    c = r.countLayers()
-    #for i in range(1, c):
-    for i in range(c-1, 0, -1):
-        layer = r.getLayerAt(i)
-        num_node = layer._num_node
-        #
-        node_index_list = list(range(num_node))
-        random.shuffle(node_index_list)
-        cnt0 = 0
-        cnt1 = 1
-        for k in node_index_list:
-            node = layer.get_node(k)
-            num_w = len(node._w_id_list)
-            w_id_list = list(range(num_w))
-            random.shuffle(w_id_list)
-            #
-            patial = num_w/5/i
-            w_id_list = w_id_list[0:patial]
-            #
-            for p in w_id_list:
-                print "[%d] %d, %d [%d, %d] layer: %d, node: %d, weight: %d : %f" % (cnt_update, it, cnt_update, cnt0, cnt1, i, k, p, mse_base)
-                w_index = node.get_weight(p)
-                w = weight_list[w_index]
-                #
-                #mse_base, c = weight_random(r, batch, batch_size, labels, w, mse_base)
-                #
-                mse_base, c = weight_shift(r, batch, batch_size, labels, w, mse_base)
-                #
-                cnt_update = cnt_update + c
-                cnt1 = cnt1 + 1
-            #
-            cnt0 = cnt0 + 1
-    
-    #
-    elasped_time = time.time() - start_time
-    t = format(elasped_time, "0")
-    print "[elasped time] %s" % (t)
-    return cnt_update
-
 #
 #
 #
@@ -386,9 +486,9 @@ def main():
     print "3 : test"
     print "4 : self-test"
     print "5 : ..."
-    print "6 : export weight to CSV"
-    print "7 : new minibatch"
-    print "8 : save and quit"
+    print "6 : "
+    print "7 : "
+    print "8 : "
     print "9 : weight distribution"
     mode = get_key_input("input command >")
     if mode==0:
@@ -411,14 +511,12 @@ def main():
         cnt = 0
         for i in range(1):
             cnt = cnt + train_mode(i, r, batch, batch_size, data_size)
-            save_weight(r)
-            r.unlock_weight_all()
+            r.export_weight_index(WEIGHT_INDEX_CSV_PATH)
         #
         elasped_time = time.time() - start_time
         t = format(elasped_time, "0")
         print "[total elasped time] %s" % (t)
         print "tatal update = %d" % (cnt)
-        save_weight(r)
     elif mode==3:
         print ">> test mode"
         debug = 0
@@ -436,23 +534,15 @@ def main():
         test_mode(r, batch, batch_size)
     elif mode==5:
         print ">> ??"
+        r.export_weight_index("./wi.csv")
     elif mode==6:
-        print ">> export weight to CSV"
-        wl = r.get_weight_list()
-        wi_list = []
-        for w in wl:
-            wi_list.append( w.get_index() )
-
-        print len(wi_list)
-        util.list_to_csv("./test.cvs", wi_list)
-        d_list = util.csv_to_list("./test.cvs")
-        print len(d_list)
+        r.load_weight_index_legacy("./legacy_wi.csv")
+        r.export_weight_index(WEIGHT_INDEX_CSV_PATH)
+        pass
     elif mode==7:
-        train_mode_new_minibatch(r)
-        save_weight(r)
+        pass
     elif mode==8:
-        print ">> save and quit"
-        save_weight(r)
+        pass
     elif mode==9:
         print ">> check_weight_distribution"
         check_weight_distribution()

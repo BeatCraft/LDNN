@@ -316,24 +316,35 @@ class Roster:
             layer = self.getLayerAt(i)
             layer.init_weight_with_random_index()
 
-    def unlock_weight_all(self):
-        for w in self._weight_list:
-            w._lock = 0
 
-    def restore_weighgt(self, w_list):
-        c = 0
-        for w in self._weight_list:
-            wi = int(w_list[c])
-            w.set_index(wi)
-            w.set_id(c)
-            c += 1
+    def reset_weight_property(self, p=0):
+        c = self.countLayers()
+        for i in range(1, c):
+            layer = self.getLayerAt(i)
+            nc = layer._num_node
+            ic = layer._num_input
+            for ni in range(nc):
+                for ii in range(ic):
+                    layer.set_weight_property(ni, ii, p)
+
+#    def unlock_weight_all(self):
+#        for w in self._weight_list:
+#            w._lock = 0
+
+#    def restore_weighgt(self, w_list):
+#        c = 0
+#        for w in self._weight_list:
+#            wi = int(w_list[c])
+#            w.set_index(wi)
+#            w.set_id(c)
+#            c += 1
 
     def update_weight(self):
         for layer in self.layers:
             layer.update_weight_gpu()
 
-    def get_weight_list(self):
-        return self._weight_list
+#    def get_weight_list(self):
+#        return self._weight_list
 
     def countLayers(self):
         return len(self.layers)

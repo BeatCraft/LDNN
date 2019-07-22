@@ -167,6 +167,7 @@ class Layer:
         self._num_input = num_input
         self._num_node = num_node
         self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         #self._weight_property = np.ones( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
@@ -241,6 +242,12 @@ class Layer:
     
     def set_weight_property(self, ni, ii, p):
         self._weight_property[ni][ii] = p
+
+    def get_weight_lock(self, ni, ii):
+        return self._weight_lock[ni][ii]
+    
+    def set_weight_lock(self, ni, ii, l):
+        self._weight_lock[ni][ii] = l
     
     def set_weight_index(self, ni, ii, wi): # weight index
         self._weight_index_matrix[ni][ii] = wi

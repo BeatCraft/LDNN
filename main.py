@@ -254,6 +254,11 @@ def weight_shift(r, batch, batch_size, labels, w, mse_base):
 #
 def weight_shift_2(r, batch, batch_size, li, ni, ii, mse_base, labels):
     layer = r.getLayerAt(li)
+    lock = layer.get_weight_lock(ni, ii)
+    if lock>1:
+        print "  locked(%d, %d)" % (ni, li)
+        return mse_base, 0
+    
     wp = layer.get_weight_property(ni, ii)
     wi = layer.get_weight_index(ni, ii)
     wi_alt = wi
@@ -266,6 +271,8 @@ def weight_shift_2(r, batch, batch_size, li, ni, ii, mse_base, labels):
             layer.set_weight_property(ni, ii,  1)
             wp = 1
     
+        #layer.set_weight_lock(ni, ii, 1)
+    
         wi_alt = wi + wp
         r.propagate(li, ni, ii, wi+wp, 0)
         mse_alt = evaluate(r, batch_size, labels)
@@ -277,17 +284,22 @@ def weight_shift_2(r, batch, batch_size, li, ni, ii, mse_base, labels):
         else:
             print "  reversed A %d" % (wi)
             layer.set_weight_property(ni, ii, wp*-1)
+            layer.set_weight_lock(ni, ii, 1)
             return mse_base, 0
 
     if wi==core.WEIGHT_INDEX_MAX:
         layer.set_weight_property(ni, ii, -1)
         wp = -1
         print "  reversed B %d" % (wi)
+        layer.set_weight_lock(ni, ii, lock+1)
         return mse_base, 0
     elif wi==core.WEIGHT_INDEX_MIN:
         layer.set_weight_property(ni, ii, 1)
         wp = 1
         print "  reversed C %d" % (wi)
+        layer.set_weight_lock(ni, ii, lock+1)
+        if lock>0:
+            print "  lock"
         return mse_base, 0
 
     wi_alt = wi + wp
@@ -299,6 +311,7 @@ def weight_shift_2(r, batch, batch_size, li, ni, ii, mse_base, labels):
         layer.update_weight_gpu()
         return mse_alt, 1
     #
+    layer.set_weight_lock(ni, ii, lock+1)
     return mse_base, 0
 #
 #
@@ -367,7 +380,7 @@ def train_mode(it, r, batch, batch_size, data_size):
             patial = num_w/5/li
             for p in range(patial):
                 ii = random.randrange(num_w)
-                print "%d [%d] (%d, %d, %d) %f" % (cnt0, cnt_update, li, ni, ii, mse_base)
+                print "%d : %d [%d] (%d, %d, %d) %f" % (it, cnt0, cnt_update, li, ni, ii, mse_base)
                 mse_base, c = weight_shift_2(r, batch, batch_size, li, ni, ii, mse_base, labels)
                 #
                 cnt_update = cnt_update + c
@@ -463,7 +476,7 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    batch_size = 100
+    batch_size = 1500
     data_size = 28*28
     #
     # GPU

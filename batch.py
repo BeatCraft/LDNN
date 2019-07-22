@@ -33,9 +33,10 @@ sys.setrecursionlimit(10000)
 #
 if __name__=='__main__':
     print ">> start"
-    batch_size = 5000
+    sts = 0
+    batch_size = 1500 # 100, 500, 1000, 1500
     data_size = 28*28
-    itteration = 4 # 12
+    itteration = 4#8 # 12
     #
     # GPU
     #
@@ -58,7 +59,7 @@ if __name__=='__main__':
     for i in range(itteration):
         cnt = cnt + main.train_mode(i, r, batch, batch_size, data_size)
         r.export_weight_index(main.WEIGHT_INDEX_CSV_PATH)
-        r.reset_weight_property()
+        #r.reset_weight_property()
     #
     elasped_time = time.time() - start_time
     t = format(elasped_time, "0")

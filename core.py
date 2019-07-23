@@ -420,52 +420,24 @@ class Roster:
                         break
                 #
                 layer.import_weight_index(block)
-
-
-    def load_weight_index_legacy(self, path):
-        wlist = util.csv_to_list(path)
-        #print wlist
-        lc = self.countLayers()
-        for li in range(1, lc):
-            layer = self.getLayerAt(li)
-            block = []
-            for n in range(layer._num_node):
-                s = layer._num_input * n
-                e = layer._num_input * n + layer._num_input
-                #print "(%d, %d, %d, %d)" % (li, n, s,e)
-                line =  wlist[s:e]
-                #print line
-                block.append(line)
-
-        ol = self.getLayerAt(3)
-        for k in ol._weight_index_matrix:
-            print k
-                
-        #for j in range(ol._num_input):
-        #    print ol.get_weight_index(9, j)
-            
-            
-            #layer.import_weight_index(block)
-            #print block
-        #
     
     def propagate(self, li=-1, ni=-1, ii=-1, wi=-1, debug=0):
         c = self.countLayers()
-        pre = self.getLayerAt(0)
-        # this line can be deleted later
-        pre.propagate(pre._gpu_output, -1, -1, -1, debug)
-        #
-        # input layer is pre-prosessed
-        #
-        for i in range(1, c):
-            layer = self.getLayerAt(i)
-            #layer.propagate(pre._gpu_output, ni, ii, wi, debug)
-            if i==li:
+        if li>0: # propagation with alt value
+            pre = self.getLayerAt(li-1)
+            for i in range(li, c):
+                layer = self.getLayerAt(i)
                 layer.propagate(pre._gpu_output, ni, ii, wi, debug)
-            else:
+                pre = layer
+        
+        else:    # simple propagatione
+            pre = self.getLayerAt(0)
+            # this line can be deleted later since input layer is pre-prosessed
+            #pre.propagate(pre._gpu_output, -1, -1, -1, debug)
+            for i in range(1, c):
+                layer = self.getLayerAt(i)
                 layer.propagate(pre._gpu_output, -1, -1, -1, debug)
-            
-            pre = layer
+                pre = layer
 #
 #
 #

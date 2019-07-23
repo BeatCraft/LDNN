@@ -549,8 +549,6 @@ def main():
         print ">> ??"
         r.export_weight_index("./wi.csv")
     elif mode==6:
-        r.load_weight_index_legacy("./legacy_wi.csv")
-        r.export_weight_index(WEIGHT_INDEX_CSV_PATH)
         pass
     elif mode==7:
         pass

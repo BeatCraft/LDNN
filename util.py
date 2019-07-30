@@ -57,6 +57,11 @@ def cross_emtropy_error_fast(y, t_class):
 #
 #
 #
+def mean_squared_error_np(y, y_len, t, t_len):
+    return np.sum( (y-t)**2.0 )/float(y_len)
+#
+#
+#
 def mean_squared_error(y, y_len, t, t_len):
     if y_len != t_len:
         return None

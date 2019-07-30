@@ -153,7 +153,8 @@ def evaluate(r, batch_size, labels):
         inf = infs[i]
         #print inf
         #
-        mse =  util.cross_emtropy_error_2(inf, len(inf), labels, len(labels))
+        mse = util.cross_emtropy_error_2(inf, len(inf), labels, len(labels))
+        #mse = util.mean_squared_error_np(inf, len(inf), labels, len(labels))
         #if mse==np.nan:
         #    #print mse
         #    #mse = 100.0
@@ -204,30 +205,41 @@ def evaluate(r, batch_size, labels):
 #
 #
 #
-def weight_shift(r, batch, batch_size, labels, w, mse_base):
-    wi = w.get_index()
+def weight_shift(r, batch, batch_size, li, ni, ii, mse_base, labels):
+    #def weight_shift(r, batch, batch_size, labels, w, mse_base):
+    layer = r.getLayerAt(li)
+    wi = layer.get_weight_index(ni, ii)
+    wp = layer.get_weight_property(ni, ii)
+    lock = layer.get_weight_lock(ni, ii)
+    #wi = w.get_index()
     wi_alt = wi
-    if w._lock==1:
+
+    if lock==1:
         print "  locked"
         return mse_base, 0
 
-    if w._step==0:
+    if wp==0:
         if wi==core.WEIGHT_INDEX_MAX:
-            w._step  = -1
+            wp  = -1
+            #layer.set_weight_property(ni, ii, -1)
         else:
-            w._step  = 1
+            wp  = 1
 
-        r.propagate()
+        #r.propagate()
+        r.propagate(li, ni, ii, wi+wp, 0)
         mse_alt = evaluate(r, batch_size, labels)
         if mse_alt<mse_base:
             #w.set_index(wi+w._step)
-            r.update_weight()
-            print "  %d > %d : %f > %f" % (wi, wi+w._step , mse_base, mse_alt)
+            #r.update_weight()
+            layer.set_weight_property(ni, ii, wp)
+            layer.set_weight_index(ni, ii, wi + wp)
+            layer.update_weight_gpu()
+            print "  %d > %d : %f > %f" % (wi, wi+wp , mse_base, mse_alt)
             return mse_alt, 1
         else:
-            w._lock = 1
+            #w._lock = 1
+            layer.set_weight_lock(ni, ii, 1)
             print "  lock at initial eval. (%d) [%f]" % (wi, mse_alt)
- 
             return mse_base, 0
 
     if wi==core.WEIGHT_INDEX_MAX:
@@ -240,12 +252,16 @@ def weight_shift(r, batch, batch_size, labels, w, mse_base):
     r.propagate()
     mse_alt = evaluate(r, batch_size, labels)
     if  mse_alt<mse_base:
-        w.set_index(wi+w._step)
-        r.update_weight()
-        print "  %d > %d : %f > %f" % (wi, wi+w._step, mse_base, mse_alt)
+        layer.set_weight_property(ni, ii, wp)
+        layer.set_weight_index(ni, ii, wi + wp)
+        layer.update_weight_gpu()
+        #w.set_index(wi+w._step)
+        #r.update_weight()
+        print "  %d > %d : %f > %f" % (wi, wi+wp, mse_base, mse_alt)
         return mse_alt, 1
     else:
-        w._lock = 1
+        #w._lock = 1
+        layer.set_weight_lock(ni, ii, 1)
         print "  lock (%d) [%f]" % (wi, mse_alt)
 
     return mse_base, 0
@@ -322,9 +338,9 @@ def weight_shift_3(r, batch, batch_size, li, ni, ii, mse_base, labels):
     wi = layer.get_weight_index(ni, ii)
     wi_alt = wi
     
-    if wp==0:
-        print "  locked"
-        return mse_base, 0
+    #if wp==0:
+    #    print "  locked"
+    #    return mse_base, 0
 
     if wi==core.WEIGHT_INDEX_MAX or wi==core.WEIGHT_INDEX_MIN:
         wp = wp + 1
@@ -367,6 +383,7 @@ def train_mode(it, r, batch, batch_size, data_size):
     #
     #weight_list = r.get_weight_list()
     cnt0 = 0
+    lcntl = [0,0,0,0]
     c = r.countLayers()
     #for li in range(1, c):
     for li in range(c-1, 0, -1):
@@ -376,6 +393,7 @@ def train_mode(it, r, batch, batch_size, data_size):
         #
         node_index_list = list(range(num_node))
         random.shuffle(node_index_list)
+        lcnt = 0
         for ni in node_index_list:
             patial = num_w/5/li
             for p in range(patial):
@@ -385,11 +403,15 @@ def train_mode(it, r, batch, batch_size, data_size):
                 #
                 cnt_update = cnt_update + c
                 cnt0 = cnt0 + 1
+                lcnt = lcnt + c
             #
+        lcntl[li] = lcnt
+
     #
     elasped_time = time.time() - start_time
     t = format(elasped_time, "0")
     print "[elasped time] %s" % (t)
+    print lcntl
     return cnt_update
 #
 #
@@ -476,12 +498,14 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    batch_size = 1500
+    batch_size = 100 #1500
     data_size = 28*28
     #
     # GPU
     #
-    my_gpu = gpu.Gpu()
+    platform_id = 0
+    device_id = 2 # 0 : AMD Server, 1 : Intel on MBP 2 : eGPU (AMD Radeon Pro 580)
+    my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
     #
     num_of_processed = util.pickle_load(PROCEEDED_PATH)

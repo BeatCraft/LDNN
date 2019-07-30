@@ -421,23 +421,41 @@ class Roster:
                 #
                 layer.import_weight_index(block)
     
-    def propagate(self, li=-1, ni=-1, ii=-1, wi=-1, debug=0):
-        c = self.countLayers()
-        if li>0: # propagation with alt value
-            pre = self.getLayerAt(li-1)
-            for i in range(li, c):
-                layer = self.getLayerAt(i)
-                layer.propagate(pre._gpu_output, ni, ii, wi, debug)
-                pre = layer
-        
-        else:    # simple propagatione
-            pre = self.getLayerAt(0)
+#    def propagate(self, li=-1, ni=-1, ii=-1, wi=-1, debug=0):
+#        c = self.countLayers()
+#        if li>0: # propagation with alt value
+#            pre = self.getLayerAt(li-1)
+#            for i in range(li, c):
+#                layer = self.getLayerAt(i)
+#                layer.propagate(pre._gpu_output, ni, ii, wi, debug)
+#                pre = layer
+#
+#        else:    # simple propagatione
+#            pre = self.getLayerAt(0)
             # this line can be deleted later since input layer is pre-prosessed
             #pre.propagate(pre._gpu_output, -1, -1, -1, debug)
-            for i in range(1, c):
-                layer = self.getLayerAt(i)
+#            for i in range(1, c):
+#                layer = self.getLayerAt(i)
+#                layer.propagate(pre._gpu_output, -1, -1, -1, debug)
+#                pre = layer
+
+    def propagate(self, li=-1, ni=-1, ii=-1, wi=-1, debug=0):
+        c = self.countLayers()
+        pre = self.getLayerAt(0)
+        # this line can be deleted later
+        pre.propagate(pre._gpu_output, -1, -1, -1, debug)
+        #
+        # input layer is pre-prosessed
+        #
+        for i in range(1, c):
+            layer = self.getLayerAt(i)
+            #layer.propagate(pre._gpu_output, ni, ii, wi, debug)
+            if i==li:
+                layer.propagate(pre._gpu_output, ni, ii, wi, debug)
+            else:
                 layer.propagate(pre._gpu_output, -1, -1, -1, debug)
-                pre = layer
+            
+            pre = layer
 #
 #
 #

@@ -67,17 +67,19 @@ __kernel void multiple_x_by_w_alt(
 #
 #
 class Gpu:
-    def __init__(self):
+    def __init__(self, platform_id, device_id):
         #
         #self._ctx = cl.create_some_context()
         #
-        platform = cl.get_platforms()[0]
+        #platform = cl.get_platforms()[0]
         # AMD Server
         #device = platform.get_devices()[0]
         # Intel on MBP
-        device = platform.get_devices()[1]
+        #device = platform.get_devices()[1]
         # AMD on eGPU
         #device = platform.get_devices()[2]
+        platform = cl.get_platforms()[platform_id]
+        device = platform.get_devices()[device_id]
         print platform
         print device
     

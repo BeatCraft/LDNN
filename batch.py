@@ -34,13 +34,15 @@ sys.setrecursionlimit(10000)
 if __name__=='__main__':
     print ">> start"
     sts = 0
-    batch_size = 1500 # 100, 500, 1000, 1500
+    batch_size = 100 # 100, 500, 1000, 1500
     data_size = 28*28
-    itteration = 4#8 # 12
-    #
+    itteration = 4 #8 # 12
     # GPU
+    # 0 : AMD Server, 1 : Intel on MBP 2 : eGPU (AMD Radeon Pro 580)
     #
-    my_gpu = gpu.Gpu()
+    platform_id = 0
+    device_id = 1
+    my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
     #
     r = main.setup_dnn(main.NETWORK_PATH, my_gpu)

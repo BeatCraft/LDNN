@@ -293,7 +293,7 @@ def weight_shift_2(r, batch, batch_size, li, ni, ii, mse_base, labels):
         r.propagate(li, ni, ii, wi+wp, 0)
         mse_alt = evaluate(r, batch_size, labels)
         print "  - %d > %d : %f > %f" % (wi, wi + wp , mse_base, mse_alt)
-        if mse_alt<mse_base:
+        if mse_alt<=mse_base:
             layer.set_weight_index(ni, ii, wi + wp)
             layer.update_weight_gpu()
             return mse_alt, 1
@@ -322,7 +322,7 @@ def weight_shift_2(r, batch, batch_size, li, ni, ii, mse_base, labels):
     r.propagate(li, ni, ii, wi_alt, 0)
     mse_alt = evaluate(r, batch_size, labels)
     print "  = %d > %d : %f > %f" % (wi, wi_alt , mse_base, mse_alt)
-    if  mse_alt<mse_base:
+    if  mse_alt<=mse_base:
         layer.set_weight_index(ni, ii, wi_alt)
         layer.update_weight_gpu()
         return mse_alt, 1

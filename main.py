@@ -380,8 +380,6 @@ def train_mode(it, r, batch, batch_size, data_size):
     mse_base = evaluate(r, batch_size, labels)
     print mse_base
     
-    #
-    #weight_list = r.get_weight_list()
     cnt0 = 0
     lcntl = [0,0,0,0]
     c = r.countLayers()
@@ -406,7 +404,168 @@ def train_mode(it, r, batch, batch_size, data_size):
                 lcnt = lcnt + c
             #
         lcntl[li] = lcnt
+    #
+    elasped_time = time.time() - start_time
+    t = format(elasped_time, "0")
+    print "[elasped time] %s" % (t)
+    print lcntl
+    return cnt_update
+#
+#
+#
+def weight_heat(r, batch, batch_size, li, ni, ii, mse_base, labels):
+    layer = r.getLayerAt(li)
+    lock = layer.get_weight_lock(ni, ii)
+    if lock>0:
+        print "  locked(%d, %d)" % (ni, li)
+        return mse_base, 0
+    
+    wp = layer.get_weight_property(ni, ii)
+    if wp<0:
+        print "  skip(%d, %d)" % (ni, li)
+        return mse_base, 0
 
+    wi = layer.get_weight_index(ni, ii)
+    wi_alt = wi
+
+    if wi==core.WEIGHT_INDEX_MAX:
+        print "  lock(%d, %d)" % (ni, li)
+        if wp==0:
+            layer.set_weight_property(ni, ii, -1)
+        layer.set_weight_lock(ni, ii, 1)
+        return mse_base, 0
+
+    if wi+1==core.WEIGHT_INDEX_MAX:
+        wi_alt = wi+1
+    else:
+        wi_alt = random.randrange(wi+1, core.WEIGHT_INDEX_MAX, 1)
+
+    r.propagate(li, ni, ii, wi_alt, 0)
+    mse_alt = evaluate(r, batch_size, labels)
+    print "  - %d > %d : %f > %f" % (wi, wi_alt , mse_base, mse_alt)
+    #
+    if mse_alt<=mse_base:
+        layer.set_weight_property(ni, ii, 1)
+        layer.set_weight_index(ni, ii, wi_alt)
+        layer.update_weight_gpu()
+        return mse_alt, 1
+    else:
+        if wi_alt==wi+1:
+            print "  lock(%d, %d)" % (ni, li)
+            layer.set_weight_property(ni, ii, -1)
+            layer.set_weight_lock(ni, ii, 1)
+            return mse_base, 0
+        
+        #layer.set_weight_property(ni, ii, 1)
+
+    return mse_base, 0
+#
+#
+#
+def weight_cool(r, batch, batch_size, li, ni, ii, mse_base, labels):
+    layer = r.getLayerAt(li)
+    lock = layer.get_weight_lock(ni, ii)
+    if lock>0:
+        print "  locked(%d, %d)" % (ni, li)
+        return mse_base, 0
+
+    wp = layer.get_weight_property(ni, ii)
+    if wp>0:
+        print "  skip(%d, %d)" % (ni, li)
+        return mse_base, 0
+    
+    wi = layer.get_weight_index(ni, ii)
+    wi_alt = wi-1
+
+    if wi==core.WEIGHT_INDEX_MIN:
+        print "  lock(%d, %d)" % (ni, li)
+        layer.set_weight_lock(ni, ii, 1)
+        return mse_base, 0
+    
+    r.propagate(li, ni, ii, wi_alt, 0)
+    mse_alt = evaluate(r, batch_size, labels)
+    print "  - %d > %d : %f > %f" % (wi, wi_alt , mse_base, mse_alt)
+    #
+    if mse_alt<mse_base:
+        layer.set_weight_index(ni, ii, wi_alt)
+        layer.update_weight_gpu()
+        return mse_alt, 1
+    else:
+        layer.set_weight_lock(ni, ii, 1)
+        return mse_base, 0
+
+    return mse_base, 0
+#
+#
+#
+def train_mode_2(it, r, batch, batch_size, data_size):
+    labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
+    cnt_update = 0
+    r.set_batch(batch, batch_size, data_size)
+    #
+    start_time = time.time()
+    r.propagate()
+    mse_base = evaluate(r, batch_size, labels)
+    print mse_base
+
+    cnt0 = 0
+    lcntl = [0,0,0,0]
+    c = r.countLayers()
+    #for li in range(1, c):
+    
+    #
+    # heating phase
+    #
+    #for li in range(c-1, 0, -1):
+    for li in range(1, c):
+        for k in range(20):
+            layer = r.getLayerAt(li)
+            num_node = layer._num_node
+            num_w = layer._num_input
+            #
+            node_index_list = list(range(num_node))
+            random.shuffle(node_index_list)
+            lcnt = 0
+            for ni in node_index_list:
+                for p in range(num_w/20):
+                    ii = random.randrange(num_w)
+                    print "(%d) H[%d] : all=%d, update=%d, W(%d,%d,%d), mse:%f" % (it, k, cnt0, cnt_update, li, ni, ii, mse_base)
+                    mse_base, ret = weight_heat(r, batch, batch_size, li, ni, ii, mse_base, labels)
+                    #
+                    cnt_update = cnt_update + ret
+                    cnt0 = cnt0 + 1
+                    lcnt = lcnt + ret
+                #
+            #
+        #
+        lcntl[li] = lcnt
+    #
+    # cooling phase
+    #
+    for li in range(1, c):
+        for k in range(20):
+            layer = r.getLayerAt(li)
+            num_node = layer._num_node
+            num_w = layer._num_input
+            #
+            node_index_list = list(range(num_node))
+            random.shuffle(node_index_list)
+            lcnt = 0
+            for ni in node_index_list:
+                for p in range(num_w/20):
+                    ii = random.randrange(num_w)
+                    print "(%d) C[%d] : all=%d, update=%d, W(%d,%d,%d), MSE:%f" % (it, k, cnt0, cnt_update, li, ni, ii, mse_base)
+                    mse_base, ret = weight_cool(r, batch, batch_size, li, ni, ii, mse_base, labels)
+                    #
+                    cnt_update = cnt_update + ret
+                    cnt0 = cnt0 + 1
+                    lcnt = lcnt + ret
+                #
+            #
+        #
+        lcntl[li] = lcnt
+    #
+    #
     #
     elasped_time = time.time() - start_time
     t = format(elasped_time, "0")
@@ -498,13 +657,17 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    batch_size = 100 #1500
+    batch_size = 1500 # 100, 500, 1000, 1500
     data_size = 28*28
     #
     # GPU
     #
+    # 0 : AMD Server
+    # 1 : Intel on MBP
+    # 2 : eGPU (AMD Radeon Pro 580)
     platform_id = 0
-    device_id = 2 # 0 : AMD Server, 1 : Intel on MBP 2 : eGPU (AMD Radeon Pro 580)
+    device_id = 2
+    #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
     #
@@ -546,8 +709,8 @@ def main():
             return 0
 
         cnt = 0
-        for i in range(1):
-            cnt = cnt + train_mode(i, r, batch, batch_size, data_size)
+        for i in range(4):
+            cnt = cnt + train_mode_2(i, r, batch, batch_size, data_size)
             r.export_weight_index(WEIGHT_INDEX_CSV_PATH)
         #
         elasped_time = time.time() - start_time
@@ -573,6 +736,24 @@ def main():
         print ">> ??"
         r.export_weight_index("./wi.csv")
     elif mode==6:
+        batch = util.pickle_load(TRAIN_BATCH_PATH)
+        batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
+        batch_class = np.zeros(batch_size, dtype=int)
+        for i in range(batch_size):
+            entry = batch[i]
+            batch_data[i] = entry[0]#.copy()
+            batch_class[i] = entry[1]
+        
+        #entry = batch_data[0]
+        #w = entry[0]
+        data = batch_data[0]
+        print
+        #print len(data)
+        for i in range(256):
+            for j in range(core.WEIGHT_INDEX_SIZE):
+                print "%d * %f = %d = %f" % (i, core.WEIGHT_SET[j], int(i*core.WEIGHT_SET[j]), i*core.WEIGHT_SET[j])
+                #print "%f" % (data[i]*core.WEIGHT_SET[j])
+        
         pass
     elif mode==7:
         pass

@@ -34,9 +34,9 @@ sys.setrecursionlimit(10000)
 if __name__=='__main__':
     print ">> start"
     sts = 0
-    batch_size = 1500 # 100, 500, 1000, 1500
+    batch_size = 100
     data_size = 28*28
-    itteration = 4 #8 # 12
+    it = 20*10
     # GPU
     # 0 : AMD Server
     # 1 : Intel on MBP
@@ -57,18 +57,13 @@ if __name__=='__main__':
     if batch is None:
         print "error : no train batch"
         sys.exit(sts)
-
-    cnt = 0
-    for i in range(itteration):
-        cnt = cnt + main.train_mode(i, r, batch, batch_size, data_size)
-        r.export_weight_index(main.WEIGHT_INDEX_CSV_PATH)
-        #r.reset_weight_property()
+    #
+    main.loop(it, r, batch, batch_size, data_size)
     #
     elasped_time = time.time() - start_time
     t = format(elasped_time, "0")
     print "[total elasped time] %s" % (t)
-    print "tatal update = %d" % (cnt)
-
+    #
     print ">> end"
     print("\007")
     sys.exit(sts)

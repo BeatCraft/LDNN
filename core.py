@@ -334,7 +334,15 @@ class Roster:
                 for ii in range(ic):
                     layer.set_weight_property(ni, ii, p)
 
-#    def unlock_weight_all(self):
+    def unlock_weight_all(self):
+        c = self.countLayers()
+        for i in range(1, c):
+            layer = self.getLayerAt(i)
+            nc = layer._num_node
+            ic = layer._num_input
+            for ni in range(nc):
+                for ii in range(ic):
+                    layer.set_weight_lock(ni, ii, 0)
 #        for w in self._weight_list:
 #            w._lock = 0
 

@@ -104,41 +104,42 @@ def softmax_no_exp(x):
 #
 #
 class Weight:
-    # layer : Layer class object
-    # node  : index of neurons
-    # i     : index of neurons in previous layer
-    # index : index of WEIGHT_SET / weight index
-    # id    : seaquencial number assigned by Roster
-    def __init__(self, layer, node, i):
-        self._layer = layer
-        self._node = node
-        self._i = i
-        self._index = 0
-        self._id = -1
-        self._lock = 0
-        self._step = 0
+    def __init__(self, li, ni, ii, wi):
+        self._li = li
+        self._ni = ni
+        self._ii = ii
+        self._wi = wi
+        self._wi_alt = wi
     
-    def set_id(self, id):
-        self._id = id
+    def set_all(self, li, ni, ii, wi):
+        self._li = li
+        self._ni = ni
+        self._ii = ii
+        self._wi = wi
     
-    def get_id(self):
-        return self._id
+    def set_index(self, li, ni, ii):
+        self._li = li
+        self._ni = ni
+        self._ii = ii
     
-    def set(self, w):
-        return self._layer.set_weight(self._node, self._i, w)
+    def set_wi(self, wi):
+        self._wi_alt = self._wi
+        self._wi = wi
+    
+    def alternate_wi(self):
+        temp = self._wi
+        self._wi = self._wi_alt
+        self._wi_alt = temp
+        return self._wi
 
-    def get(self):
-        return self._layer.get_weight(self._node, self._i)
-
-    def set_index(self, i):
-        if i>=0 and i<WEIGHT_INDEX_SIZE:
-            self._index = i
-            self.set( WEIGHT_SET[i] )
-
-        return self._index
-
+    def get_all(self):
+        return self._li, self._ni, self._ii, self._wi
+    
     def get_index(self):
-        return self._index
+        return self._li, self._ni, self._ii
+
+    def get_wi(self):
+        return self._wi
 #
 #
 #

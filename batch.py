@@ -42,7 +42,7 @@ if __name__=='__main__':
     # 1 : Intel on MBP
     # 2 : eGPU (AMD Radeon Pro 580)
     platform_id = 0
-    device_id = 2
+    device_id = 0
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
     #

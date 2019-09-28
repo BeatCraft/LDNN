@@ -151,57 +151,11 @@ def evaluate(r, batch_size, labels):
         data_class = r._batch_class[i]
         labels[data_class] = 1.0
         inf = infs[i]
-        #print inf
-        #
         mse = util.cross_emtropy_error_2(inf, len(inf), labels, len(labels))
-        #mse = util.mean_squared_error_np(inf, len(inf), labels, len(labels))
-        #if mse==np.nan:
-        #    #print mse
-        #    #mse = 100.0
-        #    print mse
-        #    sum = sum + 100.0
-        #else:
-        #    sum = sum + mse
-    
-        #mse =  util.cross_emtropy_error_fast(inf, labels, data_class)
-        #mse =  util.cross_emtropy_error_fast(inf, data_class)
-        #print mse
-        #
-        #mse = util.mean_squared_error(inf, len(inf), labels, len(labels))
-        #
         sum = sum + mse
         labels[data_class] = 0.0
 
-    #print infs[0]
     return sum/float(batch_size)
-#
-#
-#
-#def weight_random(r, batch, batch_size, labels, w, mse_base):
-#    inc = 0
-#    dec = 0
-#    wi = w.get_index()
-#    id = w.get_id()
-#    if w._lock==1:
-#        print "  locked"
-#        return mse_base, 0
-#
-#    wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
-#    while wi_alt==wi:
-#        wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
-#
-#    #r.propagate(w, wi_alt, 0)
-#    r.propagate()
-#    mse_alt = evaluate(r, batch_size, labels)
-#    if mse_alt<mse_base:
-#        w.set_index(wi_alt)
-#        r.update_weight()
-#        w._lock=1
-#        print "  %d > %d (%f, %f)" % (wi, wi_alt, mse_base, mse_alt)
-#        return mse_alt, 1
-#
-#    print "  no change (%d, %d) (%f, %f)" % (wi, wi_alt, mse_base, mse_alt)
-#    return mse_base, 0
 #
 #
 #
@@ -676,19 +630,6 @@ def test_mode(r, batch, batch_size):
 
     r.propagate(-1, -1, -1, -1, 0)
     infs = r.get_inference()
-    #print infs
-    #r.propagate(3, 0, 0, 1)
-    #infs = r.get_inference()
-    #print infs
-    #
-    #layer = r.getLayerAt(3)
-    #layer.set_weight_index(0, 0, 1)
-    #layer.update_weight_gpu()
-    #r.propagate()
-    #infs = r.get_inference()
-    #print infs
-    
-    
     #
     ca = 0
     for i in range(batch_size):
@@ -748,12 +689,11 @@ def loop(it, r, batch, batch_size, data_size):
     c_cnt_list = []
     ce_list = []
     
-    limit =0.01
+    limit = 0.01
     #limit =0.000001
     pre_ce = 0.0
     
     for i in range(it):
-        #h_cnt, c_cnt, ce = train_mode_3(i, r, batch, batch_size, data_size)
         h_cnt, c_cnt, ce = train_at_random(i, r, batch, batch_size, data_size)
         #
         h_cnt_list.append(h_cnt)
@@ -782,71 +722,6 @@ def loop(it, r, batch, batch_size, data_size):
 #
 #
 #
-def loop_SA(it, r, batch, batch_size, data_size):
-    labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
-    w_list = []
-    r.set_batch(batch, batch_size, data_size)
-    #
-    c = r.countLayers()
-    for li in range(1, c):
-        layer = r.getLayerAt(li)
-        num_node = layer._num_node
-        num_w = layer._num_input
-        for ni in range(num_node):
-            for ii in range(num_w):
-                wi = layer.get_weight_index(ni, ii)
-                w = core.Weight(li, ni, ii, wi)
-                w_list.append(w)
-
-    w_cnt = len(w_list)
-    num_update = 100
-    #print update_wi_list
-    #
-    r.propagate()
-    mse_base = evaluate(r, batch_size, labels)
-    print mse_base
-    #
-    for i in range(it):
-        update_wi_list = random.sample(range(0, w_cnt, 1), num_update)
-        for k in update_wi_list:
-            w = w_list[k]
-            li, ni, ii = w.get_index()
-            layer = r.getLayerAt(li)
-            wi = layer.get_weight_index(ni, ii)
-            wi_alt = wi
-            if wi==core.WEIGHT_INDEX_MAX:
-                pass
-            elif wi+1==core.WEIGHT_INDEX_MAX:
-                wi_alt = wi+1
-            else:
-                wi_alt = random.randrange(wi+1, core.WEIGHT_INDEX_MAX, 1)
-            #
-            layer.set_weight_index(ni, ii, wi_alt)
-            w.set_wi(wi_alt)
-        #
-        layer.update_weight_gpu()
-        r.propagate()
-        mse_alt = evaluate(r, batch_size, labels)
-        print "[%d] %f >> %f" % (i, mse_base, mse_alt)
-        if mse_alt<mse_base:
-            mse_base = mse_alt
-            print "    keep"
-        else:
-            #print "    discard"
-            for k in update_wi_list:
-                w = w_list[k]
-                li, ni, ii = w.get_index()
-                layer = r.getLayerAt(li)
-                wi = w.alternate_wi()
-                layer.set_weight_index(ni, ii, wi)
-            #
-            layer.update_weight_gpu()
-        #
-    # for i
-#
-#
-#
-#      train_mode_3(it, r, batch, batch_size, data_size):
 def train_at_random(it, r, batch, batch_size, data_size):
     limit = 0.01
     h_cnt = 0
@@ -903,6 +778,22 @@ def train_at_random(it, r, batch, batch_size, data_size):
             break
     #
     return h_cnt, c_cnt, mse_base
+#
+#
+#
+def init_WI(r, batch, batch_size, data_size):
+    r.set_batch(batch, batch_size, data_size)
+    labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
+    
+    for i in range(100):
+        r.init_weight()
+        r.update_weight()
+        r.propagate()
+        cr =  evaluate(r, batch_size, labels)
+        print cr
+        #
+        save_path = "./wi/wi.csv.%f" % cr
+        r.export_weight_index(save_path)
 #
 #
 #
@@ -999,6 +890,8 @@ def main():
         #r.export_weight_index("./wi.csv")
     elif mode==6:
         print ">> init WI"
+        batch = util.pickle_load(TRAIN_BATCH_PATH)
+        init_WI(r, batch, batch_size, data_size)
         #
     elif mode==7:
         print ">> train (loop)"

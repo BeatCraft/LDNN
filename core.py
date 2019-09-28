@@ -255,6 +255,7 @@ class Layer:
         self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
     
     def init_weight_with_random_index(self):
+        #print "init_weight_with_random_index"
         for ni in range(self._num_node):
             for ii in range(self._num_input):
                 #wi = WEIGHT_INDEX_SIZE-1

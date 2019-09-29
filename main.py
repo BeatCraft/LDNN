@@ -722,6 +722,53 @@ def loop(it, r, batch, batch_size, data_size):
 #
 #
 #
+
+def weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, mode):
+    layer = r.getLayerAt(li)
+    lock = layer.get_weight_lock(ni, ii)
+    if lock>0:
+        return mse_base, 0
+    
+    wi = layer.get_weight_index(ni, ii)
+    wi_alt = wi
+    wp = layer.get_weight_property(ni, ii)
+    R_MAX = WEIGHT_INDEX_SIZE
+    R_MIN = WEIGHT_INDEX_MIN # 0
+    if mode==1: # 1 : heat, -1 : cool
+        if wp<0:
+            return mse_base, 0
+    
+        if wi==core.WEIGHT_INDEX_MAX:
+            return mse_base, 0
+            
+        R_MIN = wi + 1
+        
+    elif mode==-1:
+        if wp<0:
+            return mse_base, 0
+            
+        if wi==core.WEIGHT_INDEX_MIN:
+            return mse_base, 0
+            
+        R_MAX = wi - 1
+    
+    wi_alt = random.randrange(R_MIN, R_MAX, 1)
+    r.propagate(li, ni, ii, wi_alt, 0)
+    mse_alt = evaluate(r, batch_size, labels)
+    #print "  - %d > %d : %f > %f" % (wi, wi_alt , mse_base, mse_alt)
+    #
+    if mse_alt<mse_base: # update wi
+        layer.set_weight_property(ni, ii, 1)
+        layer.set_weight_index(ni, ii, wi_alt)
+        layer.update_weight_gpu()
+        return mse_alt, 1
+    else: # reset direction or should lock ?
+        layer.set_weight_property(ni, ii, 0)
+
+    return mse_base, 0
+#
+#
+#
 def train_at_random(it, r, batch, batch_size, data_size):
     limit = 0.01
     h_cnt = 0

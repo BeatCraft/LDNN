@@ -689,12 +689,14 @@ def loop(it, r, batch, batch_size, data_size):
     c_cnt_list = []
     ce_list = []
     
+    #limit = 1.0
     limit = 0.01
+    #limit = 0.01
     #limit =0.000001
     pre_ce = 0.0
     
     for i in range(it):
-        h_cnt, c_cnt, ce = train_at_random(i, r, batch, batch_size, data_size)
+        h_cnt, c_cnt, ce = train_at_random(i, r, batch, batch_size, data_size, limit)
         #
         h_cnt_list.append(h_cnt)
         c_cnt_list.append(c_cnt)
@@ -709,12 +711,15 @@ def loop(it, r, batch, batch_size, data_size):
             print "exit iterations"
             break
         #
-        pre_ce = ce
+        r.reset_weight_property()
+        r.unlock_weight_all()
+        #if (i+1)%10==0:
+#        if pre_ce-ce<0.1:
+#            print "RESET WP"
+#            r.reset_weight_property()
+#            r.unlock_weight_all()
         #
-        if (i+1)%10==0:
-            print "RESET WP"
-            r.reset_weight_property()
-            r.unlock_weight_all()
+        pre_ce = ce
         #
     k = len(h_cnt_list)
     for j in range(k):
@@ -727,50 +732,88 @@ def weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, mode
     layer = r.getLayerAt(li)
     lock = layer.get_weight_lock(ni, ii)
     if lock>0:
+        print "    skip : locked"
         return mse_base, 0
     
     wi = layer.get_weight_index(ni, ii)
     wi_alt = wi
     wp = layer.get_weight_property(ni, ii)
-    R_MAX = WEIGHT_INDEX_SIZE
-    R_MIN = WEIGHT_INDEX_MIN # 0
-    if mode==1: # 1 : heat, -1 : cool
+    R_MAX = core.WEIGHT_INDEX_SIZE
+    R_MIN = core.WEIGHT_INDEX_MIN # 0
+    if mode==1: # 1 : heat
         if wp<0:
+            print "    skip : direction"
             return mse_base, 0
     
         if wi==core.WEIGHT_INDEX_MAX:
+            if wp==0:
+                print "    skip : max"
+                #layer.set_weight_lock(ni, ii, -1)
+            else:
+                print "    skip : max >> REVERSE"
+                layer.set_weight_lock(ni, ii, -1)
+                
             return mse_base, 0
             
         R_MIN = wi + 1
+        #wi_alt = random.randrange(R_MIN, R_MAX, 1)
         
-    elif mode==-1:
-        if wp<0:
+    elif mode==-1: # -1 : cool
+        if wp>0:
+            print "    skip : direction"
             return mse_base, 0
-            
+        
         if wi==core.WEIGHT_INDEX_MIN:
+            if wp==0:
+                print "    skip : max"
+                #layer.set_weight_lock(ni, ii, 1)
+            else:
+                print "    skip : min >> REVERSE"
+                layer.set_weight_lock(ni, ii, 1)
+                
             return mse_base, 0
-            
-        R_MAX = wi - 1
+        
+        # even update
+        R_MAX = wi
+        # uneven
+        #wi_alt = wi-1
     
+    # even update
     wi_alt = random.randrange(R_MIN, R_MAX, 1)
+    #
     r.propagate(li, ni, ii, wi_alt, 0)
     mse_alt = evaluate(r, batch_size, labels)
     #print "  - %d > %d : %f > %f" % (wi, wi_alt , mse_base, mse_alt)
     #
     if mse_alt<mse_base: # update wi
-        layer.set_weight_property(ni, ii, 1)
+        # should lock here??
+        layer.set_weight_property(ni, ii, mode)
         layer.set_weight_index(ni, ii, wi_alt)
+        layer.set_weight_lock(ni, ii, 1)
         layer.update_weight_gpu()
+        print "    UPDATE and LOCK"
         return mse_alt, 1
     else: # reset direction or should lock ?
-        layer.set_weight_property(ni, ii, 0)
+        print "    skip"
+    
+#        if wp!=0:
+#            # need to check the gap
+#            #layer.set_weight_lock(ni, ii, 1)
+#            print "    skip"
+#            return mse_base, 0
+        #
+        # this block must be reviewed
+        #layer.set_weight_property(ni, ii, 0)
+#        print "    reset >>> ZERO"
+        #layer.set_weight_property(ni, ii, mode*-1)
+        #print "    reversed"
 
     return mse_base, 0
 #
 #
 #
-def train_at_random(it, r, batch, batch_size, data_size):
-    limit = 0.01
+def train_at_random(it, r, batch, batch_size, data_size, limit):
+    #limit = 0.01 # 0.01
     h_cnt = 0
     c_cnt = 0
     labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
@@ -800,7 +843,8 @@ def train_at_random(it, r, batch, batch_size, data_size):
     for k in update_list:
         w = w_list[k]
         li, ni, ii = w.get_index()
-        mse_base, ret = weight_heat(r, batch, batch_size, li, ni, ii, mse_base, labels)
+        #mse_base, ret = weight_heat(r, batch, batch_size, li, ni, ii, mse_base, labels)
+        mse_base, ret = weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, 1)
         h_cnt = h_cnt + ret
         print "[%d] H(%d), %d, %d, W(%d,%d,%d), CE:%f" % (it, num_update, j, h_cnt, li, ni, ii, mse_base)
         j = j+1
@@ -815,7 +859,8 @@ def train_at_random(it, r, batch, batch_size, data_size):
     for k in update_list:
         w = w_list[k]
         li, ni, ii = w.get_index()
-        mse_base, ret = weight_cool(r, batch, batch_size, li, ni, ii, mse_base, labels)
+        #mse_base, ret = weight_cool(r, batch, batch_size, li, ni, ii, mse_base, labels)
+        mse_base, ret = weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, -1)
         c_cnt = c_cnt + ret
         print "[%d] C=%d, %d, %d, W(%d,%d,%d), CE:%f" % (it, num_update, j, c_cnt, li, ni, ii, mse_base)
         j = j+1

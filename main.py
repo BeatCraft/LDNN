@@ -742,72 +742,63 @@ def weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, mode
     R_MIN = core.WEIGHT_INDEX_MIN # 0
     if mode==1: # 1 : heat
         if wp<0:
-            print "    skip : direction"
+            print "    skip : -"
             return mse_base, 0
     
         if wi==core.WEIGHT_INDEX_MAX:
             if wp==0:
-                print "    skip : max"
-                #layer.set_weight_lock(ni, ii, -1)
+                print "    skip : max : -1"
+                layer.set_weight_property(ni, ii, -1)
             else:
-                print "    skip : max >> REVERSE"
-                layer.set_weight_lock(ni, ii, -1)
+                print "    lock : max"
+                layer.set_weight_lock(ni, ii, 1)
                 
             return mse_base, 0
             
         R_MIN = wi + 1
-        #wi_alt = random.randrange(R_MIN, R_MAX, 1)
         
     elif mode==-1: # -1 : cool
         if wp>0:
-            print "    skip : direction"
+            print "    skip : +"
             return mse_base, 0
         
         if wi==core.WEIGHT_INDEX_MIN:
             if wp==0:
-                print "    skip : max"
-                #layer.set_weight_lock(ni, ii, 1)
+                print "    skip : min : 1"
+                layer.set_weight_property(ni, ii, 1)
             else:
-                print "    skip : min >> REVERSE"
+                print "    lock : min"
                 layer.set_weight_lock(ni, ii, 1)
                 
             return mse_base, 0
-        
-        # even update
+
         R_MAX = wi
-        # uneven
-        #wi_alt = wi-1
-    
-    # even update
+    #
     wi_alt = random.randrange(R_MIN, R_MAX, 1)
     #
     r.propagate(li, ni, ii, wi_alt, 0)
     mse_alt = evaluate(r, batch_size, labels)
-    #print "  - %d > %d : %f > %f" % (wi, wi_alt , mse_base, mse_alt)
-    #
     if mse_alt<mse_base: # update wi
-        # should lock here??
-        layer.set_weight_property(ni, ii, mode)
         layer.set_weight_index(ni, ii, wi_alt)
         layer.set_weight_lock(ni, ii, 1)
         layer.update_weight_gpu()
         print "    UPDATE and LOCK"
         return mse_alt, 1
+    #elif mse_alt==mse_base:
+    #    if wp==0:
+    #        print "    skip : RESET"
+    #        #layer.set_weight_property(ni, ii, 0)
+    #    else:
+    #        #layer.set_weight_lock(ni, ii, 1)
+    #
     else: # reset direction or should lock ?
-        print "    skip"
-    
-#        if wp!=0:
-#            # need to check the gap
-#            #layer.set_weight_lock(ni, ii, 1)
-#            print "    skip"
-#            return mse_base, 0
+        if wp==0:
+            print "    skip : ZERO"
+        else:
+            print "    skip : REVERSE"
+            layer.set_weight_property(ni, ii, mode*-1)
         #
-        # this block must be reviewed
-        #layer.set_weight_property(ni, ii, 0)
-#        print "    reset >>> ZERO"
-        #layer.set_weight_property(ni, ii, mode*-1)
-        #print "    reversed"
-
+    #
     return mse_base, 0
 #
 #
@@ -903,7 +894,7 @@ def main():
     # 0 : AMD Server
     # 1 : Intel on MBP
     # 2 : eGPU (AMD Radeon Pro 580)
-    device_id = 1
+    device_id = 2
     #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()

@@ -690,18 +690,23 @@ def loop(it, r, batch, batch_size, data_size):
     ce_list = []
     
     #limit = 1.0
-    limit = 0.01
     #limit = 0.01
-    #limit =0.000001
+    #limit = 0.01
+    limit = 0.000001
     pre_ce = 0.0
     
     for i in range(it):
-        h_cnt, c_cnt, ce = train_at_random(i, r, batch, batch_size, data_size, limit)
+        #h_cnt, c_cnt, ce = train_at_random(i, r, batch, batch_size, data_size, limit)
+        h_cnt, c_cnt, ce = train(i, r, batch, batch_size, data_size, limit)
         #
         h_cnt_list.append(h_cnt)
         c_cnt_list.append(c_cnt)
         ce_list.append(ce)
         r.export_weight_index(WEIGHT_INDEX_CSV_PATH)
+        #
+        save_path = "./test/wi.csv.%f" % cr
+        r.export_weight_index(save_path)
+        #
         if pre_ce == ce:
             print "locked with local optimum"
             print "exit iterations"
@@ -835,7 +840,8 @@ def train_at_random(it, r, batch, batch_size, data_size, limit):
         w = w_list[k]
         li, ni, ii = w.get_index()
         #mse_base, ret = weight_heat(r, batch, batch_size, li, ni, ii, mse_base, labels)
-        mse_base, ret = weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, 1)
+        #mse_base, ret = weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, 1)
+        mse_base, ret = weight_shift_mode(r, batch, batch_size, li, ni, ii, mse_base, labels, 1)
         h_cnt = h_cnt + ret
         print "[%d] H(%d), %d, %d, W(%d,%d,%d), CE:%f" % (it, num_update, j, h_cnt, li, ni, ii, mse_base)
         j = j+1
@@ -851,7 +857,8 @@ def train_at_random(it, r, batch, batch_size, data_size, limit):
         w = w_list[k]
         li, ni, ii = w.get_index()
         #mse_base, ret = weight_cool(r, batch, batch_size, li, ni, ii, mse_base, labels)
-        mse_base, ret = weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, -1)
+        #mse_base, ret = weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, -1)
+        mse_base, ret = weight_shift_mode(r, batch, batch_size, li, ni, ii, mse_base, labels, -1)
         c_cnt = c_cnt + ret
         print "[%d] C=%d, %d, %d, W(%d,%d,%d), CE:%f" % (it, num_update, j, c_cnt, li, ni, ii, mse_base)
         j = j+1
@@ -864,10 +871,140 @@ def train_at_random(it, r, batch, batch_size, data_size, limit):
 #
 #
 #
+def weight_shift_mode(r, batch, batch_size, li, ni, ii, mse_base, labels, mode):
+    layer = r.getLayerAt(li)
+    wp = layer.get_weight_property(ni, ii) # default : 0
+    lock = layer.get_weight_lock(ni, ii)   # default : 0
+    wi = layer.get_weight_index(ni, ii)
+    wi_alt = wi
+    #
+    if lock>0:
+        print "    locked"
+        return mse_base, 0
+    #
+    if mode>0: # heat
+        if wi==core.WEIGHT_INDEX_MAX:
+            if wp==mode:
+                print "    lock : MAX"
+                layer.set_weight_lock(ni, ii, 1)
+                return mse_base, 0
+            else:
+                print "    skip : MAX"
+                return mse_base, 0
+            #
+        #
+    else:
+        if wi==core.WEIGHT_INDEX_MIN:
+            if wp==mode:
+                print "    lock : MIN"
+                layer.set_weight_lock(ni, ii, 1)
+                return mse_base, 0
+            else:
+                print "    skip : MIN"
+                return mse_base, 0
+        #
+    #
+    wi_alt = wi + mode
+    r.propagate(li, ni, ii, wi_alt, 0)
+    mse_alt = evaluate(r, batch_size, labels)
+    if  mse_alt<mse_base:
+        print "    update : %d >> %d" % (wi, wi_alt)
+        layer.set_weight_property(ni, ii, mode)
+        layer.set_weight_index(ni, ii, wi_alt)
+        layer.update_weight_gpu()
+        return mse_alt, 1
+    elif mse_alt>mse_base:
+        if wp!=0:
+            print "    lock : REV"
+            layer.set_weight_lock(ni, ii, 1)
+            return mse_base, 0
+        else:
+            print "    skip : REV"
+            layer.set_weight_property(ni, ii, mode*-1)
+            return mse_base, 0
+    #
+    print "    skip : =="
+    return mse_base, 0
+#
+#
+#
+def train(it, r, batch, batch_size, data_size, limit):
+    divider = 4
+    t_cnt = 0
+    h_cnt = 0
+    c_cnt = 0
+    labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
+    w_list = []
+    r.set_batch(batch, batch_size, data_size)
+    #
+    r.propagate()
+    mse_base = evaluate(r, batch_size, labels)
+    print mse_base
+    #
+    c = r.countLayers()
+    for li in range(1, c):
+        layer = r.getLayerAt(li)
+        num_node = layer._num_node
+        num_w = layer._num_input
+        #
+        node_index_list = list(range(num_node))
+        random.shuffle(node_index_list)
+        nc = 0
+        for ni in node_index_list:
+            nc = nc + 1
+            w_p = num_w/divider
+            for p in range(w_p):
+                ii = random.randrange(num_w)
+                print "[%d] H=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, h_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
+                mse_base, ret = weight_shift_mode(r, batch, batch_size, li, ni, ii, mse_base, labels, 1)
+                #mse_base, ret = weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, 1)
+                #
+                h_cnt = h_cnt + ret
+                t_cnt = t_cnt +1
+                if mse_base<limit:
+                    print "exit iterations"
+                    return h_cnt, c_cnt, mse_base
+                #
+            #
+        #
+    #
+    t_cnt = 0
+    c = r.countLayers()
+    for li in range(1, c):
+        layer = r.getLayerAt(li)
+        num_node = layer._num_node
+        num_w = layer._num_input
+        #
+        node_index_list = list(range(num_node))
+        random.shuffle(node_index_list)
+        nc = 0
+        for ni in node_index_list:
+            nc = nc + 1
+            w_p = num_w/divider
+            for p in range(w_p):
+                ii = random.randrange(num_w)
+                #print "[%d] C(%d), %d, %d, W(%d,%d,%d), CE:%f" % (it, w_p, p, c_cnt, li, ni, ii, mse_base)
+                print "[%d] C=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, c_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
+                mse_base, ret = weight_shift_mode(r, batch, batch_size, li, ni, ii, mse_base, labels, -1)
+                #mse_base, ret = weight_shift_random(r, batch, batch_size, li, ni, ii, mse_base, labels, -1)
+                #
+                c_cnt = c_cnt + ret
+                t_cnt = t_cnt + 1
+                if mse_base<limit:
+                    print "exit iterations"
+                    return h_cnt, c_cnt, mse_base
+                #
+            #
+        #
+    #
+    return h_cnt, c_cnt, mse_base
+#
+#
+#
 def init_WI(r, batch, batch_size, data_size):
     r.set_batch(batch, batch_size, data_size)
     labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
-    
+    #
     for i in range(100):
         r.init_weight()
         r.update_weight()
@@ -877,6 +1014,7 @@ def init_WI(r, batch, batch_size, data_size):
         #
         save_path = "./wi/wi.csv.%f" % cr
         r.export_weight_index(save_path)
+    #
 #
 #
 #
@@ -894,7 +1032,7 @@ def main():
     # 0 : AMD Server
     # 1 : Intel on MBP
     # 2 : eGPU (AMD Radeon Pro 580)
-    device_id = 2
+    device_id = 1
     #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
@@ -989,9 +1127,7 @@ def main():
         elasped_time = time.time() - start_time
         t = format(elasped_time, "0")
         print "[total elasped time] %s" % (t)
-        pass
     elif mode==8:
-        print ">> none"
         pass
     elif mode==9:
         print ">> check_weight_distribution"

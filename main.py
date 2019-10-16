@@ -884,24 +884,30 @@ def weight_shift_mode(r, batch, batch_size, li, ni, ii, mse_base, labels, mode):
     #
     if mode>0: # heat
         if wi==core.WEIGHT_INDEX_MAX:
-            if wp==mode:
-                print "    lock : MAX"
-                layer.set_weight_lock(ni, ii, 1)
-                return mse_base, 0
-            else:
-                print "    skip : MAX"
-                return mse_base, 0
+            print "    skip : MAX"
+            layer.set_weight_property(ni, ii, 0)
+            return mse_base, 0
+#            if wp==mode:
+#                print "    lock : MAX"
+#                layer.set_weight_lock(ni, ii, 1)
+#                return mse_base, 0
+#            else:
+#                print "    skip : MAX"
+#                return mse_base, 0
             #
         #
     else:
         if wi==core.WEIGHT_INDEX_MIN:
-            if wp==mode:
-                print "    lock : MIN"
-                layer.set_weight_lock(ni, ii, 1)
-                return mse_base, 0
-            else:
-                print "    skip : MIN"
-                return mse_base, 0
+            print "    skip : MIN"
+            layer.set_weight_property(ni, ii, 0)
+            return mse_base, 0
+#            if wp==mode:
+#                print "    lock : MIN"
+#                layer.set_weight_lock(ni, ii, 1)
+#                return mse_base, 0
+#            else:
+#                print "    skip : MIN"
+#                return mse_base, 0
         #
     #
     wi_alt = wi + mode
@@ -913,17 +919,19 @@ def weight_shift_mode(r, batch, batch_size, li, ni, ii, mse_base, labels, mode):
         layer.set_weight_index(ni, ii, wi_alt)
         layer.update_weight_gpu()
         return mse_alt, 1
-    elif mse_alt>mse_base:
-        if wp!=0:
-            print "    lock : REV"
-            layer.set_weight_lock(ni, ii, 1)
-            return mse_base, 0
-        else:
-            print "    skip : REV"
-            layer.set_weight_property(ni, ii, mode*-1)
-            return mse_base, 0
+        
+#    elif mse_alt>mse_base:
+#        if wp!=0:
+#            print "    lock : REV"
+#            layer.set_weight_lock(ni, ii, 1)
+#            return mse_base, 0
+#        else:
+#            print "    skip : REV"
+#            layer.set_weight_property(ni, ii, mode*-1)
+#            return mse_base, 0
     #
-    print "    skip : =="
+    layer.set_weight_property(ni, ii, 0)
+    print "    skip : 0"
     return mse_base, 0
 #
 #

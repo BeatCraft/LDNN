@@ -23,6 +23,17 @@ __kernel void scale(
     }
 };
 
+__kernel void testp(void)
+{
+    int i = get_global_id(0);
+    int j = get_global_id(1);
+    int k = get_global_id(2);
+    
+    //printf(\"(%d, %d)\\n\", i, j);
+    
+    printf(\"(%d, %d, %d)\\n\", i, j, k);
+};
+
 __kernel void multiple_x_by_w(
     __global float* x,
     __global float* w,
@@ -126,6 +137,10 @@ class Gpu:
     def copy(self, dist, src):
         event = cl.enqueue_copy(self._queue, dist, src)
         event.wait()
+        
+    def testp(self):
+        event = self.prg.testp(self._queue,(3,3,3), None)
+        event.wait()
 #
 #
 #
@@ -145,7 +160,10 @@ def main():
     print data_w
     print data_y
     
-    g = Gpu()
+    platform_id = 0
+    device_id = 2
+    g = Gpu(platform_id, device_id)
+    
     g.dev_malloc(data_x) # 0
     g.dev_malloc(data_w) # 1
     g.dev_malloc(data_y) # 2
@@ -155,22 +173,23 @@ def main():
     g.set_kernel_code()
     bufs = g.get_buffer_list()
     
-    g.multiple_x_by_w(bufs[0], bufs[1], bufs[2], num)
-    g.read(data_y, bufs[2])
-    print data_y
+    g.testp()
+    
+    
+    #g.multiple_x_by_w(bufs[0], bufs[1], bufs[2], num)
+    #g.read(data_y, bufs[2])
+    #print data_y
     #data_y[0][0]=0.999
     #print data_y
     
-    
-    g.scale(bufs[3], bufs[4], 255.0, 4)
-    g.read(data_x, bufs[4])
-    print data_x
+    #g.scale(bufs[3], bufs[4], 255.0, 4)
+    #g.read(data_x, bufs[4])
+    #print data_x
     
     #g.write(bufs[2], data_a)
-    
+    #
     #for row in data_y:
     #    print np.sum(row)
-    
     return 0
 
 if __name__=='__main__':

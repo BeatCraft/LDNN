@@ -69,10 +69,12 @@ def check_weight_distribution():
         return 0
 
     v_list = []
+    num_list = []
     total = 0.0
     for i in range(core.WEIGHT_INDEX_SIZE):
         key = str(i)
         num =  w_list.count(key)
+        num_list.append(num)
         v = float(num)/w_total*100.0
         print "[%02d] %d : %f" % (i, num, v)
         v_list.append(v)
@@ -85,6 +87,9 @@ def check_weight_distribution():
         dif = v_list[i] - ave
         print "[%02d] %f" % (i, dif)
 
+    for i in range(core.WEIGHT_INDEX_SIZE):
+        print num_list[i]
+    
     return 0
 
 def setup_dnn(path, my_gpu):
@@ -1040,7 +1045,7 @@ def main():
     # 0 : AMD Server
     # 1 : Intel on MBP
     # 2 : eGPU (AMD Radeon Pro 580)
-    device_id = 1
+    device_id = 2
     #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()

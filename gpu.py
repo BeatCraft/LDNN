@@ -23,15 +23,110 @@ __kernel void scale(
     }
 };
 
-__kernel void testp(void)
+__kernel void k_sum(__global float* in,
+                    __global float* out,
+                    __global float* work,
+                    int stride, int left,
+                    int bi, int num_input, int num_node)
 {
     int i = get_global_id(0);
     int j = get_global_id(1);
-    int k = get_global_id(2);
+    int start_i;
+    int start_o;
+    int k;
+ 
     
-    //printf(\"(%d, %d)\\n\", i, j);
+    k = 0;
+    start_i = num_input*num_node*bi + num_input*j;
+    start_o = num_node*bi + j;
+    //printf(\"%d, %d\\n\", i, j);
+
+    //while (stride>0){
+    for (k=stride;k>0;k/=2){
+        
+        if (i<k){
+            //in[start_i+i] += in[start_i+i+k];
+            if (left>0 && i==0){
+                printf(\"i=%d, j=%d, k=%d : %d : %f\\n\", i, j, k, start_i+k+1, in[start_i+k+1]);
+                in[start_i] = in[start_i] + in[start_i+k] + in[start_i+k+1];
+                printf(\"%f\\n\", in[start_i]);
+            }else{
+                in[start_i+i] += in[start_i+i+k];
+            }
+        }
+        
+        left = k%2;
+        barrier(CLK_GLOBAL_MEM_FENCE);
+    }
     
-    printf(\"(%d, %d, %d)\\n\", i, j, k);
+    barrier(CLK_GLOBAL_MEM_FENCE);
+    // relu
+    if (i==0){
+        if (in[start_i]<0){
+            out[start_o] = 0.0;
+        }else{
+            out[start_o] = in[start_i];
+        }
+        printf(\"%d, %f\\n\", j, out[start_o]);
+    }
+}
+
+__kernel void testp(__global float* data, int d_size, __global float* ret, int r_size)
+{
+    int i = get_global_id(0);
+    __local float k;
+    //__local float ret[size/2];
+    //const int localID = get_local_id(0);
+    //const int localSize = get_local_size(0);
+    //printf(\"[%d] local id=%d, size=%d\\n\", localID, localSize);
+    //printf(\"fuck\\n\");
+    printf(\"[%d] %f, [%d] %f\\n\", i*2, data[i*2], i*2+1, data[i*2+1]);
+    k = data[i*2] + data[i*2+1];
+    printf(\"[%d] %f\\n\", i, k);
+    //barrier(CLK_LOCAL_MEM_FENCE);
+    //printf(\"[%d] %f\\n\", i, k);
+    
+//    k = data[i*2] + data[i*2+1];
+//    printf(\"[%d] %f, (%f)\\n\", i, k, data[i*2] + data[i*2+1]);
+    //barrier(CLK_LOCAL_MEM_FENCE);
+    //printf(\"[%d] %f\\n\", i, k);
+    //ret[0] += k;
+    //printf(\"[%d] %f\\n\", i, ret[0]);
+};
+
+__kernel void multiple_x_by_w_batch(
+    __global float* x,
+    __global float* w,
+    __global float* y,
+    const int stride_1,
+    const int stride_2)
+{
+    int i = get_global_id(0);  // num_input
+    int j = get_global_id(1);  // num_node
+    int bi = get_global_id(2); // batch id
+    
+    y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
+};
+
+__kernel void multiple_x_by_w_batch_alt(
+    __global float* x,
+    __global float* w,
+    __global float* y,
+    const int stride_1,
+    const int stride_2,
+    const int alt_ni,
+    const int alt_ii,
+    const float alt_w)
+{
+    int i = get_global_id(0); // num_input
+    int j = get_global_id(1); // num_node
+    int bi = get_global_id(2); // batch id
+
+    if (j==alt_ni && i==alt_ii){
+        y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * alt_w;
+    }else{
+        y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * w[stride_2*j + i];
+    }
 };
 
 __kernel void multiple_x_by_w(
@@ -46,7 +141,6 @@ __kernel void multiple_x_by_w(
     int j = get_global_id(1); // num_node
     
     y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
-    
 //    if (j==9){
 //        printf(\"gpu(%f)(%f) [%d]\\n\", x[stride_2*bi + i], w[stride_2*j+i], i);
 //    }
@@ -127,6 +221,21 @@ class Gpu:
                                          np.int32(stride_1), np.int32(stride_2))
         event.wait()
 
+    def multiple_x_by_w_batch(self, d_x, d_w, d_y, bsize, stride_1, stride_2, row, col):
+        event = self.prg.multiple_x_by_w_batch(self._queue,(row,col,bsize), None,
+                                               d_x, d_w, d_y,
+                                               np.int32(stride_1),
+                                               np.int32(stride_2))
+        event.wait()
+        
+    def multiple_x_by_w_batch_alt(self, d_x, d_w, d_y, bsize, stride_1, stride_2, row, col, ni, ii, wv):
+        event = self.prg.multiple_x_by_w_batch_alt(self._queue,(row,col,bsize), None,
+                                                   d_x, d_w, d_y,
+                                                   np.int32(stride_1),
+                                                   np.int32(stride_2),
+                                                   np.int32(ni), np.int32(ii), np.float32(wv))
+        event.wait()
+
     def multiple_x_by_w_alt(self, d_x, d_w, d_y, bi, stride_1, stride_2, row, col, ni, ii, wv):
         event = self.prg.multiple_x_by_w_alt(self._queue,(row,col), None,
                                              d_x, d_w, d_y, np.int32(bi),
@@ -138,21 +247,28 @@ class Gpu:
         event = cl.enqueue_copy(self._queue, dist, src)
         event.wait()
         
-    def testp(self):
-        event = self.prg.testp(self._queue,(3,3,3), None)
+    def testp(self, data, d_size, ret, r_size):
+        event = self.prg.testp(self._queue, (d_size/2,), None,
+                               data, np.int32(d_size), ret, np.int32(r_size))
+        event.wait()
+        
+    def k_sum(self, data_in, data_out, data_work, stride, left, bi, num_input, num_node):
+        #print num_input
+        #print num_node
+        event = self.prg.k_sum(self._queue, (stride, num_node), None,
+                               data_in, data_out, data_work, np.int32(stride), np.int32(left),
+                               np.int32(bi), np.int32(num_input), np.int32(num_node))
         event.wait()
 #
 #
 #
 def main():
-    data_x = np.array([0.1, 0.2, 0.3, 0.4]).astype(np.float32)
-    data_w = np.array([[0.5, 0.5, 0.5, 0.5],
-                       [0.1, 0.1, 0.1, 0.1]]).astype(np.float32)
+    data_x = np.array([0.1, 0.2, 0.3, 0.4, 0.5]).astype(np.float32)
+    data_w = np.array([[0.5, 0.5, 0.5, 0.5, 0.2, 0.5, 0.5, 0.5, 0.5, 0.2, 0.5, 0.5, 0.5, 0.5, 0.2],
+                       [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
+                       [0.1, 0.2, 0.3, 0.4, 0.5, 0.1, 0.2, 0.3, 0.4, 0.5, 0.1, 0.2, 0.3, 0.4, 0.5]]).astype(np.float32)
     data_y = np.array([[0.0, 0.0, 0.0, 0.0],
                        [0.0, 0.0, 0.0, 0.0]]).astype(np.float32)
-    num = data_x.shape[0]
-    print num
-    
     data_a = np.array([8, 16, 32, 64]).astype(np.int32)
     data_b = np.array([0.0, 0.0, 0.0, 0.0]).astype(np.float32)
 
@@ -161,7 +277,7 @@ def main():
     print data_y
     
     platform_id = 0
-    device_id = 2
+    device_id = 1
     g = Gpu(platform_id, device_id)
     
     g.dev_malloc(data_x) # 0
@@ -172,10 +288,18 @@ def main():
     
     g.set_kernel_code()
     bufs = g.get_buffer_list()
+
+    num_node = data_w.shape[0]
+    num_input =  data_w[0].shape[0]
     
-    g.testp()
+    stride = num_input / 2
+    left = num_input % 2
     
-    
+    print "num=%d, stride=%d, left=%d" % (num_input, stride, left)
+    g.k_sum(bufs[1], bufs[4], stride, left, 0, num_input, num_node)
+
+    #g.testp(bufs[0], num, bufs[4], num)
+    #g.k_sum(bufs[0], bufs[4], stride, left)
     #g.multiple_x_by_w(bufs[0], bufs[1], bufs[2], num)
     #g.read(data_y, bufs[2])
     #print data_y

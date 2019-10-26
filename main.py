@@ -709,7 +709,7 @@ def loop(it, r, batch, batch_size, data_size):
         ce_list.append(ce)
         r.export_weight_index(WEIGHT_INDEX_CSV_PATH)
         #
-        save_path = "./test/wi.csv.%f" % cr
+        save_path = "./test/wi.csv.%f" % ce
         r.export_weight_index(save_path)
         #
         if pre_ce == ce:
@@ -1036,7 +1036,7 @@ def main():
     argc = len(argvs)
     #
     it = 20*10
-    batch_size = 100 # 100, 500, 1000, 1500
+    batch_size = 1 # 100, 500, 1000, 1500
     data_size = 28*28
     #
     # GPU
@@ -1045,7 +1045,7 @@ def main():
     # 0 : AMD Server
     # 1 : Intel on MBP
     # 2 : eGPU (AMD Radeon Pro 580)
-    device_id = 2
+    device_id = 1
     #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()

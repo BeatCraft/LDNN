@@ -172,7 +172,7 @@ class Layer:
         self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         #self._weight_property = np.ones( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
-        self._sum = np.zeros(self._num_node, dtype=np.float32)
+        #self._sum = np.zeros(self._num_node, dtype=np.float32)
         #self._node_list = []
     
     def set_batch(self, batch_size):
@@ -183,6 +183,10 @@ class Layer:
 
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
         self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        
+        self._work_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+        self._work_output = self._gpu.dev_malloc(self._work_array)
+        
 
     def init_gpu(self):
         if self._gpu:
@@ -223,6 +227,7 @@ class Layer:
                 if self._type==1:
                     for i in range(len(self._product_matrix[bi])):
                         self._output_array[bi][i] = relu( np.sum(self._product_matrix[bi][i]) )
+                        print self._output_array[bi][i]
             
                     self._gpu.copy(self._gpu_output, self._output_array)
                     
@@ -230,11 +235,56 @@ class Layer:
                     sum = np.zeros(len(self._product_matrix[bi]), dtype=np.float32)
                     for i in range(len(self._product_matrix[bi])):
                         sum[i] = np.sum(self._product_matrix[bi][i])
+                        #
+                        #print self._product_matrix[bi][i]
+                        #
 
                     self._output_array[bi] = softmax(sum)
 
                 #print self._output_array[bi]
         #
+    def propagate_test(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+        if self._type==0: # input
+            pass
+        else:
+            stride_1 = self._num_node * self._num_input
+            stride_2 = self._num_input
+            stride_3 = self._num_node
+            #
+            if ni>=0: # alt
+                self._gpu.multiple_x_by_w_batch_alt(array_in, self._gpu_weight, self._gpu_product,
+                                                    self._batch_size,
+                                                    stride_1, stride_2, self._num_input, self._num_node,
+                                                    ni, ii, WEIGHT_SET[wi])
+                #
+            else: # propagation
+                self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
+                                                self._batch_size,
+                                                stride_1, stride_2, self._num_input, self._num_node)
+                #
+            #
+            # reduction
+            #
+            if self._type==1:
+                left = self._num_input % 2 # for reduction
+                stride = self._num_input/2 # for reduction
+                for bi in range(self._batch_size):
+                    self._gpu.k_sum(self._gpu_product, self._gpu_output, self._work_output, stride, left,
+                                    bi, self._num_input, self._num_node)
+            elif self._type==2:
+                self._gpu.copy(self._product_matrix, self._gpu_product)
+                for bi in range(self._batch_size):
+                    sum = np.zeros(len(self._product_matrix[bi]), dtype=np.float32)
+                    for i in range(len(self._product_matrix[bi])):
+                        sum[i] = np.sum(self._product_matrix[bi][i])
+                    #
+                    self._output_array[bi] = softmax(sum)
+                #
+            # for
+        # else
+    # def
+    #
+    
     def get_weight_index(self, ni, ii):
         return self._weight_index_matrix[ni][ii]
     
@@ -461,9 +511,11 @@ class Roster:
             layer = self.getLayerAt(i)
             #layer.propagate(pre._gpu_output, ni, ii, wi, debug)
             if i==li:
-                layer.propagate(pre._gpu_output, ni, ii, wi, debug)
+                #layer.propagate(pre._gpu_output, ni, ii, wi, debug)
+                layer.propagate_test(pre._gpu_output, ni, ii, wi, debug)
             else:
-                layer.propagate(pre._gpu_output, -1, -1, -1, debug)
+                #layer.propagate(pre._gpu_output, -1, -1, -1, debug)
+                layer.propagate_test(pre._gpu_output, -1, -1, -1, debug)
             
             pre = layer
 #

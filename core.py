@@ -184,8 +184,8 @@ class Layer:
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
         self._gpu_output = self._gpu.dev_malloc(self._output_array)
         
-        self._work_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-        self._work_output = self._gpu.dev_malloc(self._work_array)
+        #self._work_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+        #self._work_output = self._gpu.dev_malloc(self._work_array)
         
 
     def init_gpu(self):
@@ -227,7 +227,7 @@ class Layer:
                 if self._type==1:
                     for i in range(len(self._product_matrix[bi])):
                         self._output_array[bi][i] = relu( np.sum(self._product_matrix[bi][i]) )
-                        print self._output_array[bi][i]
+                        #print self._output_array[bi][i]
             
                     self._gpu.copy(self._gpu_output, self._output_array)
                     
@@ -241,7 +241,14 @@ class Layer:
 
                     self._output_array[bi] = softmax(sum)
 
-                #print self._output_array[bi]
+                if self._index==2:
+                    for p in range(32):
+                        print "%f" % self._product_matrix[0][0][p]
+                        
+                    print "+++"
+                    print self._output_array[0][0]
+                    print "+++"
+                    
         #
     def propagate_test(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         if self._type==0: # input
@@ -266,19 +273,28 @@ class Layer:
             # reduction
             #
             if self._type==1:
-                left = self._num_input % 2 # for reduction
-                stride = self._num_input/2 # for reduction
-                for bi in range(self._batch_size):
-                    self._gpu.k_sum(self._gpu_product, self._gpu_output, self._work_output, stride, left,
-                                    bi, self._num_input, self._num_node)
+                activation = 0
+                self._gpu.k_sum(self._gpu_product, self._gpu_output,
+                                self._num_input, self._num_node, activation, self._batch_size)
             elif self._type==2:
-                self._gpu.copy(self._product_matrix, self._gpu_product)
+                activation = 1
+                self._gpu.k_sum(self._gpu_product, self._gpu_output,
+                                self._num_input, self._num_node, activation, self._batch_size)
+                self._gpu.copy(self._output_array, self._gpu_output)
                 for bi in range(self._batch_size):
-                    sum = np.zeros(len(self._product_matrix[bi]), dtype=np.float32)
-                    for i in range(len(self._product_matrix[bi])):
-                        sum[i] = np.sum(self._product_matrix[bi][i])
-                    #
-                    self._output_array[bi] = softmax(sum)
+                    self._output_array[bi] = softmax(self._output_array[bi])
+                    #print self._output_array[bi]
+                    #for m in range(self._output_array[bi].shape[0]):
+                    #    print "%f" % self._output_array[bi][m]
+
+#            elif self._type==2:
+#                self._gpu.copy(self._product_matrix, self._gpu_product)
+#                for bi in range(self._batch_size):
+#                    sum = np.zeros(len(self._product_matrix[bi]), dtype=np.float32)
+#                    for i in range(len(self._product_matrix[bi])):
+#                        sum[i] = np.sum(self._product_matrix[bi][i])
+#                    #
+#                    self._output_array[bi] = softmax(sum)
                 #
             # for
         # else

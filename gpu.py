@@ -23,52 +23,67 @@ __kernel void scale(
     }
 };
 
+__kernel void k_softmax(__global float* in, int num)
+{
+    int bi = get_global_id(0);
+    float max;
+    float sum;
+    
+    max = 0.0;
+    sum = 0.0;
+    
+    for (int i;i<num;i++){
+        if (in[i]>max){
+            max = in[i];
+        }
+    }
+    
+    for (int i;i<num;i++){
+        in[i] = in[i] - max;
+        sum += in[i];
+    }
+
+    for (int i;i<num;i++){
+        in[i] = in[i]/sum;
+    }
+}
+
 __kernel void k_sum(__global float* in,
                     __global float* out,
-                    __global float* work,
-                    int stride, int left,
-                    int bi, int num_input, int num_node)
+                    int num_input,
+                    int num_node,
+                    int activation)
 {
-    int i = get_global_id(0);
-    int j = get_global_id(1);
-    int start_i;
-    int start_o;
-    int k;
- 
-    
-    k = 0;
-    start_i = num_input*num_node*bi + num_input*j;
-    start_o = num_node*bi + j;
-    //printf(\"%d, %d\\n\", i, j);
+    int ni = get_global_id(0);
+    int bi = get_global_id(1);
+    int ii;
+    float sum;
 
-    //while (stride>0){
-    for (k=stride;k>0;k/=2){
-        
-        if (i<k){
-            //in[start_i+i] += in[start_i+i+k];
-            if (left>0 && i==0){
-                printf(\"i=%d, j=%d, k=%d : %d : %f\\n\", i, j, k, start_i+k+1, in[start_i+k+1]);
-                in[start_i] = in[start_i] + in[start_i+k] + in[start_i+k+1];
-                printf(\"%f\\n\", in[start_i]);
-            }else{
-                in[start_i+i] += in[start_i+i+k];
-            }
-        }
-        
-        left = k%2;
-        barrier(CLK_GLOBAL_MEM_FENCE);
+    ii = 0;
+    sum = 0.0;
+    
+    for (ii=0;ii<num_input;ii++){
+        sum += in[num_node*num_input*bi + num_input*ni + ii];
     }
     
-    barrier(CLK_GLOBAL_MEM_FENCE);
     // relu
-    if (i==0){
-        if (in[start_i]<0){
-            out[start_o] = 0.0;
-        }else{
-            out[start_o] = in[start_i];
-        }
-        printf(\"%d, %f\\n\", j, out[start_o]);
+    if (activation==0 && sum<0.0){
+        out[num_node*bi + ni] = 0.0;
+    }else{
+        out[num_node*bi + ni] = sum;
     }
+    
+//    switch(activation){
+//        case 0:
+//            // relu
+//            if (sum<0.0){
+//                out[num_node*bi + ni] = 0.0;
+//            }else{
+//                out[num_node*bi + ni] = sum;
+//            }
+//        default:
+//            out[num_node*bi + ni] = sum;
+//    }
 }
 
 __kernel void testp(__global float* data, int d_size, __global float* ret, int r_size)
@@ -252,12 +267,10 @@ class Gpu:
                                data, np.int32(d_size), ret, np.int32(r_size))
         event.wait()
         
-    def k_sum(self, data_in, data_out, data_work, stride, left, bi, num_input, num_node):
-        #print num_input
-        #print num_node
-        event = self.prg.k_sum(self._queue, (stride, num_node), None,
-                               data_in, data_out, data_work, np.int32(stride), np.int32(left),
-                               np.int32(bi), np.int32(num_input), np.int32(num_node))
+    def k_sum(self, data_in, data_out, num_input, num_node, activation, num_batch):
+        event = self.prg.k_sum(self._queue, (num_node, num_batch), None,
+                               data_in, data_out,
+                               np.int32(num_input), np.int32(num_node), np.int32(activation))
         event.wait()
 #
 #
@@ -296,7 +309,8 @@ def main():
     left = num_input % 2
     
     print "num=%d, stride=%d, left=%d" % (num_input, stride, left)
-    g.k_sum(bufs[1], bufs[4], stride, left, 0, num_input, num_node)
+    #g.k_sum(bufs[1], bufs[4], stride, left, 0, num_input, num_node)
+    g.k_sum(bufs[1], bufs[4], num_input, num_node, 0, 1)
 
     #g.testp(bufs[0], num, bufs[4], num)
     #g.k_sum(bufs[0], bufs[4], stride, left)

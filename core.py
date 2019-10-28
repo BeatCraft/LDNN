@@ -280,9 +280,17 @@ class Layer:
                 activation = 1
                 self._gpu.k_sum(self._gpu_product, self._gpu_output,
                                 self._num_input, self._num_node, activation, self._batch_size)
+                                
+                self._gpu.k_softmax(self._gpu_output, self._num_node, self._batch_size)
                 self._gpu.copy(self._output_array, self._gpu_output)
-                for bi in range(self._batch_size):
-                    self._output_array[bi] = softmax(self._output_array[bi])
+#
+#
+                #self._gpu.copy(self._output_array, self._gpu_output)
+                #for bi in range(self._batch_size):
+                #    self._output_array[bi] = softmax(self._output_array[bi])
+
+#
+#
                     #print self._output_array[bi]
                     #for m in range(self._output_array[bi].shape[0]):
                     #    print "%f" % self._output_array[bi][m]

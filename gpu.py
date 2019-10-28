@@ -32,19 +32,18 @@ __kernel void k_softmax(__global float* in, int num)
     max = 0.0;
     sum = 0.0;
     
-    for (int i;i<num;i++){
+    for (int i=0;i<num;i++){
         if (in[i]>max){
             max = in[i];
         }
     }
     
-    for (int i;i<num;i++){
-        in[i] = in[i] - max;
-        sum += in[i];
+    for (int i=0;i<num;i++){
+        sum += exp(in[i] - max);
     }
 
-    for (int i;i<num;i++){
-        in[i] = in[i]/sum;
+    for (int i=0;i<num;i++){
+        in[i] = exp(in[i]-max)/sum;
     }
 }
 
@@ -271,6 +270,10 @@ class Gpu:
         event = self.prg.k_sum(self._queue, (num_node, num_batch), None,
                                data_in, data_out,
                                np.int32(num_input), np.int32(num_node), np.int32(activation))
+        event.wait()
+    
+    def k_softmax(self, data, size, num_batch):
+        event = self.prg.k_softmax(self._queue, (num_batch,), None, data, np.int32(size))
         event.wait()
 #
 #

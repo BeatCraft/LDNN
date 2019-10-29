@@ -34,7 +34,7 @@ sys.setrecursionlimit(10000)
 if __name__=='__main__':
     print ">> start"
     sts = 0
-    batch_size = 100
+    batch_size = 2000
     data_size = 28*28
     it = 20*10
     # GPU

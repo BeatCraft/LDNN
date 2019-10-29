@@ -23,6 +23,22 @@ __kernel void scale(
     }
 };
 
+__kernel void k_cross_entropy(__global float* infs,
+                              __global float* output,
+                              __global int* labels,
+                              int num)
+{
+    int bi = get_global_id(0);
+    float delta;
+    float k;
+    int i;
+    
+    delta = 0.0000001;
+    i = labels[bi];
+    k = infs[bi*10+i]+delta;    
+    output[bi] = -log(k);
+}
+
 __kernel void k_softmax(__global float* in, int num)
 {
     int bi = get_global_id(0);
@@ -33,17 +49,17 @@ __kernel void k_softmax(__global float* in, int num)
     sum = 0.0;
     
     for (int i=0;i<num;i++){
-        if (in[i]>max){
-            max = in[i];
+        if (in[bi*num+i]>max){
+            max = in[bi*num+i];
         }
     }
     
     for (int i=0;i<num;i++){
-        sum += exp(in[i] - max);
+        sum += exp(in[bi*num+i]-max);
     }
 
     for (int i=0;i<num;i++){
-        in[i] = exp(in[i]-max)/sum;
+        in[bi*num+i] = exp(in[bi*num+i]-max)/sum;
     }
 }
 
@@ -122,6 +138,9 @@ __kernel void multiple_x_by_w_batch(
     y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
 };
 
+// stride_1 : num_node * num_input
+// stride_2 : num_input
+
 __kernel void multiple_x_by_w_batch_alt(
     __global float* x,
     __global float* w,
@@ -155,9 +174,6 @@ __kernel void multiple_x_by_w(
     int j = get_global_id(1); // num_node
     
     y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
-//    if (j==9){
-//        printf(\"gpu(%f)(%f) [%d]\\n\", x[stride_2*bi + i], w[stride_2*j+i], i);
-//    }
 };
 
 __kernel void multiple_x_by_w_alt(
@@ -274,6 +290,11 @@ class Gpu:
     
     def k_softmax(self, data, size, num_batch):
         event = self.prg.k_softmax(self._queue, (num_batch,), None, data, np.int32(size))
+        event.wait()
+    
+    def k_cross_entropy(self, infs, output, labels, size, num_batch):
+        event = self.prg.k_cross_entropy(self._queue, (num_batch,), None,
+                                        infs, output, labels, np.int32(size))
         event.wait()
 #
 #

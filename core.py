@@ -206,8 +206,11 @@ class Layer:
                 activation = 1
                 self._gpu.k_sum(self._gpu_product, self._gpu_output,
                                 self._num_input, self._num_node, activation, self._batch_size)
-                self._gpu.k_softmax(self._gpu_output, self._num_node, self._batch_size)
+                #
                 #self._gpu.copy(self._output_array, self._gpu_output)
+                #print self._output_array
+                #
+                self._gpu.k_softmax(self._gpu_output, self._num_node, self._batch_size)
                 #
             # for
         # else
@@ -272,7 +275,9 @@ class Roster:
         self.layers = []
         self._batch_size = 1
     
-    def set_batch(self, batch, batch_size, data_size, num_class, debug=0):
+#    def set_batch(self, batch, batch_size, data_size, num_class, debug=0):
+    def set_batch(self, data, labels, batch_size, data_size, num_class, debug=0):
+    
         self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
         self._gpu_input = self._gpu.dev_malloc(self._batch_data)
         self._batch_class = np.zeros(batch_size, dtype=np.int32)
@@ -280,23 +285,20 @@ class Roster:
         self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
         self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
         
-        self._batch_size = batch_size
         self.num_class = num_class
-        #
+        self._batch_size = batch_size
         for layer in self.layers:
             layer.set_batch(batch_size)
         
-        layer = self.getLayerAt(0) # input layer
         for i in range(batch_size):
-            entry = batch[i]
-            self._batch_data[i] = entry[0].copy()
-            self._batch_class[i] = entry[1]
-        #
-        #print self._batch_class
+            self._batch_data[i] = data[i]
+            self._batch_class[i] = labels[i]
         #
         self._gpu.copy(self._gpu_labels, self._batch_class)
         self._gpu.copy(self._gpu_input, self._batch_data)
-        layer._gpu.scale(self._gpu_input, layer._gpu_output, 28*28, float(255.0), layer._num_node, batch_size, 0)
+        layer = self.getLayerAt(0) # input layer
+        layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0),
+                         layer._num_node, batch_size, 0)
         ### debug use ###
         if debug:
             self._gpu.copy(layer._output_array, layer._gpu_output)
@@ -364,7 +366,7 @@ class Roster:
         ret = []
         c = self.countLayers()
         output = self.getLayerAt(c-1)
-        output._gpu.copy(self._output_array, self._gpu_output)
+        output._gpu.copy(output._output_array, output._gpu_output)
         return output._output_array
         
     def get_cross_entropy(self):

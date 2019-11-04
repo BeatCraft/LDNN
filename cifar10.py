@@ -337,11 +337,11 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    it = 20*10
+    it = 20*20
     package = -1
     mode = -1
     #
-    batch_size = 100
+    batch_size = 1000
     #num_class = 10
     #data_size = 32*32*3
 

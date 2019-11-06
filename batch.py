@@ -36,7 +36,7 @@ if __name__=='__main__':
     sts = 0
     batch_size = 2000
     data_size = 28*28
-    it = 20*10
+    it = 20*20
     # GPU
     # 0 : AMD Server
     # 1 : Intel on MBP

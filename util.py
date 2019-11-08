@@ -248,18 +248,23 @@ MNIST_IMAGE_WIDTH = 28
 MNIST_IMAGE_HEIGHT = 28
 MNIST_NUM_CLASS = 10
 MNIST_IMAGE_SIZE = MNIST_IMAGE_WIDTH*MNIST_IMAGE_HEIGHT
-MNIST_TRAIN_IMAGE_PATH = "./MNIST/train-images-idx3-ubyte"
-MNIST_TRAIN_LABEL_PATH = "./MNIST/train-labels-idx1-ubyte"
-MNIST_TRAIN_IMAGE_BATCH_PATH = "./MNIST/train_image_batch.pickle"
-MNIST_TRAIN_LABEL_BATCH_PATH = "./MNIST/train_label_batch.pickle"
-MNIST_TEST_IMAGE_PATH = "./MNIST/t10k-images-idx3-ubyte"
-MNIST_TEST_LABEL_PATH = "./MNIST/t10k-labels-idx1-ubyte"
-MNIST_TEST_IMAGE_BATCH_PATH = "./MNIST/test_image_batch.pickle"
-MNIST_TEST_LABEL_BATCH_PATH = "./MNIST/test_label_batch.pickle"
+MNIST_TRAIN_IMAGE_PATH = "./package/MNIST/train-images-idx3-ubyte"
+MNIST_TRAIN_LABEL_PATH = "./package/MNIST/train-labels-idx1-ubyte"
+MNIST_TRAIN_IMAGE_BATCH_PATH = "./config/MNIST/train_image_batch.pickle"
+MNIST_TRAIN_LABEL_BATCH_PATH = "./config/MNIST/train_label_batch.pickle"
+MNIST_TEST_IMAGE_PATH = "./package/MNIST/t10k-images-idx3-ubyte"
+MNIST_TEST_LABEL_PATH = "./package/MNIST/t10k-labels-idx1-ubyte"
+MNIST_TEST_IMAGE_BATCH_PATH = "./config/MNIST/test_image_batch.pickle"
+MNIST_TEST_LABEL_BATCH_PATH = "./config/MNIST/test_label_batch.pickle"
+MNIST_WI_CSV_PATH = "./config/MNIST/wi.csv"
+MNIST_W_PROPERTY_CSV_PATH = "./config/cifar-10-batches-py/w_property.csv"
+MNIST_W_LOCK_CSV_PATH = "./config/cifar-10-batches-py/w_lock.csv"
 
 class Mnist:
     def __init__(self, mode=0): # 0 : train, 1 : test, 2 : self-test
         print "mnist"
+        self._wi_csv_path = MNIST_WI_CSV_PATH
+        #
         if mode==0 or mode==2:
             self._mode = 0 # 0 : train, 1 : test
             if os.path.isfile(MNIST_TRAIN_IMAGE_BATCH_PATH) and os.path.isfile(MNIST_TRAIN_LABEL_BATCH_PATH):
@@ -325,7 +330,18 @@ class Mnist:
         hidden_layer_3 = r.add_layer(1, 32, 32)
         hidden_layer_4 = r.add_layer(1, 32, 32)
         output_layer = r.add_layer(2, 32, 10)
-    
+        #
+        if os.path.isfile(self._wi_csv_path):
+            print "restore weight index"
+            r.import_weight_index(self._wi_csv_path)
+        else:
+            print "init weight index"
+            r.init_weight()
+            r.export_weight_index(self._wi_csv_path)
+        #
+        if my_gpu:
+            r.update_weight()
+        #
         return r
 #
 #
@@ -337,18 +353,21 @@ CIFAR10_IMAGE_HEIGHT = 32
 CIFAR10_NUM_CLASS = 10
 CIFAR10_IMAGE_SIZE = CIFAR10_IMAGE_WIDTH*CIFAR10_IMAGE_HEIGHT*3
 CIFAR10_IMAGE_Y_SIZE = CIFAR10_IMAGE_WIDTH*CIFAR10_IMAGE_HEIGHT
-
-CIFAR10_TRAIN_DATA_PATH = "./cifar-10-batches-py/data_batch_1"
-CIFAR10_TRAIN_IMAGE_BATCH_PATH = "./cifar-10-batches-py/train_image_batch.pickle"
-CIFAR10_TRAIN_LABEL_BATCH_PATH = "./cifar-10-batches-py/train_label_batch.pickle"
-
-CIFAR10_TEST_DATA_PATH = "./cifar-10-batches-py/test_batch"
-CIFAR10_TEST_IMAGE_BATCH_PATH = "./cifar-10-batches-py/test_image_batch.pickle"
-CIFAR10_TEST_LABEL_BATCH_PATH = "./cifar-10-batches-py/test_label_batch.pickle"
+CIFAR10_TRAIN_DATA_PATH = "./package/cifar-10-batches-py/data_batch_1"
+CIFAR10_TRAIN_IMAGE_BATCH_PATH = "./config/cifar-10-batches-py/train_image_batch.pickle"
+CIFAR10_TRAIN_LABEL_BATCH_PATH = "./config/cifar-10-batches-py/train_label_batch.pickle"
+CIFAR10_TEST_DATA_PATH = "./package/cifar-10-batches-py/test_batch"
+CIFAR10_TEST_IMAGE_BATCH_PATH = "./config/cifar-10-batches-py/test_image_batch.pickle"
+CIFAR10_TEST_LABEL_BATCH_PATH = "./config/cifar-10-batches-py/test_label_batch.pickle"
+CIFAR10_WI_CSV_PATH = "./config/cifar-10-batches-py/wi.csv"
+CIFAR10_W_PROPERTY_CSV_PATH = "./config/cifar-10-batches-py/w_property.csv"
+CIFAR10_W_LOCK_CSV_PATH = "./config/cifar-10-batches-py/w_lock.csv"
 #
 class Cifar10:
     def __init__(self, mode=0): # 0 : train, 1 : test, 2 : self-test
         print "cifar10(%d)" % (mode)
+        self._wi_csv_path = CIFAR10_WI_CSV_PATH
+        #
         if mode==0 or mode==2:
             self._mode = 0 # train
             if os.path.isfile(CIFAR10_TRAIN_IMAGE_BATCH_PATH) and os.path.isfile(CIFAR10_TRAIN_LABEL_BATCH_PATH):
@@ -402,5 +421,16 @@ class Cifar10:
         hidden_layer_1 = r.add_layer(1, CIFAR10_IMAGE_Y_SIZE, 32)
         hidden_layer_2 = r.add_layer(1, 32, 32)
         output_layer = r.add_layer(2, 32, 10)
+        #
+        if os.path.isfile(self._wi_csv_path):
+            print "restore weight index"
+            r.import_weight_index(self._wi_csv_path)
+        else:
+            print "init weight index"
+            r.init_weight()
+            r.export_weight_index(self._wi_csv_path)
+        #
+        if my_gpu:
+            r.update_weight()
         #
         return r

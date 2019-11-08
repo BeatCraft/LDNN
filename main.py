@@ -273,7 +273,7 @@ def train(it, r, limit):
 #
 #
 #
-def loop(it, r):
+def loop(it, r, package, debug=0):
     h_cnt_list = []
     c_cnt_list = []
     ce_list = []
@@ -281,8 +281,7 @@ def loop(it, r):
     limit = 0.000001
     pre_ce = 0.0
     #
-    save_path = "./test/wi.csv.init"
-    r.export_weight_index(save_path)
+    start_time = time.time()
     #
     for i in range(it):
         h_cnt, c_cnt, ce = train(i, r, limit)
@@ -290,11 +289,12 @@ def loop(it, r):
         h_cnt_list.append(h_cnt)
         c_cnt_list.append(c_cnt)
         ce_list.append(ce)
-        r.export_weight_index(WEIGHT_INDEX_CSV_PATH)
+        # debug
+        if debug==1:
+            save_path = "./debug/wi.csv.%f" % ce
+            r.export_weight_index(save_path)
         #
-        save_path = "./test/wi.csv.%f" % ce
-        r.export_weight_index(save_path)
-        #
+        r.export_weight_index(package._wi_csv_path)
         if pre_ce == ce:
             print "locked with local optimum"
             print "exit iterations"
@@ -304,9 +304,13 @@ def loop(it, r):
             print "exit iterations"
             break
         #
-        r.reset_weight_property()
-        r.unlock_weight_all()
+        #r.reset_weight_property()
+        #r.unlock_weight_all()
         pre_ce = ce
+    #
+    elapsed_time = time.time() - start_time
+    t = format(elapsed_time, "0")
+    print "time = %s" % (t)
     #
     k = len(h_cnt_list)
     for j in range(k):
@@ -337,6 +341,7 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
+    debug = 1
     it = 20*20
     package = -1
     mode = -1
@@ -388,7 +393,7 @@ def main():
     # GPU
     #
     platform_id = 0
-    device_id = 1 # 0 : AMD Server, 1 : Intel on MBP 2 : eGPU (AMD Radeon Pro 580)
+    device_id = 2 # 0 : AMD Server, 1 : Intel on MBP 2 : eGPU (AMD Radeon Pro 580)
     #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
@@ -404,20 +409,9 @@ def main():
             print "fatal DNN error"
             return 0
         #
-        if os.path.isfile(path):
-            print "restore weight index"
-            r.import_weight_index(WEIGHT_INDEX_CSV_PATH)
-        else:
-            print "init weight index"
-            r.init_weight()
-            r.export_weight_index(WEIGHT_INDEX_CSV_PATH)
-        #
-        if my_gpu:
-            r.update_weight()
-        #
         if mode==0: # train
             r.set_batch(mnist._data, mnist._labels, batch_size, util.MNIST_IMAGE_SIZE, util.MNIST_NUM_CLASS)
-            loop(it, r)
+            loop(it, r, mnist, debug)
         elif mode==1: # test
             batch_size = util.MNIST_TEST_BATCH_SIZE
             r.set_batch(mnist._data, mnist._labels, batch_size, util.MNIST_IMAGE_SIZE, util.MNIST_NUM_CLASS)
@@ -433,20 +427,9 @@ def main():
             print "fatal DNN error"
             return 0
         #
-        if os.path.isfile(path):
-            print "restore weight index"
-            r.import_weight_index(WEIGHT_INDEX_CSV_PATH)
-        else:
-            print "init weight index"
-            r.init_weight()
-            r.export_weight_index(WEIGHT_INDEX_CSV_PATH)
-        #
-        if my_gpu:
-            r.update_weight()
-        #
         if mode==0: # train
             r.set_batch(cifar10._data, cifar10._labels, batch_size, util.CIFAR10_IMAGE_Y_SIZE, util.CIFAR10_NUM_CLASS)
-            loop(it, r)
+            loop(it, r, cifar10, debug)
         elif mode==1: # test
             batch_size = util.MNIST_TEST_BATCH_SIZE
             r.set_batch(cifar10._data, cifar10._labels, batch_size, util.CIFAR10_IMAGE_Y_SIZE, util.CIFAR10_NUM_CLASS)

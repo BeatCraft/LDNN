@@ -170,34 +170,62 @@ def weight_shift_mode(r, li, ni, ii, mse_base, mode):
     wi_alt = wi
     #
     if lock>0:
-        print "    locked"
         return mse_base, 0
     #
     if mode>0: # heat
-        if wi==core.WEIGHT_INDEX_MAX:
-            print "    skip : MAX"
-            layer.set_weight_property(ni, ii, 0)
+        if wp<0:
             return mse_base, 0
         #
-    else:
-        if wi==core.WEIGHT_INDEX_MIN:
-            print "    skip : MIN"
+        if wi==core.WEIGHT_INDEX_MAX:
             layer.set_weight_property(ni, ii, 0)
+            #
+            layer.set_weight_index(ni, ii, wi-1)
+            layer.update_weight_gpu()
+            r.propagate()
+            mse_base = r.get_cross_entropy()
+            return mse_base, 1
+            #
+#            wi_alt = wi -1
+#            r.propagate(li, ni, ii, wi_alt, 0)
+#            mse_alt = r.get_cross_entropy()
+#            if  mse_alt<mse_base:
+#                layer.set_weight_property(ni, ii, -1)
+#                layer.set_weight_index(ni, ii, wi_alt)
+#                layer.update_weight_gpu()
+#                return mse_base, 1
+            #
+#            layer.set_weight_lock(ni, ii, 1)
+#            return mse_base, 0
+        #
+    else:
+        if wp>0:
             return mse_base, 0
+        #
+        if wi==core.WEIGHT_INDEX_MIN:
+            layer.set_weight_property(ni, ii, 0)
+            #
+            layer.set_weight_index(ni, ii, wi+1)
+            layer.update_weight_gpu()
+            r.propagate()
+            mse_base = r.get_cross_entropy()
+            return mse_base, 1
         #
     #
     wi_alt = wi + mode
     r.propagate(li, ni, ii, wi_alt, 0)
     mse_alt = r.get_cross_entropy()
+    #
     if  mse_alt<mse_base:
-        print "    update : %d >> %d : %f" % (wi, wi_alt, mse_base)
         layer.set_weight_property(ni, ii, mode)
         layer.set_weight_index(ni, ii, wi_alt)
         layer.update_weight_gpu()
         return mse_alt, 1
     #
+#    if wp!=mode:
+#        layer.set_weight_lock(ni, ii, 1)
+#    else:
     layer.set_weight_property(ni, ii, 0)
-    print "    skip : %f" % (mse_base)
+    #
     return mse_base, 0
 #
 #
@@ -228,8 +256,9 @@ def train(it, r, limit):
             w_p = num_w/divider
             for p in range(w_p):
                 ii = random.randrange(num_w)
-                print "[%d] H=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, h_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
                 mse_base, ret = weight_shift_mode(r, li, ni, ii, mse_base, 1)
+                if ret>0:
+                    print "[%d] H=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, h_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
                 #print "    %f" % mse_base
                 #
                 h_cnt = h_cnt + ret
@@ -256,8 +285,9 @@ def train(it, r, limit):
             w_p = num_w/divider
             for p in range(w_p):
                 ii = random.randrange(num_w)
-                print "[%d] C=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, c_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
                 mse_base, ret = weight_shift_mode(r, li, ni, ii, mse_base, -1)
+                if ret>0:
+                    print "[%d] C=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, c_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
                 #print "    %f" % mse_base
                 #
                 c_cnt = c_cnt + ret
@@ -280,6 +310,7 @@ def loop(it, r, package, debug=0):
     #
     limit = 0.000001
     pre_ce = 0.0
+    lim_cnt = 0
     #
     start_time = time.time()
     #
@@ -296,9 +327,12 @@ def loop(it, r, package, debug=0):
         #
         r.export_weight_index(package._wi_csv_path)
         if pre_ce == ce:
-            print "locked with local optimum"
-            print "exit iterations"
-            break
+            lim_cnt = lim_cnt + 1
+            if lim_cnt>5:
+                print "locked with local optimum"
+                print "exit iterations"
+                break
+            #
         #
         if ce<limit:
             print "exit iterations"
@@ -346,7 +380,7 @@ def main():
     package = -1
     mode = -1
     #
-    batch_size = 1000
+    batch_size = 5000
     #num_class = 10
     #data_size = 32*32*3
 
@@ -393,7 +427,7 @@ def main():
     # GPU
     #
     platform_id = 0
-    device_id = 2 # 0 : AMD Server, 1 : Intel on MBP 2 : eGPU (AMD Radeon Pro 580)
+    device_id = 1 # 0 : AMD Server, 1 : Intel on MBP 2 : eGPU (AMD Radeon Pro 580)
     #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()

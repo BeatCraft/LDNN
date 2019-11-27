@@ -42,6 +42,8 @@ def main():
     batch_size = 60000
     batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
     batch_label = np.zeros(batch_size, dtype=np.int32)
+    divider = 10
+    total = 0
     
     pic_index = 0
     for cat in range(10):
@@ -53,29 +55,28 @@ def main():
                 reader = csv.reader(f)
                 n = 0
                 for row in reader:
-                    #print n
-                    #print len(row)
-                    i = 0
-                    #for cell in row:
-                    for i in range(data_size):
-                        cell = row[i]
-                        tmp = int(cell)
-                        batch_data[pic_index][i] = float(tmp)
-                        i = i + 1
+                    left = pic_index%divider
+                    if left==0:
+                        i = 0
+                        for i in range(data_size):
+                            cell = row[i]
+                            tmp = int(cell)
+                            batch_data[pic_index][i] = float(tmp)
+                            i = i + 1
+                        #
+                        batch_label[pic_index] = cat
+                        n = n + 1
                     #
-                    #print batch_data[pic_index]
-                    batch_label[pic_index] = cat
-                    n = n + 1
                     pic_index = pic_index +1
                 # for
+                total = total + n
                 print n
             # with
         #
     #
-    print pic_index
-    print batch_label
-    
-
+    util.pickle_save("./package/MNIST2/train_image_batch.pickle", batch_data)
+    util.pickle_save("./package/MNIST2/train_label_batch.pickle", batch_label)
+    print total
     #
     return 0
 #

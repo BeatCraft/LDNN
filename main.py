@@ -3,7 +3,7 @@
 #
 
 #
-# LDNN : lesser Deep Neural Network
+# LDNN : lesser's Deep Neural Network
 #
 
 #
@@ -31,26 +31,6 @@ sys.setrecursionlimit(10000)
 #
 # constant values
 #
-#TRAIN_BASE_PATH  = "./data/train/"
-#TRAIN_BATCH_PATH = "./train_batch.pickle"
-#TEST_BASE_PATH   = "./data/test/"
-#TEST_BATCH_PATH = "./test_batch.pickle"
-#TRAIN_IMAGE_PATH  = "./MNIST/train-images-idx3-ubyte"
-#TRAIN_LABEL_PATH = "./MNIST/train-labels-idx1-ubyte"
-#TEST_IMAGE_PATH   = "./MNIST/t10k-images-idx3-ubyte"
-#TEST_LABEL_PATH   = "./MNIST/t10k-labels-idx1-ubyte"
-
-#MNIST_IMAGE_WIDTH  = 28
-#MNIST_IMAGE_HEIGHT = 28
-#MNIST_IMAGE_SIZE   = MNIST_IMAGE_WIDTH*MNIST_IMAGE_HEIGHT
-#NUM_OF_CLASS     = 10    # 0,1,2,3,4,5,6,7,8,9
-#NUM_OF_SAMPLES   = 5000  # must be 5,000 per a class
-#NUM_OF_TEST      = 500
-#TRAIN_BATCH_SIZE  = 60000
-#TEST_BATCH_SIZE   = 10000
-#IMAGE_HEADER_SIZE = 16
-#LABEL_HEADER_SIZE  = 8
-
 WEIGHT_INDEX_CSV_PATH = "./wi.csv"
 #
 #
@@ -235,7 +215,6 @@ def train(it, r, limit):
     t_cnt = 0
     h_cnt = 0
     c_cnt = 0
-    #labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
     w_list = []
     #
     r.propagate()
@@ -375,103 +354,90 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
+#    path = WEIGHT_INDEX_CSV_PATH
+#    if argc==2:
+#        path = argvs[1]
+#
     debug = 1
     it = 20*20
-    package = -1
-    mode = -1
-    #
-    batch_size = 5000
-    #num_class = 10
-    #data_size = 32*32*3
-
-    print "0 : MNIST : train"
-    print "1 : MNIST : test"
-    print "2 : MNIST : self-test"
-    print "3 : CIFAR-10 : train"
-    print "4 : CIFAR-10 : test"
-    print "5 : CIFAR-10 : self-test"
-    print "6 : "
-    print "7 : "
-    print "8 : "
-    print "9 : "
-    menu = get_key_input("input command >")
-    if menu==0:
-        # MNIST : train
-        package = 0
-        mode = 0
-    elif menu==1:
-        # MNIST : test
-        package = 0
-        mode = 1
-    elif menu==2:
-        # MNIST : self-test
-        package = 0
-        mode = 2
-    elif menu==3:
-        # CIFAR-10 : train
-        package = 1
-        mode = 0
-    elif menu==4:
-        # CIFAR-10 : test
-        package = 1
-        mode = 1
-    elif menu==5:
-        # CIFAR-10 : self-test
-        package = 1
-        mode = 2
-    #
-    if package<0 or mode<0:
-        print "bad menu select"
-        return 0
+    batch_size = 6000
     #
     # GPU
     #
     platform_id = 0
-    device_id = 1 # 0 : AMD Server, 1 : Intel on MBP 2 : eGPU (AMD Radeon Pro 580)
+    device_id = 1
+    print "- Select a GPU -"
+    print "0 : AMD Server"
+    print "1 : Intel on MBP"
+    print "2 : eGPU (AMD Radeon Pro 580)"
+    menu = get_key_input("input command >")
+    if menu==0:
+        device_id = 0
+    elif menu==1:
+        device_id = 1
+    elif menu==2:
+        device_id = 2
+    else:
+        device_id = 1
     #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
     #
-    path = WEIGHT_INDEX_CSV_PATH
-    if argc==2:
-        path = argvs[1]
     #
-    if package==0: # MNIST
-        mnist = util.Mnist(mode)
-        r = mnist.setup_dnn(my_gpu)
-        if r is None:
-            print "fatal DNN error"
-            return 0
-        #
-        if mode==0: # train
-            r.set_batch(mnist._data, mnist._labels, batch_size, util.MNIST_IMAGE_SIZE, util.MNIST_NUM_CLASS)
-            loop(it, r, mnist, debug)
-        elif mode==1: # test
-            batch_size = util.MNIST_TEST_BATCH_SIZE
-            r.set_batch(mnist._data, mnist._labels, batch_size, util.MNIST_IMAGE_SIZE, util.MNIST_NUM_CLASS)
-            test(r)
-        elif mode==2: # self-test
-            r.set_batch(mnist._data, mnist._labels, batch_size, util.MNIST_IMAGE_SIZE, util.MNIST_NUM_CLASS)
-            test(r)
-        #
-    elif package==1: # CIFAR-10
-        cifar10 = util.Cifar10(mode)
-        r = cifar10.setup_dnn(my_gpu)
-        if r is None:
-            print "fatal DNN error"
-            return 0
-        #
-        if mode==0: # train
-            r.set_batch(cifar10._data, cifar10._labels, batch_size, util.CIFAR10_IMAGE_Y_SIZE, util.CIFAR10_NUM_CLASS)
-            loop(it, r, cifar10, debug)
-        elif mode==1: # test
-            batch_size = util.MNIST_TEST_BATCH_SIZE
-            r.set_batch(cifar10._data, cifar10._labels, batch_size, util.CIFAR10_IMAGE_Y_SIZE, util.CIFAR10_NUM_CLASS)
-            test(r)
-        elif mode==2: # self-test
-            r.set_batch(cifar10._data, cifar10._labels, batch_size, util.CIFAR10_IMAGE_Y_SIZE, util.CIFAR10_NUM_CLASS)
-            test(r)
-        #
+    #
+    package_id = 0
+    print "- Select a package -"
+    print "0 : MNIST"
+    print "1 : MNIST2 (clustered data set)"
+    print "2 : CIFAR-10"
+    menu = get_key_input("input command >")
+    if menu==0:
+        package_id = 0
+    elif menu==1:
+        package_id = 1
+    elif menu==2:
+        package_id = 2
+    else:
+        package_id = 0
+    #
+    #
+    #
+    mode = 1
+    print "0 : train"
+    print "1 : test"
+    print "2 : self-test"
+    print "3 : "
+    menu = get_key_input("input command >")
+    if menu==0:
+        mode = 0
+    elif menu==1:
+        mode = 1
+    elif menu==2:
+        mode = 2
+    else:
+        mode = 1
+    #
+    #
+    #
+    package = util.Package(package_id)
+    r = package.setup_dnn(my_gpu)
+    if r is None:
+        print "fatal DNN error"
+        return 0
+    #
+    if mode==0: # train
+        r.set_batch(package._train_image_batch, package._train_label_batch,
+                    batch_size, package._image_size, package._num_class)
+        loop(it, r, package, debug)
+    elif mode==1: # test
+        batch_size = package._test_batch_size
+        r.set_batch(package._test_image_batch, package._test_label_batch,
+                    batch_size, package._image_size, package._num_class)
+        test(r)
+    elif mode==2: # self-test
+        r.set_batch(package._train_image_batch, package._train_label_batch,
+        batch_size, package._image_size, package._num_class)
+        test(r)
     #
     return 0
 #

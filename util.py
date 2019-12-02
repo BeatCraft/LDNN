@@ -525,31 +525,36 @@ class Mnist2:
 #
 #
 TRAIN_IMAGE_PATH = ["./package/MNIST/train-images-idx3-ubyte",
-                    "",
+                    "./",
                     "./package/cifar-10-batches-py/data_batch_1"]
 TRAIN_LABEL_PATH = ["./package/MNIST/train-labels-idx1-ubyte",
-                    "",
+                    "./",
                     "./config/cifar-10-batches-py/train_label_batch.pickle"]
 TRAIN_IMAGE_BATCH_PATH = ["./config/MNIST/train_image_batch.pickle",
-                          "./config/MNIST2/train_image_batch.pickle"
+                          "./config/MNIST2/train_image_batch.pickle",
                           "./config/cifar-10-batches-py/train_image_batch.pickle"]
 TRAIN_LABEL_BATCH_PATH = ["./config/MNIST/train_label_batch.pickle",
                           "./config/MNIST2/train_label_batch.pickle",
                           "./config/cifar-10-batches-py/train_label_batch.pickle"]
-TRAIN_BATCH_SIZE = [60000, 10000, 6000]
-TEST_IMAGE_PATH = ["./package/MNIST/t10k-images-idx3-ubyte", ]
-TEST_LABEL_PATH = ["./package/MNIST/t10k-labels-idx1-ubyte"]
+TRAIN_BATCH_SIZE = [60000, 6000, 10000]
+TEST_BATCH_SIZE = [10000, 10000, 10000]
+TEST_IMAGE_PATH = ["./package/MNIST/t10k-images-idx3-ubyte",
+                   "./package/MNIST/t10k-images-idx3-ubyte",
+                   "./"]
+TEST_LABEL_PATH = ["./package/MNIST/t10k-labels-idx1-ubyte",
+                   "./package/MNIST/t10k-labels-idx1-ubyte",
+                   "./"]
 TEST_IMAGE_BATCH_PATH = ["./config/MNIST/test_image_batch.pickle",
                          "./config/MNIST/test_image_batch.pickle",
                          "./config/cifar-10-batches-py/test_image_batch.pickle"]
 TEST_LABEL_BATCH_PATH = ["./config/MNIST/test_label_batch.pickle",
                          "./config/MNIST/test_label_batch.pickle",
                          "./config/cifar-10-batches-py/test_label_batch.pickle"]
-TEST_BATCH_SIZE = [10000, 10000, 10000]
+
 PACKAGE_NAME = ["MNIST", "MNIST2", "cifar-10-batches-py"]
 PACKAGE_IMAGE_WIDTH = [28, 32, 32]
 PACKAGE_IMAGE_HEIGHT = [28, 32, 32]
-PACKAGE_IMAGE_SIZE = [784, 1024, 784]
+PACKAGE_IMAGE_SIZE = [784, 784, 1024]
 PACKAGE_NUM_CLASS = [10, 10, 10]
 
 class Package:
@@ -557,21 +562,26 @@ class Package:
         self._package_id = package_id
         self._image_size = PACKAGE_IMAGE_SIZE[package_id]
         self._num_class = PACKAGE_NUM_CLASS[package_id]
+        self._train_batch_size = TRAIN_BATCH_SIZE[package_id]
         self._test_batch_size = TEST_BATCH_SIZE[package_id]
         #
         self._wi_csv_path = "./config/%s/wi.csv" % (PACKAGE_NAME[package_id])
+        #
         self._train_image_path = TRAIN_IMAGE_PATH[package_id]
         self._train_label_path = TRAIN_LABEL_PATH[package_id]
-        self._train_image_batch_path = TRAIN_IMAGE_BATCH_PATH[package_id]
-        self._train_label_batch_path = TRAIN_LABEL_BATCH_PATH[package_id]
         self._test_image_path = TEST_IMAGE_PATH[package_id]
         self._test_label_path = TEST_LABEL_PATH[package_id]
+        #
+        self._train_image_batch_path = TRAIN_IMAGE_BATCH_PATH[package_id]
+        self._train_label_batch_path = TRAIN_LABEL_BATCH_PATH[package_id]
         self._test_image_batch_path = TEST_IMAGE_BATCH_PATH[package_id]
         self._test_label_batch_path = TEST_LABEL_BATCH_PATH[package_id]
         #
+        
+    def load_batch(self):
         if os.path.isfile(self._train_image_batch_path):
             print "restore train image batch"
-            self._train_image_batch = pickle_load(self._test_image_batch_path)
+            self._train_image_batch = pickle_load(self._train_image_batch_path)
         else:
             print "fatal error : no train image batch"
         #
@@ -603,8 +613,27 @@ class Package:
         r = core.Roster()
         r.set_gpu(my_gpu)
         #
-        if self._package_id==0:
-            input_layer = r.add_layer(0, MNIST_IMAGE_SIZE, MNIST_IMAGE_SIZE)
+        if self._package_id==0: # MNIST
+            input_layer = r.add_layer(0, self._image_size, self._image_size)
+            hidden_layer_1 = r.add_layer(1, MNIST_IMAGE_SIZE, 32)
+            hidden_layer_2 = r.add_layer(1, 32, 32)
+            hidden_layer_3 = r.add_layer(1, 32, 32)
+            hidden_layer_4 = r.add_layer(1, 32, 32)
+            output_layer = r.add_layer(2, 32, 10)
+            #
+            if os.path.isfile(self._wi_csv_path):
+                print "restore weight index"
+                r.import_weight_index(self._wi_csv_path)
+            else:
+                print "init weight index"
+                r.init_weight()
+                r.export_weight_index(self._wi_csv_path)
+            #
+            if my_gpu:
+                r.update_weight()
+            #
+        elif self._package_id==1: # MNIST2 : selective clustered data
+            input_layer = r.add_layer(0, self._image_size, self._image_size)
             hidden_layer_1 = r.add_layer(1, MNIST_IMAGE_SIZE, 32)
             hidden_layer_2 = r.add_layer(1, 32, 32)
             hidden_layer_3 = r.add_layer(1, 32, 32)

@@ -360,7 +360,7 @@ def main():
 #
     debug = 1
     it = 20*20
-    batch_size = 6000
+    batch_size = 15000
     #
     # GPU
     #
@@ -370,7 +370,7 @@ def main():
     print "0 : AMD Server"
     print "1 : Intel on MBP"
     print "2 : eGPU (AMD Radeon Pro 580)"
-    menu = get_key_input("input command >")
+    menu = 1#get_key_input("input command >")
     if menu==0:
         device_id = 0
     elif menu==1:
@@ -390,7 +390,7 @@ def main():
     print "0 : MNIST"
     print "1 : MNIST2 (clustered data set)"
     print "2 : CIFAR-10"
-    menu = get_key_input("input command >")
+    menu = 0#get_key_input("input command >")
     if menu==0:
         package_id = 0
     elif menu==1:
@@ -426,15 +426,18 @@ def main():
         return 0
     #
     if mode==0: # train
+        package.load_batch()
         r.set_batch(package._train_image_batch, package._train_label_batch,
                     batch_size, package._image_size, package._num_class)
         loop(it, r, package, debug)
     elif mode==1: # test
+        package.load_batch()
         batch_size = package._test_batch_size
         r.set_batch(package._test_image_batch, package._test_label_batch,
                     batch_size, package._image_size, package._num_class)
         test(r)
     elif mode==2: # self-test
+        package.load_batch()
         r.set_batch(package._train_image_batch, package._train_label_batch,
         batch_size, package._image_size, package._num_class)
         test(r)

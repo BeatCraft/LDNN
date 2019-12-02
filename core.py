@@ -286,6 +286,9 @@ class Roster:
 #    def set_batch(self, batch, batch_size, data_size, num_class, debug=0):
     def set_batch(self, data, labels, batch_size, data_size, num_class, debug=0):
     
+        print data.shape[0]
+        print len(labels)#.shape[0]
+    
         self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
         self._gpu_input = self._gpu.dev_malloc(self._batch_data)
         self._batch_class = np.zeros(batch_size, dtype=np.int32)

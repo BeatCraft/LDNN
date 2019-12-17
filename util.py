@@ -240,6 +240,16 @@ def csv_to_list(path):
 #
 #
 #
+def get_key_input(prompt):
+    try:
+        c = input(prompt)
+    except:
+        c = -1
+        
+    return c
+#
+#
+#
 MNIST_TRAIN_BATCH_SIZE  = 60000
 MNIST_TEST_BATCH_SIZE   = 10000
 MNIST_IMAGE_HEADER_SIZE = 16

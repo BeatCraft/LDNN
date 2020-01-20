@@ -615,10 +615,10 @@ class Package:
             print self._test_label_batch_path
             
     def setup_dnn(self, my_gpu):
-        if my_gpu:
-            pass
-        else:
-            return None
+#        if my_gpu:
+#            pass
+#        else:
+#            return None
         #
         r = core.Roster()
         r.set_gpu(my_gpu)

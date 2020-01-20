@@ -112,8 +112,8 @@ class ClientLooper():
             #
             try:
                 if data:
-                    pass
-                    #self.command(data, address)
+                    #pass
+                    self.command(data, address)
             except:
                 traceback.print_exc()
         # while

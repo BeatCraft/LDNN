@@ -27,13 +27,32 @@ def main():
     #self._sock.bind(("", self._local_port))
     msg = "test"
     ip = "127.0.0.1"
-    port = 5005
+    port = 5000
     #sock.sendto(msg, (ip, port))
+    
     
     values = (1, 'ab', 2.7)
     packer = struct.Struct('I 2s f')
     packed_data = packer.pack(*values)
     sock.sendto(packed_data, (ip, port))
+    
+    # 0x : init
+    #   00 : init : 0
+    #   01 : ack : 1 c_id
+    # 1x : Map WI (TBD)
+    #   10 : map
+    #   11 : OK
+    # 2x : train
+    #   20 : set alt : 20 li ni wi
+    #   21 : return cr : 21 c_id cr
+    #   22 : update : 22 li ni wi
+    #   23 : OK
+    
+    cmd = struct.Struct('I I f f')
+    cmd_init = (0, 0)
+    cmd_ack = ()
+    
+    
 
     print "main() : end"
 #

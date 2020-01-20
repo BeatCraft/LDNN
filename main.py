@@ -111,6 +111,8 @@ def test(r):
     t = format(elapsed_time, "0")
     print "time = %s" % (t)
     #
+    
+    #
     ca = 0
     for i in range(batch_size):
         dist[r._batch_class[i]] = dist[r._batch_class[i]] + 1
@@ -370,7 +372,7 @@ def main():
     print "0 : AMD Server"
     print "1 : Intel on MBP"
     print "2 : eGPU (AMD Radeon Pro 580)"
-    menu = 1#get_key_input("input command >")
+    menu = get_key_input("input command >")
     if menu==0:
         device_id = 0
     elif menu==1:
@@ -390,7 +392,7 @@ def main():
     print "0 : MNIST"
     print "1 : MNIST2 (clustered data set)"
     print "2 : CIFAR-10"
-    menu = 0#get_key_input("input command >")
+    menu = get_key_input("input command >")
     if menu==0:
         package_id = 0
     elif menu==1:

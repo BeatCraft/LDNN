@@ -26,9 +26,10 @@ def main():
     #sock.settimeout(1)
     msg = "test"
     ip = "127.0.0.1"
-    port = 5005
+    port = 5000
     sock.bind((ip, port))
-    unpacker = struct.Struct('I 2s f')
+    #unpacker = struct.Struct('I 2s f')
+    unpacker = struct.Struct('I I I I')
 
     while True:
         data, addr = sock.recvfrom(1024) # buffer size is 1024 bytes
@@ -36,6 +37,7 @@ def main():
         print data
         unpacked_data = unpacker.unpack(data)
         print unpacked_data
+        print addr
         #print >>sys.stderr, 'rcv "%s"' % #binascii.hexlify(unpacked_data), values
 
     print "main() : end"

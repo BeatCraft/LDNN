@@ -429,19 +429,16 @@ def main():
     #
     if mode==0: # train
         package.load_batch()
-        r.set_batch(package._train_image_batch, package._train_label_batch,
-                    batch_size, package._image_size, package._num_class)
+        r.set_batch(package._train_image_batch, package._train_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
         loop(it, r, package, debug)
     elif mode==1: # test
         package.load_batch()
         batch_size = package._test_batch_size
-        r.set_batch(package._test_image_batch, package._test_label_batch,
-                    batch_size, package._image_size, package._num_class)
+        r.set_batch(package._test_image_batch, package._test_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
         test(r)
     elif mode==2: # self-test
         package.load_batch()
-        r.set_batch(package._train_image_batch, package._train_label_batch,
-        batch_size, package._image_size, package._num_class)
+        r.set_batch(package._train_image_batch, package._train_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
         test(r)
     #
     return 0

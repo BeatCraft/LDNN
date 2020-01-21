@@ -6,7 +6,7 @@ import traceback
 import csv
 import socket
 import time
-import command
+#import command
 import multiprocessing
 import struct
 import binascii
@@ -106,7 +106,7 @@ class Looper(object):
         while not self._stop.value:
             print "  loop"
             print self._stop.value
-
+        #
         print "  stopped."
 
     def run(self):

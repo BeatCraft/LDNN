@@ -28,12 +28,6 @@ class ServerLooper(netutil.Looper):
         #
         super(ServerLooper, self).__init__(local_addr, local_port, remote_addr, remote_port)
         #
-        #self._local_addr = local_addr
-        #self._local_port = local_port
-        #self._remoto_addr = remote_addr
-        #self._remote_port = remote_port
-        #self._send_sock = None
-        #self._recv_sock = None
         self._send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self._client_num = 0
@@ -86,16 +80,6 @@ class ServerLooper(netutil.Looper):
         mode = 20
         return self.execute_cmd(mode, 0, 0, 0, 0)
         
-#        self.set_mode(mode)
-#        cmd = pack_i5(mode, 0, 0, 0, 0)
-#        self.send(cmd)
-#        #
-#        self.set_mode(mode+5)
-#        ret = self.recv_multi()
-#        #
-#        self.set_mode(mode+5)
-#        return ret
-        
     def set_alt(self, li, ni, ii, wi):
         mode = 30
         return self.execute_cmd(mode, li, ni, ii, wi)
@@ -122,13 +106,6 @@ class ServerLooper(netutil.Looper):
             elif mode==20: # evaluate
                 ce = self.evaluate()
                 print "evaluate :%f" % (ce)
-#                cmd = pack_i5(mode, 0, 1, 2, 0)
-#                self.send(cmd)
-#                self.set_mode(mode+5)
-#                #
-#                ret = self.recv_multi()
-#                print ret
-#                self.set_mode(0)
             elif mode==30: # alt
                 cmd = netutil.pack_i5(mode, 0, 1, 0, 0)
                 self.send(cmd)
@@ -147,9 +124,6 @@ class ServerLooper(netutil.Looper):
                 self.set_mode(0)
             elif mode==50: # train
                 self.train_loop()
-#                r = self._roster
-#                c = r.countLayers()
-#                print c
                 self.set_mode(0)
             else:
                 self.set_mode(0)
@@ -159,7 +133,6 @@ class ServerLooper(netutil.Looper):
 
 
     def weight_shift_mode(self, li, ni, ii, mse_base, mode):
-        #print "weight_shift_mode"
         r =  self._roster
         layer = r.getLayerAt(li)
         wp = layer.get_weight_property(ni, ii) # default : 0
@@ -357,9 +330,9 @@ class ServerLooper(netutil.Looper):
 def main():
     print "main() : start"
     #
-    BC_ADDR = "192.168.0.255"
+    BC_ADDR = "192.168.200.255"
     BC_PORT = 5000
-    SERVER_ADDR = "192.168.0.152"
+    SERVER_ADDR = "192.168.200.10"
     SERVER_PORT = 5005
     #
     s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT)

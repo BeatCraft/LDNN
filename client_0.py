@@ -42,7 +42,7 @@ class ClientLooper(netutil.Looper):
         #
         # set batch
         batch_start = 0
-        batch_size = 10000
+        batch_size = 5000
         self._package.load_batch()
         self._roster.set_batch(self._package._train_image_batch, self._package._train_label_batch, batch_start, batch_size, self._package._image_size, self._package._num_class, 0)
         

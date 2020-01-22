@@ -130,10 +130,6 @@ class Looper(object):
 #
 #
 #
-
-#
-#
-#
 def main():
     print "main() : start"
     #

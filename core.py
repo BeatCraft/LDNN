@@ -283,39 +283,6 @@ class Roster:
         self.layers = []
         self._batch_size = 1
     
-#    def set_batch(self, batch, batch_size, data_size, num_class, debug=0):
-    def set_batch(self, data, labels, batch_size, data_size, num_class, debug=0):
-    
-        print data.shape[0]
-        print len(labels)#.shape[0]
-    
-        self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
-        self._gpu_input = self._gpu.dev_malloc(self._batch_data)
-        self._batch_class = np.zeros(batch_size, dtype=np.int32)
-        self._gpu_labels = self._gpu.dev_malloc(self._batch_class)
-        self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
-        self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
-        
-        self.num_class = num_class
-        self._batch_size = batch_size
-        for layer in self.layers:
-            layer.set_batch(batch_size)
-        
-        for i in range(batch_size):
-            self._batch_data[i] = data[i]
-            self._batch_class[i] = labels[i]
-        #
-        self._gpu.copy(self._gpu_labels, self._batch_class)
-        self._gpu.copy(self._gpu_input, self._batch_data)
-        layer = self.getLayerAt(0) # input layer
-        layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0),
-                         layer._num_node, batch_size, 0)
-        ### debug use ###
-        if debug:
-            self._gpu.copy(layer._output_array, layer._gpu_output)
-            for i in range(batch_size):
-                print layer._output_array[i]
-                
     def set_batch(self, data, labels, start, batch_size, data_size, num_class, debug=0):
         print "Roster::set_batch()"
         print data.shape[0]
@@ -333,9 +300,9 @@ class Roster:
         for layer in self.layers:
             layer.set_batch(batch_size)
             
-        for i in range(start, start+batch_size):
-            self._batch_data[i] = data[i]
-            self._batch_class[i] = labels[i]
+        for i in range(batch_size):
+            self._batch_data[i] = data[start+i]
+            self._batch_class[i] = labels[start+i]
         #
         self._gpu.copy(self._gpu_labels, self._batch_class)
         self._gpu.copy(self._gpu_input, self._batch_data)

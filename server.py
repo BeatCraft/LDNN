@@ -6,7 +6,7 @@ import traceback
 import csv
 import socket
 import time
-import command
+#import command
 import multiprocessing
 import struct
 import binascii
@@ -28,12 +28,14 @@ class ServerLooper(netutil.Looper):
         #
         super(ServerLooper, self).__init__(local_addr, local_port, remote_addr, remote_port)
         #
-        self._local_addr = local_addr
-        self._local_port = local_port
-        self._remoto_addr = remote_addr
-        self._remote_port = remote_port
-        self._send_sock = None
-        self._recv_sock = None
+        #self._local_addr = local_addr
+        #self._local_port = local_port
+        #self._remoto_addr = remote_addr
+        #self._remote_port = remote_port
+        #self._send_sock = None
+        #self._recv_sock = None
+        self._send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self._client_num = 0
         #
         package_id = 0 # MNIST
@@ -49,7 +51,7 @@ class ServerLooper(netutil.Looper):
     def recv_multi(self):
         ret = 0.0
         timeout = 0
-        error = 0
+        error = 0.0
         #
         for i in range(self._client_num):
             res, addr = self.recv()
@@ -64,14 +66,14 @@ class ServerLooper(netutil.Looper):
                 error = error +1
         #
         if timeout + error>0:
-            return -1
+            return -1.0
         #
         return ret/float(self._client_num)
     
     
     def execute_cmd(self, mode, a, b, c, d):
         self.set_mode(mode)
-        cmd = netutil.pack_i5(mode, 0, 0, 0, 0)
+        cmd = netutil.pack_i5(mode, a, b, c, d)
         self.send(cmd)
         #
         self.set_mode(mode+5)
@@ -157,12 +159,13 @@ class ServerLooper(netutil.Looper):
 
 
     def weight_shift_mode(self, li, ni, ii, mse_base, mode):
-        print "weight_shift_mode"
+        #print "weight_shift_mode"
         r =  self._roster
         layer = r.getLayerAt(li)
         wp = layer.get_weight_property(ni, ii) # default : 0
         lock = layer.get_weight_lock(ni, ii)   # default : 0
         wi = layer.get_weight_index(ni, ii)
+        #print wi
         wi_alt = wi
         #
         if lock>0:
@@ -170,6 +173,7 @@ class ServerLooper(netutil.Looper):
         #
         if mode>0: # heat
             if wp<0:
+                print "    skip"
                 return mse_base, 0
             #
             if wi==core.WEIGHT_INDEX_MAX:
@@ -182,6 +186,7 @@ class ServerLooper(netutil.Looper):
                 #mse_base = r.get_cross_entropy()
                 mse_base = self.update(li, ni, ii, wi-1)
                 #
+                #print "    max:%d" % (wi)
                 return mse_base, 1
             #
         else:
@@ -205,9 +210,11 @@ class ServerLooper(netutil.Looper):
         #
         #r.propagate(li, ni, ii, wi_alt, 0)
         #mse_alt = r.get_cross_entropy()
-        mse_alt = self.set_alt(li, ni, ii, wi+1)
+        mse_alt = self.set_alt(li, ni, ii, wi_alt)
+        #print mse_alt
         #
         if mse_alt<mse_base:
+            #print "    update"
             layer.set_weight_property(ni, ii, mode)
             layer.set_weight_index(ni, ii, wi_alt)
             #
@@ -249,8 +256,6 @@ class ServerLooper(netutil.Looper):
                 for p in range(w_p):
                     ii = random.randrange(num_w)
                     mse_base, ret = self.weight_shift_mode(li, ni, ii, mse_base, 1)
-                    mse_base = 1.0
-                    ret = 0
                     if ret>0:
                         print "[%d] H=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, h_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
                     #print "    %f" % mse_base
@@ -279,9 +284,7 @@ class ServerLooper(netutil.Looper):
                 w_p = num_w/divider
                 for p in range(w_p):
                     ii = random.randrange(num_w)
-                    mse_base, ret = self.weight_shift_mode(r, li, ni, ii, mse_base, -1)
-                    mse_base = 1.0
-                    ret = 0
+                    mse_base, ret = self.weight_shift_mode(li, ni, ii, mse_base, -1)
                     if ret>0:
                         print "[%d] C=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, c_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
                     #print "    %f" % mse_base
@@ -354,13 +357,13 @@ class ServerLooper(netutil.Looper):
 def main():
     print "main() : start"
     #
-    BC_ADDR = "127.0.0.1"
+    BC_ADDR = "192.168.0.255"
     BC_PORT = 5000
-    SERVER_ADDR = "127.0.0.1"
+    SERVER_ADDR = "192.168.0.152"
     SERVER_PORT = 5005
     #
     s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT)
-    s.set_client_num(1)
+    s.set_client_num(3)
     s.init()
     s.run()
     

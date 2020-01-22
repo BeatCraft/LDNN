@@ -6,7 +6,6 @@ import traceback
 import csv
 import socket
 import time
-import command
 import multiprocessing
 import struct
 import binascii
@@ -25,7 +24,7 @@ class ClientLooper(netutil.Looper):
         print "ClientLooper::__init__()"
         super(ClientLooper, self).__init__(local_addr, local_port, remote_addr, remote_port)
         #
-        #self._state = 0
+        self._send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         
     def setup(self):
         package_id = 0 # MNIST
@@ -33,7 +32,7 @@ class ClientLooper(netutil.Looper):
         # 1 : Intel on MBP"
         # 2 : eGPU (AMD Radeon Pro 580)"
         platform_id = 0
-        device_id = 1
+        device_id = 0
         my_gpu = gpu.Gpu(platform_id, device_id)
         my_gpu.set_kernel_code()
         self._package = util.Package(package_id)
@@ -43,7 +42,7 @@ class ClientLooper(netutil.Looper):
         #
         # set batch
         batch_start = 0
-        batch_size = 5000
+        batch_size = 10000
         self._package.load_batch()
 #        self._roster.set_batch(self._package._train_image_batch, self._package._train_label_batch, batch_size, self._package._image_size, self._package._num_class)
         self._roster.set_batch(self._package._train_image_batch, self._package._train_label_batch, batch_start, batch_size, self._package._image_size, self._package._num_class, 0)
@@ -69,7 +68,9 @@ class ClientLooper(netutil.Looper):
             # decode and response
             #
             a, b, c, d, e = netutil.unpack_i5(res)
+            #print a
             if a==10: # init
+                print "init"
                 cmd = netutil.pack_if(15, 1.0)
                 self.send(cmd)
             elif a==20: # evaluate
@@ -80,6 +81,7 @@ class ClientLooper(netutil.Looper):
             elif a==30: # alt
                 self._roster.propagate(b, c, d, e, 0)
                 ce = self._roster.get_cross_entropy()
+                #print "set_alt(%d, %d, %d, %d)=%f" %(b, c, d, e, ce)
                 cmd = netutil.pack_if(35, ce)
                 self.send(cmd)
             elif a==40: # update
@@ -88,6 +90,8 @@ class ClientLooper(netutil.Looper):
                 layer.update_weight_gpu()
                 self._roster.propagate()
                 ce = self._roster.get_cross_entropy()
+                #print "update(%d, %d, %d, %d)=%f" %(b, c, d, e, ce)
+                #print ce
                 cmd = netutil.pack_if(45, ce)
                 self.send(cmd)
             else:
@@ -99,9 +103,9 @@ class ClientLooper(netutil.Looper):
 def main():
     print "main() : start"
     #
-    BC_ADDR = "127.0.0.1"
+    BC_ADDR = "192.168.0.255"
     BC_PORT = 5000
-    SERVER_ADDR = "127.0.0.1"
+    SERVER_ADDR = "192.168.0.152"
     SERVER_PORT = 5005
     #
     c = ClientLooper(BC_ADDR, BC_PORT, SERVER_ADDR, SERVER_PORT)

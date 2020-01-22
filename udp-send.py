@@ -6,7 +6,6 @@ import traceback
 import csv
 import socket
 import time
-import command
 import multiprocessing
 import struct
 import binascii
@@ -24,9 +23,10 @@ def main():
     #
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(1)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1) 
     #self._sock.bind(("", self._local_port))
     msg = "test"
-    ip = "127.0.0.1"
+    ip = "192.168.0.255"
     port = 5000
     #sock.sendto(msg, (ip, port))
     

@@ -107,7 +107,7 @@ class Looper(object):
         while not self._stop.value:
             print "  loop"
             print self._stop.value
-
+        #
         print "  stopped."
 
     def run(self):

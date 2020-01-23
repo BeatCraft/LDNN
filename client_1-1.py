@@ -32,7 +32,7 @@ class ClientLooper(netutil.Looper):
         # 1 : Intel on MBP"
         # 2 : eGPU (AMD Radeon Pro 580)"
         platform_id = 0
-        device_id = 0
+        device_id = 1 
         my_gpu = gpu.Gpu(platform_id, device_id)
         my_gpu.set_kernel_code()
         self._package = util.Package(package_id)
@@ -42,7 +42,7 @@ class ClientLooper(netutil.Looper):
         #
         # set batch
         batch_start = 10000
-        batch_size = 10000
+        batch_size = 5000
         self._package.load_batch()
         self._roster.set_batch(self._package._train_image_batch, self._package._train_label_batch, batch_start, batch_size, self._package._image_size, self._package._num_class, 0)
         

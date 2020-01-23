@@ -299,7 +299,7 @@ class ServerLooper(netutil.Looper):
 #                save_path = "./debug/wi.csv.%f" % ce
 #                r.export_weight_index(save_path)
             #
-            #r.export_weight_index(self._package._wi_csv_path)
+            r.export_weight_index(self._package._wi_csv_path)
             #
             if pre_ce == ce:
                 lim_cnt = lim_cnt + 1
@@ -336,7 +336,7 @@ def main():
     SERVER_PORT = 5005
     #
     s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT)
-    s.set_client_num(3)
+    s.set_client_num(4)
     s.init()
     s.run()
     

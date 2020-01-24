@@ -51,13 +51,15 @@ class ServerLooper(netutil.Looper):
             res, addr = self.recv()
             if res==None:
                 timeout = timeout + 1
+                print "   timeout : %s : %d" % (addr[0], addr[1])
                 continue
             #
             a, b = netutil.unpack_if(res)
             if a==self.mode():
                 ret =  ret + b
             else:
-                error = error +1
+                print "   error : %s : %d" % (addr[0], addr[1])
+                error = error + 1
         #
         if timeout + error>0:
             return -1.0

@@ -47,8 +47,12 @@ class ClientLooper(netutil.Looper):
         self._roster.set_batch(self._package._train_image_batch, self._package._train_label_batch, batch_start, batch_size, self._package._image_size, self._package._num_class, 0)
         
         # evaluate
+        start_time = time.time()
         self._roster.propagate()
         ce = self._roster.get_cross_entropy()
+        elapsed_time = time.time() - start_time
+        t = format(elapsed_time, "0")
+        print "time = %s" % (t)
         print ce
         
     def loop(self):

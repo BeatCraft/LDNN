@@ -28,20 +28,20 @@ def main():
     SERVER_ADDR = "192.168.200.10"
     SERVER_PORT = 5005
     # 0 : 192.168.0.150 / 192.168.200.10
-    batch_size = 5000
+    batch_size = 8000
     batch_start = 0
     device_id = 0
     # 1-0 : 192.168.0.150 / 192.168.200.11
-#   batch_size = 5000
-#   batch_start = 5000
+#   batch_size = 6000
+#   batch_start = 8000
 #   device_id = 0
     # 1-1 : 192.168.0.151 / 192.168.200.11
-#   batch_size = 5000
-#   batch_start = 10000
+#   batch_size = 8000
+#   batch_start = 14000
 #   device_id = 1
     # 2-0 : 192.168.0.152 / 192.168.200.12
-#   batch_size = 10000
-#   batch_start = 15000
+#   batch_size = 20000
+#   batch_start = 22000
 #   device_id = 0
     # 0 : AMD Server"
     # 1 : Intel on MBP"

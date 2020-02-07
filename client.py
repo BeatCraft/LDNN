@@ -70,7 +70,7 @@ class ClientLooper(netutil.Looper):
             # decode and response
             #
             a, b, c, d, e = netutil.unpack_i5(res)
-            if a==10: # init
+            if a==10:   # init
                 print "init"
                 cmd = netutil.pack_if(15, 1.0)
                 self.send(cmd)
@@ -91,6 +91,10 @@ class ClientLooper(netutil.Looper):
                 self._roster.propagate()
                 ce = self._roster.get_cross_entropy()
                 cmd = netutil.pack_if(45, ce)
+                self.send(cmd)
+            elif a==60 : # debug
+                print "debug"
+                cmd = netutil.pack_if(65, 1.0)
                 self.send(cmd)
             else:
                 print "unknown command"
@@ -123,14 +127,16 @@ def client(BC_ADDR, BC_PORT, SERVER_ADDR, SERVER_PORT, batch_size, batch_start, 
 def main():
     print "main() : start"
     #
-    BC_ADDR = "192.168.200.255"
+    BC_ADDR = "127.0.0.1"
+    #BC_ADDR = "192.168.200.255"
     BC_PORT = 5000
-    SERVER_ADDR = "192.168.200.10"
+    #SERVER_ADDR = "192.168.200.10"
+    SERVER_ADDR = "127.0.0.1"
     SERVER_PORT = 5005
     #
     batch_size = 5000
     batch_start = 0
-    device_id = 0
+    device_id = 1#0
     # 0 : AMD Server"
     # 1 : Intel on MBP"
     # 2 : eGPU (AMD Radeon Pro 580)"

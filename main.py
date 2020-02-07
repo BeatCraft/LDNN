@@ -440,6 +440,9 @@ def main():
         package.load_batch()
         r.set_batch(package._train_image_batch, package._train_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
         test(r)
+#    elif mode==3 # init_WI
+#        package.load_batch()
+#        init_WI(r, batch, batch_size, data_size):
     #
     return 0
 #

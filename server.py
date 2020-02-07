@@ -31,6 +31,7 @@ class ServerLooper(netutil.Looper):
         self._send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self._client_num = 0
+        self._client_list = []
         #
         package_id = 0 # MNIST
         my_gpu = None
@@ -48,12 +49,28 @@ class ServerLooper(netutil.Looper):
         error = 0.0
         #
         for i in range(self._client_num):
+            self._client_timeout[i] = 0
+        #
+        for i in range(self._client_num):
             res, addr = self.recv()
             if res==None:
                 timeout = timeout + 1
-                print "   timeout : %s : %d" % (addr[0], addr[1])
-                continue
+                print "   timeout : "#%s : %d" % (addr[0], addr[1])
+                for k in range(self._client_num):
+                    print "        %s : %d" % (self._client_list[k], self._client_timeout[k])
+                #
+                return -1.0
+                #continue
             #
+            if addr[0] in self._client_list:
+                pass
+            else:
+                print "bad address"
+                return -1.0
+            
+            k = self._client_list.index(addr[0])
+            #print "k=%d" % (k)
+            self._client_timeout[k] = 1
             a, b = netutil.unpack_if(res)
             if a==self.mode():
                 ret =  ret + b
@@ -98,10 +115,24 @@ class ServerLooper(netutil.Looper):
                 time.sleep(0.01)
                 continue
             elif mode==10:  # init
+                #
                 cmd = netutil.pack_i5(mode, 0, 0, 0, 0)
                 self.send(cmd)
                 self.set_mode(mode+5)
                 #
+                res, addr = self.recv()
+                while res:
+                    print "%s : %d" % (addr[0], addr[1])
+                    self._client_list.append(addr[0])
+                    res, addr = self.recv()
+                #
+                self._client_num = len(self._client_list)
+                self._client_timeout = [0] * self._client_num
+                print self._client_num
+            elif mode==60: # debug
+                cmd = netutil.pack_i5(mode, 0, 0, 0, 0)
+                self.send(cmd)
+                self.set_mode(mode+5)
                 ret = self.recv_multi()
                 print ret
                 self.set_mode(0)
@@ -332,9 +363,11 @@ class ServerLooper(netutil.Looper):
 def main():
     print "main() : start"
     #
-    BC_ADDR = "192.168.200.255"
+    #BC_ADDR = "192.168.200.255"
+    BC_ADDR = "127.0.0.1"
     BC_PORT = 5000
-    SERVER_ADDR = "192.168.200.10"
+    #SERVER_ADDR = "192.168.200.10"
+    SERVER_ADDR = "127.0.0.1"
     SERVER_PORT = 5005
     #
     s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT)
@@ -359,6 +392,8 @@ def main():
             s.set_mode(40)
         elif key=='t' or key=='T':
             s.set_mode(50)
+        elif key=='d' or key=='D':
+            s.set_mode(60)
         #
     #
     print "main() : end"

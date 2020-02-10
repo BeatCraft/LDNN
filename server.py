@@ -261,7 +261,17 @@ class ServerLooper(netutil.Looper):
                 w_p = num_w/divider
                 for p in range(w_p):
                     ii = random.randrange(num_w)
-                    mse_base, ret = self.weight_shift_mode(li, ni, ii, mse_base, 1)
+                    #mse_base, ret = self.weight_shift_mode(li, ni, ii, mse_base, 1)
+                    mse_alt, ret = self.weight_shift_mode(li, ni, ii, mse_base, 1)
+                    if mse_alt>0.0:
+                        mse_base = mse_alt
+                    else:
+                        print "*** timeout error, retry onece!!"
+                        mse_alt, ret = self.weight_shift_mode(li, ni, ii, mse_base, 1)
+                        if mse_alt>0.0:
+                            mse_base = mse_alt
+                        #
+                    #
                     if ret>0:
                         print "[%d] H=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, h_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
                     #print "    %f" % mse_base
@@ -360,21 +370,13 @@ class ServerLooper(netutil.Looper):
 #
 #
 #
-def main():
+def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT):
     print "main() : start"
     #
-    #BC_ADDR = "192.168.200.255"
-    BC_ADDR = "127.0.0.1"
-    BC_PORT = 5000
-    #SERVER_ADDR = "192.168.200.10"
-    SERVER_ADDR = "127.0.0.1"
-    SERVER_PORT = 5005
-    #
     s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT)
-    s.set_client_num(4)
     s.init()
     s.run()
-    
+    #
     loop = 1
     while loop:
         key = raw_input("cmd >")
@@ -395,6 +397,20 @@ def main():
         elif key=='d' or key=='D':
             s.set_mode(60)
         #
+    #
+    print "main() : end"
+#
+#
+#
+def main():
+    print "main() : start"
+    #
+    BC_ADDR = "127.0.0.1"
+    BC_PORT = 5000
+    SERVER_ADDR = "127.0.0.1"
+    SERVER_PORT = 5005
+    #
+    s = server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT)
     #
     print "main() : end"
 #

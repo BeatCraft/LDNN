@@ -59,6 +59,7 @@ class ClientLooper(netutil.Looper):
         print "ClientLooper::loop() - start"
         
         self.setup()
+        r_cnt = 0
         #
         while not self.is_quite_requested():
             # recv a packet
@@ -66,6 +67,9 @@ class ClientLooper(netutil.Looper):
             if res==None:
                 time.sleep(0.01)
                 continue
+            #
+            print "r_cnt : %d" % (r_cnt)
+            r_cnt = r_cnt + 1
             #
             # decode and response
             #

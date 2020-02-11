@@ -435,7 +435,7 @@ class Package:
         #
         if self._package_id==0: # MNIST
             input_layer = r.add_layer(0, self._image_size, self._image_size)
-            hidden_layer_1 = r.add_layer(1, MNIST_IMAGE_SIZE, 32)
+            hidden_layer_1 = r.add_layer(1, self._image_size, 32)
             hidden_layer_2 = r.add_layer(1, 32, 32)
             hidden_layer_3 = r.add_layer(1, 32, 32)
             hidden_layer_4 = r.add_layer(1, 32, 32)
@@ -454,7 +454,7 @@ class Package:
             #
         elif self._package_id==1: # MNIST2 : selective clustered data
             input_layer = r.add_layer(0, self._image_size, self._image_size)
-            hidden_layer_1 = r.add_layer(1, MNIST_IMAGE_SIZE, 32)
+            hidden_layer_1 = r.add_layer(1, self._image_size, 32)
             hidden_layer_2 = r.add_layer(1, 32, 32)
             hidden_layer_3 = r.add_layer(1, 32, 32)
             hidden_layer_4 = r.add_layer(1, 32, 32)

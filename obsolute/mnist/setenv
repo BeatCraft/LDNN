@@ -1,3 +1,0 @@
-alias vim='vim -u .vimrc'
-alias python='python3.6'
-

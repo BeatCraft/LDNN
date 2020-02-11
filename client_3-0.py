@@ -36,7 +36,7 @@ def main():
     # 1 : 15000
     # 2 : 30000
     # 3 : 45000
-    batch_start = 0
+    batch_start = 45000
     # 0 : AMD Server"
     # 1 : Intel on MBP"
     # 2 : eGPU (AMD Radeon Pro 580)"

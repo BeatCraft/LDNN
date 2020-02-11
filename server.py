@@ -266,10 +266,18 @@ class ServerLooper(netutil.Looper):
                     if mse_alt>0.0:
                         mse_base = mse_alt
                     else:
-                        print "*** timeout error, retry onece!!"
+                        print "*** timeout error"
+                        print "*** wait for 10 secs"
+                        time.sleep(10)
+                        print "*** retry onece"
+                        #
                         mse_alt, ret = self.weight_shift_mode(li, ni, ii, mse_base, 1)
                         if mse_alt>0.0:
+                            print "*** recovered"
                             mse_base = mse_alt
+                        else:
+                            print "*** error and exit"
+                            mse_base = -1
                         #
                     #
                     if ret>0:

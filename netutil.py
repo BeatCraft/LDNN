@@ -35,6 +35,17 @@ def unpack_iiii(data):
     unpacked_data = unpacker.unpack(data)
     return unpacked_data
 
+def pack_i6(seq, a=0, b=0, c=0, d=0, e=0):
+    values = (seq, a, b, c, d, e)
+    packer = struct.Struct('I I I I I I')
+    data = packer.pack(*values)
+    return data
+    
+def unpack_i6(data):
+    unpacker = struct.Struct('I I I I I I')
+    unpacked_data = unpacker.unpack(data)
+    return unpacked_data
+
 def pack_i5(a=0, b=0, c=0, d=0, e=0):
     values = (a, b, c, d, e)
     packer = struct.Struct('I I I I I')
@@ -82,6 +93,7 @@ class Looper(object):
         self._remote_port = remote_port
         self._send_sock = None
         self._recv_sock = None
+        #self._packet_cnt = 0
         #
         self.init()
 

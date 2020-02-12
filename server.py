@@ -40,6 +40,8 @@ class ServerLooper(netutil.Looper):
         if self._roster is None:
             print "fatal DNN error"
         #
+        self._seq = 0
+        
     def set_client_num(self, num):
         self._client_num = num
         
@@ -47,12 +49,18 @@ class ServerLooper(netutil.Looper):
         ret = 0.0
         timeout = 0
         error = 0.0
+        # start_time = time.time()
+        #        elapsed_time = time.time() - start_time
+        #t = format(elapsed_time, "0")
+        #print "time = %s" % (t)
         #
         for i in range(self._client_num):
             self._client_timeout[i] = 0
         #
+        start_time = time.time()
         for i in range(self._client_num):
             res, addr = self.recv()
+            #
             if res==None:
                 timeout = timeout + 1
                 print "   timeout : "#%s : %d" % (addr[0], addr[1])
@@ -67,32 +75,39 @@ class ServerLooper(netutil.Looper):
             else:
                 print "bad address"
                 return -1.0
-            
+            #
+            elapsed_time = time.time() - start_time
+            t = format(elapsed_time, "0")
+            print "    %d : %s : %s" % (i, addr[0], t)
+            #
             k = self._client_list.index(addr[0])
-            #print "k=%d" % (k)
             self._client_timeout[k] = 1
             a, b = netutil.unpack_if(res)
-            if a==self.mode():
+            #if a==self.mode():
+            if a==self._seq:
                 ret =  ret + b
             else:
-                print "   error : %s : %d" % (addr[0], addr[1])
+                print "   seq error : %s : %d" % (addr[0], addr[1])
                 error = error + 1
         #
         if timeout + error>0:
             return -1.0
         #
+        self._seq = self._seq + 1
         return ret/float(self._client_num)
     
     
     def execute_cmd(self, mode, a, b, c, d):
         self.set_mode(mode)
-        cmd = netutil.pack_i5(mode, a, b, c, d)
+        cmd = netutil.pack_i6(self._seq, mode, a, b, c, d)
+        print "send seq=%d" %(self._seq)
         self.send(cmd)
         #
         self.set_mode(mode+5)
         ret = self.recv_multi()
         #
         self.set_mode(mode+5)
+        #self._seq = self._seq + 1
         return ret
     
     def evaluate(self):
@@ -116,7 +131,7 @@ class ServerLooper(netutil.Looper):
                 continue
             elif mode==10:  # init
                 #
-                cmd = netutil.pack_i5(mode, 0, 0, 0, 0)
+                cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)
                 self.send(cmd)
                 self.set_mode(mode+5)
                 #
@@ -130,7 +145,7 @@ class ServerLooper(netutil.Looper):
                 self._client_timeout = [0] * self._client_num
                 print self._client_num
             elif mode==60: # debug
-                cmd = netutil.pack_i5(mode, 0, 0, 0, 0)
+                cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)
                 self.send(cmd)
                 self.set_mode(mode+5)
                 ret = self.recv_multi()
@@ -140,7 +155,7 @@ class ServerLooper(netutil.Looper):
                 ce = self.evaluate()
                 print "evaluate :%f" % (ce)
             elif mode==30: # alt
-                cmd = netutil.pack_i5(mode, 0, 1, 0, 0)
+                cmd = netutil.pack_i6(self._seq, mode, 0, 1, 0, 0)
                 self.send(cmd)
                 self.set_mode(mode+5)
                 #
@@ -148,7 +163,7 @@ class ServerLooper(netutil.Looper):
                 print ret
                 self.set_mode(0)
             elif mode==40: # update
-                cmd = netutil.pack_i5(mode, 0, 1, 0, 0)
+                cmd = netutil.pack_i6(self._seq, mode, 0, 1, 0, 0)
                 self.send(cmd)
                 self.set_mode(mode+5)
                 #
@@ -184,15 +199,10 @@ class ServerLooper(netutil.Looper):
             #
             if wi==core.WEIGHT_INDEX_MAX:
                 layer.set_weight_property(ni, ii, 0)
-                #
                 layer.set_weight_index(ni, ii, wi-1)
                 #
-                #layer.update_weight_gpu()
-                #r.propagate()
-                #mse_base = r.get_cross_entropy()
                 mse_base = self.update(li, ni, ii, wi-1)
                 #
-                #print "    max:%d" % (wi)
                 return mse_base, 1
             #
         else:
@@ -201,12 +211,8 @@ class ServerLooper(netutil.Looper):
             #
             if wi==core.WEIGHT_INDEX_MIN:
                 layer.set_weight_property(ni, ii, 0)
-                #
                 layer.set_weight_index(ni, ii, wi+1)
                 #
-                #layer.update_weight_gpu()
-                #r.propagate()
-                #mse_base = r.get_cross_entropy()
                 mse_base = self.update(li, ni, ii, wi+1)
                 #
                 return mse_base, 1
@@ -214,19 +220,14 @@ class ServerLooper(netutil.Looper):
         #
         wi_alt = wi + mode
         #
-        #r.propagate(li, ni, ii, wi_alt, 0)
-        #mse_alt = r.get_cross_entropy()
         mse_alt = self.set_alt(li, ni, ii, wi_alt)
-        #print mse_alt
         #
         if mse_alt<mse_base:
-            #print "    update"
             layer.set_weight_property(ni, ii, mode)
             layer.set_weight_index(ni, ii, wi_alt)
             #
-            #layer.update_weight_gpu()
-            #
             mse_alt = self.update(li, ni, ii, wi_alt)
+            #
             return mse_alt, 1
         #
         layer.set_weight_property(ni, ii, 0)

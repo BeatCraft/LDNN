@@ -59,21 +59,20 @@ class ClientLooper(netutil.Looper):
         print "ClientLooper::loop() - start"
         
         self.setup()
-        r_cnt = 0
+        #r_cnt = 0
         #
         while not self.is_quite_requested():
             # recv a packet
             res, addr = self.recv()
             if res==None:
+                print "**** recv sock timeout"
                 time.sleep(0.01)
                 continue
             #
-            print "r_cnt : %d" % (r_cnt)
-            r_cnt = r_cnt + 1
-            #
             # decode and response
             #
-            a, b, c, d, e = netutil.unpack_i5(res)
+            seq, a, b, c, d, e = netutil.unpack_i6(res)
+            print "recv seq = %d" % (seq)
             if a==10:   # init
                 print "init"
                 cmd = netutil.pack_if(15, 1.0)
@@ -81,12 +80,14 @@ class ClientLooper(netutil.Looper):
             elif a==20: # evaluate
                 self._roster.propagate()
                 ce = self._roster.get_cross_entropy()
-                cmd = netutil.pack_if(25, ce)
+                cmd = netutil.pack_if(seq, ce)
+                #cmd = netutil.pack_if(25, ce)
                 self.send(cmd)
             elif a==30: # alt
                 self._roster.propagate(b, c, d, e, 0)
                 ce = self._roster.get_cross_entropy()
-                cmd = netutil.pack_if(35, ce)
+                cmd = netutil.pack_if(seq, ce)
+                #cmd = netutil.pack_if(35, ce)
                 self.send(cmd)
             elif a==40: # update
                 layer = self._roster.getLayerAt(b)
@@ -94,16 +95,20 @@ class ClientLooper(netutil.Looper):
                 layer.update_weight_gpu()
                 self._roster.propagate()
                 ce = self._roster.get_cross_entropy()
-                cmd = netutil.pack_if(45, ce)
+                cmd = netutil.pack_if(seq, ce)
+                #cmd = netutil.pack_if(45, ce)
                 self.send(cmd)
             elif a==60 : # debug
                 print "debug"
-                cmd = netutil.pack_if(65, 1.0)
+                cmd = netutil.pack_if(seq, 1.0)
+                #cmd = netutil.pack_if(65, 1.0)
                 self.send(cmd)
             else:
                 print "unknown command"
                 pass
             # if
+            #print "r_cnt : %d" % (r_cnt)
+            #r_cnt = r_cnt + 1
         # while
     # end of loop()
 #
@@ -132,9 +137,7 @@ def main():
     print "main() : start"
     #
     BC_ADDR = "127.0.0.1"
-    #BC_ADDR = "192.168.200.255"
     BC_PORT = 5000
-    #SERVER_ADDR = "192.168.200.10"
     SERVER_ADDR = "127.0.0.1"
     SERVER_PORT = 5005
     #

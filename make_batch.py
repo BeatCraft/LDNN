@@ -42,7 +42,7 @@ MNIST_IMAGE_HEADER_SIZE = 16
 MNIST_LABEL_HEADER_SIZE  = 8
 MNIST_IMAGE_SIZE = 784
 #
-def make_mnist_batch(package):
+def make_mnist_train_batch(package):
     image_path = package._train_image_path
     labels_path = package._train_label_path
     batch_size = package._train_batch_size
@@ -77,12 +77,46 @@ def make_mnist_batch(package):
 #
 #
 #
+def make_mnist_test_batch(package):
+    image_path = package._test_image_path
+    labels_path = package._test_label_path
+    batch_size = package._test_batch_size
+    #
+    file_in = open(labels_path)
+    header = file_in.read(MNIST_LABEL_HEADER_SIZE)
+    data = file_in.read()
+    #
+    labels = [0 for i in range(batch_size)] # list
+    #
+    for i in range(batch_size):
+        label = struct.unpack('>B', data[i])
+        labels[i] = label[0]
+    #
+    file_in = open(image_path)
+    header = file_in.read(MNIST_IMAGE_HEADER_SIZE)
+    #
+    images = np.zeros((batch_size, (MNIST_IMAGE_SIZE)), dtype=np.float32)
+    #
+    for i in range(batch_size):
+        image = file_in.read(MNIST_IMAGE_SIZE)
+        da = np.frombuffer(image, dtype=np.uint8)
+        a_float = da.astype(np.float32) # convert from uint8 to float32
+        images[i] = a_float
+    #
+    print len(labels)
+    print images.shape[0]
+    util.pickle_save(package._test_image_batch_path, images)
+    util.pickle_save(package._test_label_batch_path, labels)
+#
+#
+#
 CIFAR10_TRAIN_BATCH_NUM  = 5
 CIFAR10_TRAIN_BATCH_SIZE  = 10000
+#CIFAR10_TEST_BATCH_NUM = 1
 CIFAR10_TEST_BATCH_SIZE   = 10000
+CIFAR10_NUM_CLASS = 10
 CIFAR10_IMAGE_WIDTH = 32
 CIFAR10_IMAGE_HEIGHT = 32
-CIFAR10_NUM_CLASS = 10
 CIFAR10_IMAGE_SIZE = CIFAR10_IMAGE_WIDTH*CIFAR10_IMAGE_HEIGHT*3
 CIFAR10_IMAGE_Y_SIZE = CIFAR10_IMAGE_WIDTH*CIFAR10_IMAGE_HEIGHT
 CIFAR10_TRAIN_DATA_PATH =[ "../ldnn_package/cifar-10-batches-py/data_batch_1",
@@ -128,13 +162,13 @@ def make_cifa10_train_batch(package):
                 array_rgb = pix.reshape([32, 32, 3])
                 img = Image.fromarray(array_rgb)
                 label = label_list[offset+j]
-                save_path = "../ldnn_package/cifar-10-batches-py/rgb/%d/%d/%05d.png" % (i, label, offset+j)
+                save_path = "../ldnn_package/cifar-10-batches-py/train/rgb/%d/%d/%05d.png" % (i, label, offset+j)
                 img.save(save_path)
                 # save y
                 array_y = data_array[offset+j].astype(np.uint8)
                 array_y = array_y.reshape([32,32])
                 img = Image.fromarray(array_y)
-                save_path = "../ldnn_package/cifar-10-batches-py/y/%d/%d/%05d.png" % (i, label, offset+j)
+                save_path = "../ldnn_package/cifar-10-batches-py/train/y/%d/%d/%05d.png" % (i, label, offset+j)
                 img.save(save_path)
                 #
             # for j
@@ -142,6 +176,56 @@ def make_cifa10_train_batch(package):
     # for i
     util.pickle_save(package._train_image_batch_path, data_array)
     util.pickle_save(package._train_label_batch_path, label_list)
+    return 0
+#
+#
+#
+def make_cifa10_test_batch(package):
+    label_list = []
+    batch_size = CIFAR10_TEST_BATCH_SIZE
+    data_array = np.zeros((batch_size, CIFAR10_IMAGE_Y_SIZE), dtype=np.float32)
+    pix = np.zeros((1024,3), dtype=np.uint8)
+    path = CIFAR10_TEST_DATA_PATH
+    #
+    with open(path, 'rb') as fo:
+        dict = cPickle.load(fo)
+        label_list.extend(dict["labels"])
+        images_rgb = dict["data"]
+        for j in range(CIFAR10_TRAIN_BATCH_SIZE):
+            print "(%d)" % (j)
+            image = images_rgb[j]
+            image = image.reshape([3,1024])
+            red = image[0]
+            green = image[1]
+            blue = image[2]
+            for m in range(1024):
+                r = red[m]
+                g = green[m]
+                b = blue[m]
+                pix[m][0] = r
+                pix[m][1] = g
+                pix[m][2] = b
+                y = 0.299*float(r) + 0.587*float(g) + 0.114*float(b)
+                data_array[j][m] = y
+            # for m
+            #
+            # save rgb
+            array_rgb = pix.reshape([32, 32, 3])
+            img = Image.fromarray(array_rgb)
+            label = label_list[j]
+            save_path = "../ldnn_package/cifar-10-batches-py/test/rgb/%d/%05d.png" % (label, j)
+            img.save(save_path)
+            # save y
+            array_y = data_array[j].astype(np.uint8)
+            array_y = array_y.reshape([32,32])
+            img = Image.fromarray(array_y)
+            save_path = "../ldnn_package/cifar-10-batches-py/test/y/%d/%05d.png" % (label, j)
+            img.save(save_path)
+        # for j
+    # with
+    #
+    util.pickle_save(package._test_image_batch_path, data_array)
+    util.pickle_save(package._test_label_batch_path, label_list)
     return 0
 #
 #
@@ -170,10 +254,11 @@ def main():
 #    print len(images)
 #    labels = package._train_label_batch
 #    print len(labels)
-    return 0
-    
+#    return 0
+    #
     if package_id==0:
-        make_mnist_batch(package)
+        make_mnist_train_batch(package)
+        make_mnist_test_batch(package)
     elif package_id==1:
         pass
     elif package_id==2:

@@ -4,11 +4,9 @@
 *.stats
 *.csv
 wi.csv
-./MNIST/
-wi.csv.bak.2019-06-11
-./obsolute/
-./test/
-./debug/
-./client_data/
-./debug/*
+MNIST/
+obsolute/
+test/
+debug/
+client_data/
 

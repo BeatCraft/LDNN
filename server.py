@@ -23,7 +23,7 @@ import netutil
 #
 #
 class ServerLooper(netutil.Looper):
-    def __init__(self, local_addr, local_port, remote_addr, remote_port):
+    def __init__(self, local_addr, local_port, remote_addr, remote_port, package_id=0):
         print "ServerLooper::__init__()"
         #
         super(ServerLooper, self).__init__(local_addr, local_port, remote_addr, remote_port)
@@ -33,7 +33,7 @@ class ServerLooper(netutil.Looper):
         self._client_num = 0
         self._client_list = []
         #
-        package_id = 0 # MNIST
+        #package_id = 0 # MNIST
         my_gpu = None
         self._package = util.Package(package_id)
         self._roster = self._package.setup_dnn(my_gpu)
@@ -44,63 +44,59 @@ class ServerLooper(netutil.Looper):
         
     def set_client_num(self, num):
         self._client_num = num
-        
+
     def recv_multi(self):
         ret = 0.0
         timeout = 0
         error = 0.0
-        # start_time = time.time()
-        #        elapsed_time = time.time() - start_time
-        #t = format(elapsed_time, "0")
-        #print "time = %s" % (t)
-        #
         for i in range(self._client_num):
             self._client_timeout[i] = 0
         #
         start_time = time.time()
-        for i in range(self._client_num):
+        max = self._client_num*2
+        cnt = 0
+        for i in range(max):
             res, addr = self.recv()
-            #
-            if res==None:
-                timeout = timeout + 1
-                print "   timeout : "#%s : %d" % (addr[0], addr[1])
+            if res:
+                pass
+            else: # timeout
                 for k in range(self._client_num):
-                    print "        %s : %d" % (self._client_list[k], self._client_timeout[k])
+                    print "    timeout:"
+                    print "        %s, %d" % (self._client_list[k], self._client_timeout[k])
                 #
-                return -1.0
-                #continue
+                timeout = timeout + 1
+                continue
             #
             if addr[0] in self._client_list:
-                pass
-            else:
-                print "bad address"
-                return -1.0
-            #
-            elapsed_time = time.time() - start_time
-            t = format(elapsed_time, "0")
-            print "    %d : %s : %s" % (i, addr[0], t)
-            #
-            k = self._client_list.index(addr[0])
-            self._client_timeout[k] = 1
-            a, b = netutil.unpack_if(res)
-            #if a==self.mode():
-            if a==self._seq:
-                ret =  ret + b
-            else:
-                print "   seq error : %s : %d" % (addr[0], addr[1])
+                k = self._client_list.index(addr[0])
+                self._client_timeout[k] = 1
+            else: # address is not registered
+                print "    bad address : %s, %d" % (addr[0], addr[1])
                 error = error + 1
+                continue
+            #
+            seq, ce = netutil.unpack_if(res)
+            if seq==self._seq:
+                ret =  ret + ce
+            else: # bad seq
+                print "   seq error : %s, %d, %d (%d)" % (addr[0], addr[1], seq, self._seq)
+                error = error + 1
+                continue
+            #
+            cnt = cnt + 1
+            if self._client_num==cnt:
+                break
         #
-        if timeout + error>0:
+        if timeout + error>0 and cnt<self._client_num:
             return -1.0
         #
         self._seq = self._seq + 1
         return ret/float(self._client_num)
     
-    
     def execute_cmd(self, mode, a, b, c, d):
         self.set_mode(mode)
         cmd = netutil.pack_i6(self._seq, mode, a, b, c, d)
-        print "send seq=%d" %(self._seq)
+        #print "send seq=%d" %(self._seq)
         self.send(cmd)
         #
         self.set_mode(mode+5)

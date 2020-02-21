@@ -5,7 +5,7 @@
 #
 # LDNN : lesser Deep Neural Network
 #
-
+PACKAGE_BASE_PATH = "../ldnn_package/"
 #
 #
 #
@@ -19,6 +19,12 @@ import numpy as np
 import struct
 import cPickle
 import csv
+from PIL import Image
+from PIL import ImageFile
+from PIL import JpegImagePlugin
+from PIL import ImageFile
+from PIL import PngImagePlugin
+import zlib
 #
 #
 # LDNN Modules
@@ -30,11 +36,11 @@ import gpu
 #
 sys.setrecursionlimit(10000)
 #
+#
+#
 MNIST_IMAGE_HEADER_SIZE = 16
 MNIST_LABEL_HEADER_SIZE  = 8
 MNIST_IMAGE_SIZE = 784
-#
-#
 #
 def make_mnist_batch(package):
     image_path = package._train_image_path
@@ -71,52 +77,80 @@ def make_mnist_batch(package):
 #
 #
 #
-def make_mnist2_batch():
-    cat = 0
-    clut = 0
-    data_size = 28*28
-    batch_size = 6000
-    batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
-    batch_label = np.zeros(batch_size, dtype=np.int32)
-    divider = 10
-    total = 0
-
-    src_index = 0
-    dst_index = 0
-    for cat in range(10):
-        for clut in range(10):
-            path = "./package/MNIST2/clustered_data/class_%d/cluster_%d/image.csv" % (cat, clut)
-            print path
-            #
-            with open(path, "r") as f:
-                reader = csv.reader(f)
-                n = 0
-                for row in reader:
-                    left = src_index%divider
-                    if left==0:
-                        i = 0
-                        for i in range(data_size):
-                            cell = row[i]
-                            tmp = int(cell)
-                            batch_data[dst_index][i] = float(tmp)
-                            i = i + 1
-                        #
-                        batch_label[dst_index] = cat
-                        dst_index = dst_index+1
-                        n = n + 1
-                    #
-                    src_index = src_index+1
-                # for
-                total = total + n
-                print n
-            # with
-        #
+CIFAR10_TRAIN_BATCH_NUM  = 5
+CIFAR10_TRAIN_BATCH_SIZE  = 10000
+CIFAR10_TEST_BATCH_SIZE   = 10000
+CIFAR10_IMAGE_WIDTH = 32
+CIFAR10_IMAGE_HEIGHT = 32
+CIFAR10_NUM_CLASS = 10
+CIFAR10_IMAGE_SIZE = CIFAR10_IMAGE_WIDTH*CIFAR10_IMAGE_HEIGHT*3
+CIFAR10_IMAGE_Y_SIZE = CIFAR10_IMAGE_WIDTH*CIFAR10_IMAGE_HEIGHT
+CIFAR10_TRAIN_DATA_PATH =[ "../ldnn_package/cifar-10-batches-py/data_batch_1",
+                           "../ldnn_package/cifar-10-batches-py/data_batch_2",
+                           "../ldnn_package/cifar-10-batches-py/data_batch_3",
+                           "../ldnn_package/cifar-10-batches-py/data_batch_4",
+                           "../ldnn_package/cifar-10-batches-py/data_batch_5"]
+CIFAR10_TEST_DATA_PATH = "../ldnn_package/cifar-10-batches-py/test_batch"
+#
+#
+#
+def make_cifa10_train_batch(package):
+    label_list = []
+    batch_size = CIFAR10_TRAIN_BATCH_SIZE*CIFAR10_TRAIN_BATCH_NUM
+    data_array = np.zeros((batch_size, CIFAR10_IMAGE_Y_SIZE), dtype=np.float32)
+    pix = np.zeros((1024,3), dtype=np.uint8)
     #
-    util.pickle_save("./package/MNIST2/train_image_batch.pickle", batch_data)
-    util.pickle_save("./package/MNIST2/train_label_batch.pickle", batch_label)
-    print total
-    #
-    print batch_label
+    for i in range(CIFAR10_TRAIN_BATCH_NUM):
+        path = CIFAR10_TRAIN_DATA_PATH[i]
+        with open(path, 'rb') as fo:
+            dict = cPickle.load(fo)
+            label_list.extend(dict["labels"])
+            images_rgb = dict["data"]
+            offset = CIFAR10_TRAIN_BATCH_SIZE*i
+            for j in range(CIFAR10_TRAIN_BATCH_SIZE):
+                print "(%d, %d)" % (i, j)
+                image = images_rgb[j]
+                image = image.reshape([3,1024])
+                red = image[0]
+                green = image[1]
+                blue = image[2]
+                for m in range(1024):
+                    r = red[m]
+                    g = green[m]
+                    b = blue[m]
+                    pix[m][0] = r
+                    pix[m][1] = g
+                    pix[m][2] = b
+                    y = 0.299*float(r) + 0.587*float(g) + 0.114*float(b)
+                    data_array[offset+j][m] = y
+                # for m
+                # save rgb
+                array_rgb = pix.reshape([32, 32, 3])
+                img = Image.fromarray(array_rgb)
+                label = label_list[offset+j]
+                save_path = "../ldnn_package/cifar-10-batches-py/rgb/%d/%d/%05d.png" % (i, label, offset+j)
+                img.save(save_path)
+                # save y
+                array_y = data_array[offset+j].astype(np.uint8)
+                array_y = array_y.reshape([32,32])
+                img = Image.fromarray(array_y)
+                save_path = "../ldnn_package/cifar-10-batches-py/y/%d/%d/%05d.png" % (i, label, offset+j)
+                img.save(save_path)
+                #
+            # for j
+        # with
+    # for i
+    util.pickle_save(package._train_image_batch_path, data_array)
+    util.pickle_save(package._train_label_batch_path, label_list)
+    return 0
+#
+#
+#
+def narray2png(p_1d, x, y):
+    image = np.array(p_1d, dtype='uint8')
+    image = image.reshape([x, y])
+    return Image.fromarray(image)
+    #return Image.fromarray(np.uint8(image))
 #
 #
 #
@@ -125,16 +159,26 @@ def main():
     argc = len(argvs)
     #
     # 0 : MNIST
-    # 1 : MNIST2 (clustered data set)
+    # 1 : MNIST2 (smaller network)
     # 2 : CIFAR-10
-    package_id = 0
+    package_id = 2
     package = util.Package(package_id)
+    #
+#    package.load_batch()
+#    images = package._train_image_batch
+#    print type(images)
+#    print len(images)
+#    labels = package._train_label_batch
+#    print len(labels)
+    return 0
+    
     if package_id==0:
         make_mnist_batch(package)
     elif package_id==1:
         pass
     elif package_id==2:
-        pass
+        #make_cifa10_train_batch(package)
+        make_cifa10_test_batch(package)
     else:
         pass
     #

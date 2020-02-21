@@ -345,10 +345,10 @@ class Cifar10:
 #
 #
 TRAIN_IMAGE_PATH = ["../ldnn_package/MNIST/train-images-idx3-ubyte",
-                    "./",
+                    "../ldnn_package/MNIST/train-images-idx3-ubyte",
                     "../ldnn_package/cifar-10-batches-py/data_batch_1"]
 TRAIN_LABEL_PATH = ["../ldnn_package/MNIST/train-labels-idx1-ubyte",
-                    "./",
+                    "../ldnn_package/MNIST/train-labels-idx1-ubyte",
                     "../ldnn_config/cifar-10-batches-py/train_label_batch.pickle"]
 TRAIN_IMAGE_BATCH_PATH = ["../ldnn_config/MNIST/train_image_batch.pickle",
                           "../ldnn_config/MNIST2/train_image_batch.pickle",
@@ -365,10 +365,10 @@ TEST_LABEL_PATH = ["../ldnn_package/MNIST/t10k-labels-idx1-ubyte",
                    "../ldnn_package/MNIST/t10k-labels-idx1-ubyte",
                    "./"]
 TEST_IMAGE_BATCH_PATH = ["../ldnn_config/MNIST/test_image_batch.pickle",
-                         "../ldnn_config/MNIST/test_image_batch.pickle",
+                         "../ldnn_config/MNIST2/test_image_batch.pickle",
                          "../ldnn_config/cifar-10-batches-py/test_image_batch.pickle"]
 TEST_LABEL_BATCH_PATH = ["../ldnn_config/MNIST/test_label_batch.pickle",
-                         "../ldnn_config/MNIST/test_label_batch.pickle",
+                         "../ldnn_config/MNIST2/test_label_batch.pickle",
                          "../ldnn_config/cifar-10-batches-py/test_label_batch.pickle"]
 
 PACKAGE_NAME = ["MNIST", "MNIST2", "cifar-10-batches-py"]
@@ -452,12 +452,10 @@ class Package:
             if my_gpu:
                 r.update_weight()
             #
-        elif self._package_id==1: # MNIST2 : selective clustered data
+        elif self._package_id==1: # MNIST : less layers
             input_layer = r.add_layer(0, self._image_size, self._image_size)
             hidden_layer_1 = r.add_layer(1, self._image_size, 32)
             hidden_layer_2 = r.add_layer(1, 32, 32)
-            hidden_layer_3 = r.add_layer(1, 32, 32)
-            hidden_layer_4 = r.add_layer(1, 32, 32)
             output_layer = r.add_layer(2, 32, 10)
             #
             if os.path.isfile(self._wi_csv_path):

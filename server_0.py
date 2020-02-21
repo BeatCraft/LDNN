@@ -28,8 +28,9 @@ def main():
     BC_PORT = 5000
     SERVER_ADDR = "192.168.200.10"
     SERVER_PORT = 5005
+    package_id = 1
     #
-    server.server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT)
+    server.server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id)
     #
     print "main() : end"
 #

@@ -65,14 +65,14 @@ class ClientLooper(netutil.Looper):
             # recv a packet
             res, addr = self.recv()
             if res==None:
-                print "**** recv sock timeout"
+                #print "**** recv sock timeout"
                 time.sleep(0.01)
                 continue
             #
             # decode and response
             #
             seq, a, b, c, d, e = netutil.unpack_i6(res)
-            print "recv seq = %d" % (seq)
+            #print "recv seq = %d" % (seq)
             if a==10:   # init
                 print "init"
                 cmd = netutil.pack_if(15, 1.0)

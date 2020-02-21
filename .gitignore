@@ -10,3 +10,5 @@ wi.csv.bak.2019-06-11
 ./test/
 ./debug/
 ./client_data/
+./debug/*
+

@@ -250,100 +250,6 @@ def get_key_input(prompt):
 #
 #
 #
-CIFAR10_TRAIN_BATCH_SIZE  = 10000
-CIFAR10_TEST_BATCH_SIZE   = 10000
-CIFAR10_IMAGE_WIDTH = 32
-CIFAR10_IMAGE_HEIGHT = 32
-CIFAR10_NUM_CLASS = 10
-CIFAR10_IMAGE_SIZE = CIFAR10_IMAGE_WIDTH*CIFAR10_IMAGE_HEIGHT*3
-CIFAR10_IMAGE_Y_SIZE = CIFAR10_IMAGE_WIDTH*CIFAR10_IMAGE_HEIGHT
-CIFAR10_TRAIN_DATA_PATH = "../ldnn_package/cifar-10-batches-py/data_batch_1"
-CIFAR10_TRAIN_IMAGE_BATCH_PATH = "../ldnn_config/cifar-10-batches-py/train_image_batch.pickle"
-CIFAR10_TRAIN_LABEL_BATCH_PATH = "../ldnn_config/cifar-10-batches-py/train_label_batch.pickle"
-CIFAR10_TEST_DATA_PATH = "../ldnn_package/cifar-10-batches-py/test_batch"
-CIFAR10_TEST_IMAGE_BATCH_PATH = "../ldnn_config/cifar-10-batches-py/test_image_batch.pickle"
-CIFAR10_TEST_LABEL_BATCH_PATH = "../ldnn_config/cifar-10-batches-py/test_label_batch.pickle"
-CIFAR10_WI_CSV_PATH = "../ldnn_config/cifar-10-batches-py/wi.csv"
-CIFAR10_W_PROPERTY_CSV_PATH = "../ldnn_config/cifar-10-batches-py/w_property.csv"
-CIFAR10_W_LOCK_CSV_PATH = "../ldnn_config/cifar-10-batches-py/w_lock.csv"
-#
-class Cifar10:
-    def __init__(self, mode=0): # 0 : train, 1 : test, 2 : self-test
-        print "cifar10(%d)" % (mode)
-        self._wi_csv_path = CIFAR10_WI_CSV_PATH
-        #
-        if mode==0 or mode==2:
-            self._mode = 0 # train
-            if os.path.isfile(CIFAR10_TRAIN_IMAGE_BATCH_PATH) and os.path.isfile(CIFAR10_TRAIN_LABEL_BATCH_PATH):
-                print "restore train batch"
-                self._data = pickle_load(CIFAR10_TRAIN_IMAGE_BATCH_PATH)
-                self._labels = pickle_load(CIFAR10_TRAIN_LABEL_BATCH_PATH)
-            else:
-                print "make train batch"
-                self.make_batch(CIFAR10_TRAIN_DATA_PATH, CIFAR10_TRAIN_BATCH_SIZE)
-                pickle_save(CIFAR10_TRAIN_IMAGE_BATCH_PATH, self._data)
-                pickle_save(CIFAR10_TRAIN_LABEL_BATCH_PATH, self._labels)
-        else:
-            self._mode = 1 # test
-            if os.path.isfile(CIFAR10_TEST_IMAGE_BATCH_PATH) and os.path.isfile(CIFAR10_TEST_LABEL_BATCH_PATH) :
-                print "restore test batch"
-                self._data = pickle_load(CIFAR10_TEST_IMAGE_BATCH_PATH)
-                self._labels = pickle_load(CIFAR10_TEST_LABEL_BATCH_PATH)
-            else:
-                print "make test batch"
-                self.make_batch(CIFAR10_TEST_DATA_PATH, CIFAR10_TEST_BATCH_SIZE)
-                pickle_save(CIFAR10_TEST_IMAGE_BATCH_PATH, self._data)
-                pickle_save(CIFAR10_TEST_LABEL_BATCH_PATH, self._labels)
-        #
-    def make_batch(self, path, batch_size):
-        with open(path, 'rb') as fo:
-             dict = cPickle.load(fo)
-        #
-        self._labels = dict["labels"]
-        #
-        image_rgb = dict["data"]
-        images_rgb = image_rgb.astype(np.float32)
-        self._data = np.zeros((batch_size, (CIFAR10_IMAGE_Y_SIZE)), dtype=np.float32)
-        for j in range(batch_size):
-            for i in range(CIFAR10_IMAGE_Y_SIZE):
-                red = image_rgb[j][i]
-                green = image_rgb[j][CIFAR10_IMAGE_Y_SIZE+i]
-                blue = image_rgb[j][CIFAR10_IMAGE_Y_SIZE*2+i]
-                self._data[j][i] = 0.299*red + 0.587*green + 0.114*blue
-        #
-
-    def setup_dnn(self, my_gpu):
-        if my_gpu:
-            pass
-        else:
-            return None
-        #
-        r = core.Roster()
-        r.set_gpu(my_gpu)
-        #
-        input_layer = r.add_layer(0, CIFAR10_IMAGE_Y_SIZE, CIFAR10_IMAGE_Y_SIZE)
-        hidden_layer_1 = r.add_layer(1, CIFAR10_IMAGE_Y_SIZE, 32)
-        hidden_layer_2 = r.add_layer(1, 32, 32)
-        output_layer = r.add_layer(2, 32, 10)
-        #
-        if os.path.isfile(self._wi_csv_path):
-            print "restore weight index"
-            r.import_weight_index(self._wi_csv_path)
-        else:
-            print "init weight index"
-            r.init_weight()
-            r.export_weight_index(self._wi_csv_path)
-        #
-        if my_gpu:
-            r.update_weight()
-        #
-        return r
-#
-#
-#
-#
-#
-#
 TRAIN_IMAGE_PATH = ["../ldnn_package/MNIST/train-images-idx3-ubyte",
                     "../ldnn_package/MNIST/train-images-idx3-ubyte",
                     "../ldnn_package/cifar-10-batches-py/data_batch_1"]
@@ -372,8 +278,8 @@ TEST_LABEL_BATCH_PATH = ["../ldnn_config/MNIST/test_label_batch.pickle",
                          "../ldnn_config/cifar-10-batches-py/test_label_batch.pickle"]
 
 PACKAGE_NAME = ["MNIST", "MNIST2", "cifar-10-batches-py"]
-PACKAGE_IMAGE_WIDTH = [28, 32, 32]
-PACKAGE_IMAGE_HEIGHT = [28, 32, 32]
+PACKAGE_IMAGE_WIDTH = [28, 28, 32]
+PACKAGE_IMAGE_HEIGHT = [28, 28, 32]
 PACKAGE_IMAGE_SIZE = [784, 784, 1024]
 PACKAGE_NUM_CLASS = [10, 10, 10]
 
@@ -425,11 +331,6 @@ class Package:
             print self._test_label_batch_path
             
     def setup_dnn(self, my_gpu):
-#        if my_gpu:
-#            pass
-#        else:
-#            return None
-        #
         r = core.Roster()
         r.set_gpu(my_gpu)
         #
@@ -439,37 +340,31 @@ class Package:
             hidden_layer_2 = r.add_layer(1, 32, 32)
             hidden_layer_3 = r.add_layer(1, 32, 32)
             hidden_layer_4 = r.add_layer(1, 32, 32)
-            output_layer = r.add_layer(2, 32, 10)
-            #
-            if os.path.isfile(self._wi_csv_path):
-                print "restore weight index"
-                r.import_weight_index(self._wi_csv_path)
-            else:
-                print "init weight index"
-                r.init_weight()
-                r.export_weight_index(self._wi_csv_path)
-            #
-            if my_gpu:
-                r.update_weight()
-            #
+            output_layer = r.add_layer(2, 32, self._num_class)
         elif self._package_id==1: # MNIST : less layers
             input_layer = r.add_layer(0, self._image_size, self._image_size)
             hidden_layer_1 = r.add_layer(1, self._image_size, 32)
+            hidden_layer_2 = r.add_layer(1, 32, 16)
+            hidden_layer_3 = r.add_layer(1, 16, 16)
+            output_layer = r.add_layer(2, 16, self._num_class)
+        elif self._package_id==2: # cifa-10
+            input_layer = r.add_layer(0, self._image_size, self._image_size)
+            hidden_layer_1 = r.add_layer(1, self._image_size, 32)
             hidden_layer_2 = r.add_layer(1, 32, 32)
-            output_layer = r.add_layer(2, 32, 10)
-            #
-            if os.path.isfile(self._wi_csv_path):
-                print "restore weight index"
-                r.import_weight_index(self._wi_csv_path)
-            else:
-                print "init weight index"
-                r.init_weight()
-                r.export_weight_index(self._wi_csv_path)
-            #
-            if my_gpu:
-                r.update_weight()
-            #
+            output_layer = r.add_layer(2, 32, self._num_class)
         else:
+            print "package error"
             return None
+        #
+        if os.path.isfile(self._wi_csv_path):
+            print "restore weight index"
+            r.import_weight_index(self._wi_csv_path)
+        else:
+            print "init weight index"
+            r.init_weight()
+            r.export_weight_index(self._wi_csv_path)
+        #
+        if my_gpu:
+            r.update_weight()
         #
         return r

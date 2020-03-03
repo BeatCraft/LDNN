@@ -23,7 +23,7 @@ import netutil
 #
 #
 class ServerLooper(netutil.Looper):
-    def __init__(self, local_addr, local_port, remote_addr, remote_port, package_id=0):
+    def __init__(self, local_addr, local_port, remote_addr, remote_port, package_id):
         print "ServerLooper::__init__()"
         #
         super(ServerLooper, self).__init__(local_addr, local_port, remote_addr, remote_port)
@@ -175,18 +175,16 @@ class ServerLooper(netutil.Looper):
         #
         print "ServerLooper::loop() - end"
 
-
     def weight_shift_mode(self, li, ni, ii, mse_base, mode):
         r =  self._roster
         layer = r.getLayerAt(li)
         wp = layer.get_weight_property(ni, ii) # default : 0
-        lock = layer.get_weight_lock(ni, ii)   # default : 0
+        #lock = layer.get_weight_lock(ni, ii)   # default : 0
         wi = layer.get_weight_index(ni, ii)
-        #print wi
         wi_alt = wi
         #
-        if lock>0:
-            return mse_base, 0
+        #if lock>0:
+        #    return mse_base, 0
         #
         if mode>0: # heat
             if wp<0:
@@ -196,28 +194,24 @@ class ServerLooper(netutil.Looper):
             if wi==core.WEIGHT_INDEX_MAX:
                 layer.set_weight_property(ni, ii, 0)
                 layer.set_weight_index(ni, ii, wi-1)
-                #
                 mse_base = self.update(li, ni, ii, wi-1)
-                #
                 return mse_base, 1
             #
         else:
             if wp>0:
+                print "    skip"
                 return mse_base, 0
             #
             if wi==core.WEIGHT_INDEX_MIN:
                 layer.set_weight_property(ni, ii, 0)
                 layer.set_weight_index(ni, ii, wi+1)
-                #
                 mse_base = self.update(li, ni, ii, wi+1)
-                #
                 return mse_base, 1
             #
+        # if mode
         #
         wi_alt = wi + mode
-        #
         mse_alt = self.set_alt(li, ni, ii, wi_alt)
-        #
         if mse_alt<mse_base:
             layer.set_weight_property(ni, ii, mode)
             layer.set_weight_index(ni, ii, wi_alt)
@@ -227,7 +221,6 @@ class ServerLooper(netutil.Looper):
             return mse_alt, 1
         #
         layer.set_weight_property(ni, ii, 0)
-        #
         return mse_base, 0
 
     def train(self, it, limit):
@@ -375,10 +368,10 @@ class ServerLooper(netutil.Looper):
 #
 #
 #
-def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT):
+def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id):
     print "main() : start"
     #
-    s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT)
+    s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id)
     s.init()
     s.run()
     #

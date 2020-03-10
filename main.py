@@ -212,75 +212,90 @@ def weight_shift_mode(r, li, ni, ii, mse_base, mode):
 #
 #
 #
+def weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction):
+    cnt = 0
+    num_w = layer._num_input
+    w_p = num_w/divider
+    #
+    for p in range(w_p):
+        ii = random.randrange(num_w)
+        entropy, ret = weight_shift_mode(r, li, ni, ii, entropy, direction)
+        if ret>0:
+            cnt = cnt + ret
+            print "[%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (it, li, ni, ii, p, w_p, cnt, entropy)
+        #
+        if entropy<limit:
+            print "reach to the limit(%f), exit iterations" %(limit)
+            break
+        #
+    # for p
+    return entropy, cnt
+#
+#
+#
+def node_loop(it, r, limit, divider, entropy, layer, li, direction):
+    cnt = 0
+    num_node = layer._num_node
+    num_w = layer._num_input
+    #
+    node_index_list = list(range(num_node))
+    random.shuffle(node_index_list)
+    nc = 0
+    for ni in node_index_list:
+        entropy, ret = weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction)
+        cnt = cnt + ret
+        if entropy<limit:
+            print "reach to the limit(%f), exit iterations" %(limit)
+            break
+        #
+    # for ni
+    return entropy, cnt
+#
+#
+#
+def layer_loop(it, r, limit, reverse, divider, direction):
+    cnt = 0
+    r.propagate()
+    entropy = r.get_cross_entropy()
+    c = r.countLayers()
+    list_of_layer_index = []
+    #
+    if reverse==0: # input to output
+        for i in range(1, c):
+            list_of_layer_index.append(i)
+    else: # output to intput
+        for i in range(c-1, 0, -1):
+            list_of_layer_index.append(i)
+    #
+    for li in list_of_layer_index:
+        layer = r.getLayerAt(li)
+        entropy, ret = node_loop(it, r, limit, divider, entropy, layer, li, direction)
+        cnt = cnt + ret
+        if entropy<limit:
+            print "reach to the limit(%f), exit iterations" %(limit)
+            break
+        #
+    # for li
+    return entropy, cnt
+#
+#
+#
 def train(it, r, limit):
     divider = 4
+    entropy = 0.0
+    reverse = 0
+    direction = 1
+    w_list = []
     t_cnt = 0
     h_cnt = 0
     c_cnt = 0
-    w_list = []
     #
-    r.propagate()
-    mse_base = r.get_cross_entropy()
+    entropy, h_cnt = layer_loop(it, r, limit, reverse, divider, direction)
     #
-    c = r.countLayers()
-    for li in range(1, c):
-    #for li in range(c-1, 0, -1):
-        layer = r.getLayerAt(li)
-        num_node = layer._num_node
-        num_w = layer._num_input
-        #
-        node_index_list = list(range(num_node))
-        random.shuffle(node_index_list)
-        nc = 0
-        for ni in node_index_list:
-            nc = nc + 1
-            w_p = num_w/divider
-            for p in range(w_p):
-                ii = random.randrange(num_w)
-                mse_base, ret = weight_shift_mode(r, li, ni, ii, mse_base, 1)
-                if ret>0:
-                    print "[%d] H=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, h_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
-                #print "    %f" % mse_base
-                #
-                h_cnt = h_cnt + ret
-                t_cnt = t_cnt +1
-                if mse_base<limit:
-                    print "exit iterations"
-                    return h_cnt, c_cnt, mse_base
-                #
-            #
-        #
+    direction = -1
+    entropy, c_cnt = layer_loop(it, r, limit, reverse, divider, direction)
     #
-    t_cnt = 0
-    c = r.countLayers()
-    for li in range(1, c):
-        layer = r.getLayerAt(li)
-        num_node = layer._num_node
-        num_w = layer._num_input
-        #
-        node_index_list = list(range(num_node))
-        random.shuffle(node_index_list)
-        nc = 0
-        for ni in node_index_list:
-            nc = nc + 1
-            w_p = num_w/divider
-            for p in range(w_p):
-                ii = random.randrange(num_w)
-                mse_base, ret = weight_shift_mode(r, li, ni, ii, mse_base, -1)
-                if ret>0:
-                    print "[%d] C=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, c_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
-                #print "    %f" % mse_base
-                #
-                c_cnt = c_cnt + ret
-                t_cnt = t_cnt + 1
-                if mse_base<limit:
-                    print "exit iterations"
-                    return h_cnt, c_cnt, mse_base
-                #
-            #
-        #
-    #
-    return h_cnt, c_cnt, mse_base
+    return entropy, h_cnt, c_cnt
 #
 #
 #
@@ -296,7 +311,8 @@ def loop(it, r, package, debug=0):
     start_time = time.time()
     #
     for i in range(it):
-        h_cnt, c_cnt, ce = train(i, r, limit)
+        #
+        ce, h_cnt, c_cnt = train(i, r, limit)
         #
         h_cnt_list.append(h_cnt)
         c_cnt_list.append(c_cnt)
@@ -319,8 +335,6 @@ def loop(it, r, package, debug=0):
             print "exit iterations"
             break
         #
-        #r.reset_weight_property()
-        #r.unlock_weight_all()
         pre_ce = ce
     #
     elapsed_time = time.time() - start_time
@@ -390,7 +404,7 @@ def main():
     package_id = 0
     print "- Select a package -"
     print "0 : MNIST"
-    print "1 : MNIST2 (clustered data set)"
+    print "1 : MNIST (2)"
     print "2 : CIFAR-10"
     menu = get_key_input("input command >")
     if menu==0:
@@ -404,7 +418,6 @@ def main():
     #
     #
     #
-    mode = 1
     print "0 : train"
     print "1 : test"
     print "2 : self-test"

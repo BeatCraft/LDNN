@@ -390,7 +390,8 @@ class Roster:
         #ret = np.sum(self._batch_cross_entropy)/float(self._batch_size)
         #print "    CE=%f" % (ret)
         #return ret
-        return np.sum(self._batch_cross_entropy)/float(self._batch_size)
+        return np.sum(self._batch_cross_entropy)
+        #return np.sum(self._batch_cross_entropy)/float(self._batch_size)
     
     def export_weight_index(self, path):
         print "Roster : export_weight_index(%s)" % path

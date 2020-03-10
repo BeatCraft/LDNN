@@ -345,7 +345,7 @@ class Package:
             input_layer = r.add_layer(0, self._image_size, self._image_size)
             hidden_layer_1 = r.add_layer(1, self._image_size, 32)
             hidden_layer_2 = r.add_layer(1, 32, 16)
-            hidden_layer_3 = r.add_layer(1, 16, 16)
+            #hidden_layer_3 = r.add_layer(1, 16, 16)
             output_layer = r.add_layer(2, 16, self._num_class)
         elif self._package_id==2: # cifa-10
             input_layer = r.add_layer(0, self._image_size, self._image_size)

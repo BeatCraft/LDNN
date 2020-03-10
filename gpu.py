@@ -23,6 +23,43 @@ __kernel void scale(
     }
 };
 
+__kernel void p_softmax(__global float* in, int num)
+{
+    int bi = get_global_id(0);
+    float max;
+    float sum;
+    
+    max = 0.0;
+    sum = 0.0;
+    
+//    for (int i=0;i<num;i++){
+//        if (in[bi*num+i]>max){
+//            max = in[bi*num+i];
+//        }
+//    }
+
+    for (int i=0;i<num;i++){
+        in[bi*num+i] = exp(in[bi*num+i]);
+    }
+
+    for (int i=0;i<num;i++){
+        sum += in[bi*num+i];
+    }
+
+    for (int i=0;i<num;i++){
+        in[bi*num+i] = in[bi*num+i]/sum;
+    }
+
+//    for (int i=0;i<num;i++){
+//        sum += in[bi*num+i];
+//    }
+//
+//   for (int i=0;i<num;i++){
+//        in[bi*num+i] = in[bi*num+i]/sum;
+//    }
+}
+
+
 __kernel void k_cross_entropy(__global float* infs,
                               __global float* output,
                               __global int* labels,
@@ -87,42 +124,7 @@ __kernel void k_sum(__global float* in,
     }else{
         out[num_node*bi + ni] = sum;
     }
-    
-//    switch(activation){
-//        case 0:
-//            // relu
-//            if (sum<0.0){
-//                out[num_node*bi + ni] = 0.0;
-//            }else{
-//                out[num_node*bi + ni] = sum;
-//            }
-//        default:
-//            out[num_node*bi + ni] = sum;
-//    }
 }
-
-__kernel void testp(__global float* data, int d_size, __global float* ret, int r_size)
-{
-    int i = get_global_id(0);
-    __local float k;
-    //__local float ret[size/2];
-    //const int localID = get_local_id(0);
-    //const int localSize = get_local_size(0);
-    //printf(\"[%d] local id=%d, size=%d\\n\", localID, localSize);
-    //printf(\"fuck\\n\");
-    printf(\"[%d] %f, [%d] %f\\n\", i*2, data[i*2], i*2+1, data[i*2+1]);
-    k = data[i*2] + data[i*2+1];
-    printf(\"[%d] %f\\n\", i, k);
-    //barrier(CLK_LOCAL_MEM_FENCE);
-    //printf(\"[%d] %f\\n\", i, k);
-    
-//    k = data[i*2] + data[i*2+1];
-//    printf(\"[%d] %f, (%f)\\n\", i, k, data[i*2] + data[i*2+1]);
-    //barrier(CLK_LOCAL_MEM_FENCE);
-    //printf(\"[%d] %f\\n\", i, k);
-    //ret[0] += k;
-    //printf(\"[%d] %f\\n\", i, ret[0]);
-};
 
 __kernel void multiple_x_by_w_batch(
     __global float* x,
@@ -203,21 +205,11 @@ __kernel void multiple_x_by_w_alt(
 #
 class Gpu:
     def __init__(self, platform_id, device_id):
-        #
-        #self._ctx = cl.create_some_context()
-        #
-        #platform = cl.get_platforms()[0]
-        # AMD Server
-        #device = platform.get_devices()[0]
-        # Intel on MBP
-        #device = platform.get_devices()[1]
-        # AMD on eGPU
-        #device = platform.get_devices()[2]
         platform = cl.get_platforms()[platform_id]
         device = platform.get_devices()[device_id]
         print platform
         print device
-    
+        #
         self._ctx = cl.Context([device])
         for dev in self._ctx.devices:
             assert dev.local_mem_size > 0
@@ -277,11 +269,6 @@ class Gpu:
         event = cl.enqueue_copy(self._queue, dist, src)
         event.wait()
         
-    def testp(self, data, d_size, ret, r_size):
-        event = self.prg.testp(self._queue, (d_size/2,), None,
-                               data, np.int32(d_size), ret, np.int32(r_size))
-        event.wait()
-        
     def k_sum(self, data_in, data_out, num_input, num_node, activation, num_batch):
         event = self.prg.k_sum(self._queue, (num_node, num_batch), None,
                                data_in, data_out,
@@ -289,7 +276,7 @@ class Gpu:
         event.wait()
     
     def k_softmax(self, data, size, num_batch):
-        event = self.prg.k_softmax(self._queue, (num_batch,), None, data, np.int32(size))
+        event = self.prg.p_softmax(self._queue, (num_batch,), None, data, np.int32(size))
         event.wait()
     
     def k_cross_entropy(self, infs, output, labels, size, num_batch):
@@ -353,7 +340,9 @@ def main():
     #for row in data_y:
     #    print np.sum(row)
     return 0
-
+#
+#
+#
 if __name__=='__main__':
     print ">> start"
     sts = main()

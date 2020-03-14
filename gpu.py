@@ -62,6 +62,106 @@ __kernel void p_softmax(__global float* in, int num)
 //    }
 }
 
+__kernel void k_normalize(__global float* in, int num)
+{
+    int bi = get_global_id(0);
+    float max;
+    
+    max = 0.0;
+    for (int i=0;i<num;i++){
+        if (in[bi*num+i]>max){
+            max = in[bi*num+i];
+        }
+    }
+    
+    for (int i=0;i<num;i++){
+        in[bi*num+i] = (in[bi*num+i]/max);
+    }
+}
+
+__kernel void p_normalize(__global float* in, int num)
+{
+    int bi = get_global_id(0);
+    float max;
+    float sum;
+    float avg;
+    float std;
+    float tmp;
+    float k;
+    
+    max = 0.0;
+    sum = 0.0;
+    avg = 0.0;
+    std = 0.0;
+    tmp = 0.0;
+    k = 0.0;
+    
+    for (int i=0;i<num;i++){
+        sum += in[bi*num+i];
+    }
+    avg = sum/float(num);
+    
+    sum = 0.0;
+    for (int i=0;i<num;i++){
+        sum += ( (in[bi*num+i]-avg)*(in[bi*num+i]-avg) );
+    }
+    std = sqrt(sum/float(num));
+    
+    
+    sum = 0.0;
+    for (int i=0;i<num;i++){
+//        in[bi*num+i] = (in[bi*num+i]-avg/float(num)+1)/2;
+        in[bi*num+i] = in[bi*num+i]-avg/std;
+    }
+    
+    max = 0.0;
+    for (int i=0;i<num;i++){
+        tmp = in[bi*num+i];
+        k = fabs(tmp);
+        if (k>max){
+            max = k;
+        }
+    }
+    
+    for (int i=0;i<num;i++){
+//        in[bi*num+i] = (in[bi*num+i]+max)/(max*2.0);
+        in[bi*num+i] = in[bi*num+i]+max;
+    }
+}
+
+__kernel void q_normalize(__global float* in, int num)
+{
+    int bi = get_global_id(0);
+    float max;
+    float min;
+    float sum;
+    float avg;
+    float div;
+    float std;
+    
+    max = 0.0;
+    min = 0.0;
+    sum = 0.0;
+    avg = 0.0;
+    div = 0.0;
+    std = 0.0;
+    
+    for (int i=0;i<num;i++){
+        sum += in[bi*num+i];
+    }
+    avg = sum/float(num);
+    
+    sum = 0.0;
+    for (int i=0;i<num;i++){
+        sum += ( (in[bi*num+i]-avg)*(in[bi*num+i]-avg) );
+    }
+    div = sum / float(num);
+    std = sqrt(div);
+    
+    for (int i=0;i<num;i++){
+        in[bi*num+i]  = (((in[bi*num+i]-avg)*10)/std + 50)/100;
+    }
+}
 
 __kernel void k_cross_entropy(__global float* infs,
                               __global float* output,
@@ -276,6 +376,10 @@ class Gpu:
         event = self.prg.k_sum(self._queue, (num_node, num_batch), None,
                                data_in, data_out,
                                np.int32(num_input), np.int32(num_node), np.int32(activation))
+        event.wait()
+    
+    def normalize(self, data, size, num_batch):
+        event = self.prg.k_normalize(self._queue, (num_batch,), None, data, np.int32(size))
         event.wait()
     
     def k_softmax(self, data, size, num_batch):

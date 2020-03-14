@@ -210,6 +210,9 @@ class Layer:
                 activation = 0
                 self._gpu.k_sum(self._gpu_product, self._gpu_output,
                                 self._num_input, self._num_node, activation, self._batch_size)
+                #
+                # normalize()
+                self._gpu.normalize(self._gpu_output, self._num_node, self._batch_size)
             elif self._type==2:
                 activation = 1
                 self._gpu.k_sum(self._gpu_product, self._gpu_output,

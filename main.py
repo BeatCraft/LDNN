@@ -154,10 +154,10 @@ def weight_shift_mode(r, li, ni, ii, mse_base, mode):
     if lock>0:
         return mse_base, 0
     #
+    if wp!=mode and wp!=0:
+        return mse_base, 0
+    #
     if mode>0: # heat
-        if wp<0:
-            return mse_base, 0
-        #
         if wi==core.WEIGHT_INDEX_MAX:
             layer.set_weight_property(ni, ii, 0)
             #
@@ -166,23 +166,8 @@ def weight_shift_mode(r, li, ni, ii, mse_base, mode):
             r.propagate()
             mse_base = r.get_cross_entropy()
             return mse_base, 1
-            #
-#            wi_alt = wi -1
-#            r.propagate(li, ni, ii, wi_alt, 0)
-#            mse_alt = r.get_cross_entropy()
-#            if  mse_alt<mse_base:
-#                layer.set_weight_property(ni, ii, -1)
-#                layer.set_weight_index(ni, ii, wi_alt)
-#                layer.update_weight_gpu()
-#                return mse_base, 1
-            #
-#            layer.set_weight_lock(ni, ii, 1)
-#            return mse_base, 0
         #
-    else:
-        if wp>0:
-            return mse_base, 0
-        #
+    else: # cool
         if wi==core.WEIGHT_INDEX_MIN:
             layer.set_weight_property(ni, ii, 0)
             #
@@ -193,19 +178,17 @@ def weight_shift_mode(r, li, ni, ii, mse_base, mode):
             return mse_base, 1
         #
     #
+    #
+    #
     wi_alt = wi + mode
     r.propagate(li, ni, ii, wi_alt, 0)
     mse_alt = r.get_cross_entropy()
-    #
     if  mse_alt<mse_base:
         layer.set_weight_property(ni, ii, mode)
         layer.set_weight_index(ni, ii, wi_alt)
         layer.update_weight_gpu()
         return mse_alt, 1
     #
-#    if wp!=mode:
-#        layer.set_weight_lock(ni, ii, 1)
-#    else:
     layer.set_weight_property(ni, ii, 0)
     #
     return mse_base, 0

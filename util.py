@@ -336,17 +336,14 @@ class Package:
         #
         if self._package_id==0: # MNIST
             input_layer = r.add_layer(0, self._image_size, self._image_size)
-            hidden_layer_1 = r.add_layer(1, self._image_size, 32)
-            hidden_layer_2 = r.add_layer(1, 32, 32)
-            hidden_layer_3 = r.add_layer(1, 32, 32)
-            hidden_layer_4 = r.add_layer(1, 32, 32)
+            hidden_layer_1 = r.add_layer(1, self._image_size, 128)
+            hidden_layer_2 = r.add_layer(1, 128, 32)
             output_layer = r.add_layer(2, 32, self._num_class)
         elif self._package_id==1: # MNIST : less layers
             input_layer = r.add_layer(0, self._image_size, self._image_size)
             hidden_layer_1 = r.add_layer(1, self._image_size, 32)
-            hidden_layer_2 = r.add_layer(1, 32, 16)
-            #hidden_layer_3 = r.add_layer(1, 16, 16)
-            output_layer = r.add_layer(2, 16, self._num_class)
+            hidden_layer_2 = r.add_layer(1, 32, 32)
+            output_layer = r.add_layer(2, 32, self._num_class)
         elif self._package_id==2: # cifa-10
             input_layer = r.add_layer(0, self._image_size, self._image_size)
             hidden_layer_1 = r.add_layer(1, self._image_size, 32)

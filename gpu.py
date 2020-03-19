@@ -99,19 +99,16 @@ __kernel void p_normalize(__global float* in, int num)
     for (int i=0;i<num;i++){
         sum += in[bi*num+i];
     }
-    avg = sum/float(num);
+    avg = sum/num;
     
     sum = 0.0;
     for (int i=0;i<num;i++){
         sum += ( (in[bi*num+i]-avg)*(in[bi*num+i]-avg) );
     }
-    std = sqrt(sum/float(num));
+    std = sqrt(sum/num);
     
-    
-    sum = 0.0;
     for (int i=0;i<num;i++){
-//        in[bi*num+i] = (in[bi*num+i]-avg/float(num)+1)/2;
-        in[bi*num+i] = in[bi*num+i]-avg/std;
+        in[bi*num+i] = (in[bi*num+i]-avg)/std;
     }
     
     max = 0.0;
@@ -124,8 +121,7 @@ __kernel void p_normalize(__global float* in, int num)
     }
     
     for (int i=0;i<num;i++){
-//        in[bi*num+i] = (in[bi*num+i]+max)/(max*2.0);
-        in[bi*num+i] = in[bi*num+i]+max;
+        in[bi*num+i] = (in[bi*num+i]+max)/(max*2);
     }
 }
 
@@ -138,6 +134,7 @@ __kernel void q_normalize(__global float* in, int num)
     float avg;
     float div;
     float std;
+    float tmp;
     
     max = 0.0;
     min = 0.0;
@@ -145,6 +142,7 @@ __kernel void q_normalize(__global float* in, int num)
     avg = 0.0;
     div = 0.0;
     std = 0.0;
+    tmp = 0.0;
     
     for (int i=0;i<num;i++){
         sum += in[bi*num+i];
@@ -153,13 +151,15 @@ __kernel void q_normalize(__global float* in, int num)
     
     sum = 0.0;
     for (int i=0;i<num;i++){
-        sum += ( (in[bi*num+i]-avg)*(in[bi*num+i]-avg) );
+        tmp = in[bi*num+i]-avg;
+        sum += (tmp*tmp);
     }
     div = sum / float(num);
     std = sqrt(div);
     
     for (int i=0;i<num;i++){
-        in[bi*num+i]  = (((in[bi*num+i]-avg)*10)/std + 50)/100;
+        tmp = (in[bi*num+i]-avg)*10;
+        in[bi*num+i] = (tmp/std+50)/100;
     }
 }
 

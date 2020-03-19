@@ -359,7 +359,7 @@ def main():
 #
     debug = 1
     it = 20*20
-    batch_size = 5000
+    batch_size = 1000
     #
     # GPU
     #

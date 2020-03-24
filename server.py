@@ -19,6 +19,7 @@ import core
 import util
 import gpu
 import netutil
+import main
 #
 #
 #
@@ -40,6 +41,7 @@ class ServerLooper(netutil.Looper):
         if self._roster is None:
             print "fatal DNN error"
         #
+        self._roster.set_remote(self)
         self._seq = 0
         
     def set_client_num(self, num):
@@ -92,6 +94,7 @@ class ServerLooper(netutil.Looper):
         #
         self._seq = self._seq + 1
         return ret/float(self._client_num)
+        #return ret/float(self._client_num)
     
     def execute_cmd(self, mode, a, b, c, d):
         self.set_mode(mode)
@@ -167,7 +170,8 @@ class ServerLooper(netutil.Looper):
                 print ret
                 self.set_mode(0)
             elif mode==50: # train
-                self.train_loop()
+                main.train(400, r, 0.000001)
+                #self.train_loop()
                 self.set_mode(0)
             else:
                 self.set_mode(0)

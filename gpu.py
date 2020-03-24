@@ -147,14 +147,14 @@ __kernel void q_normalize(__global float* in, int num)
     for (int i=0;i<num;i++){
         sum += in[bi*num+i];
     }
-    avg = sum/float(num);
+    avg = sum/num;
     
     sum = 0.0;
     for (int i=0;i<num;i++){
         tmp = in[bi*num+i]-avg;
         sum += (tmp*tmp);
     }
-    div = sum / float(num);
+    div = sum/num;
     std = sqrt(div);
     
     for (int i=0;i<num;i++){

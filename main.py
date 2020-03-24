@@ -78,25 +78,6 @@ def get_key_input(prompt):
 #
 #
 #
-def evaluate(r, batch_size):
-    #return r.get_cross_entropy()
-    infs = r.get_inference()
-    
-    sum = 0.0
-    for i in range(batch_size):
-        data_class = r._batch_class[i]
-        labels[data_class] = 1.0
-        #print labels
-        inf = infs[i]
-        #print inf
-        mse = util.cross_emtropy_error_2(inf, len(inf), labels, len(labels))
-        sum = sum + mse
-        labels[data_class] = 0.0
-
-    return sum/float(batch_size)
-#
-#
-#
 def test(r):
     batch_size = r._batch_size
     print ">>batch test mode (%d)" % (batch_size)
@@ -111,13 +92,10 @@ def test(r):
     t = format(elapsed_time, "0")
     print "time = %s" % (t)
     #
-    
-    #
     ca = 0
     for i in range(batch_size):
         dist[r._batch_class[i]] = dist[r._batch_class[i]] + 1
         inf = infs[i]
-        #print inf
         index = -1
         mx = max(inf)
         if mx>0.0:
@@ -144,7 +122,7 @@ def test(r):
 #
 #
 #
-def weight_shift_mode(r, li, ni, ii, mse_base, mode):
+def weight_shift_mode(r, li, ni, ii, entropy, mode):
     layer = r.getLayerAt(li)
     wp = layer.get_weight_property(ni, ii) # default : 0
     lock = layer.get_weight_lock(ni, ii)   # default : 0
@@ -152,46 +130,61 @@ def weight_shift_mode(r, li, ni, ii, mse_base, mode):
     wi_alt = wi
     #
     if lock>0:
-        return mse_base, 0
+        return entropy, 0
     #
     if wp!=mode and wp!=0:
-        return mse_base, 0
+        return entropy, 0
     #
     if mode>0: # heat
         if wi==core.WEIGHT_INDEX_MAX:
             layer.set_weight_property(ni, ii, 0)
-            #
             layer.set_weight_index(ni, ii, wi-1)
-            layer.update_weight_gpu()
-            r.propagate()
-            mse_base = r.get_cross_entropy()
-            return mse_base, 1
+            if r._gpu:
+                layer.update_weight_gpu()
+                r.propagate()
+                entropy = r.get_cross_entropy()
+            else:
+                entropy = self.update(li, ni, ii, wi-1)
+            #
+            return entropy, 1
         #
     else: # cool
         if wi==core.WEIGHT_INDEX_MIN:
             layer.set_weight_property(ni, ii, 0)
-            #
             layer.set_weight_index(ni, ii, wi+1)
-            layer.update_weight_gpu()
-            r.propagate()
-            mse_base = r.get_cross_entropy()
-            return mse_base, 1
+            if r._gpu:
+                layer.update_weight_gpu()
+                r.propagate()
+                entropy = r.get_cross_entropy()
+            else:
+                entropy = self.update(li, ni, ii, wi+1)
+            #
+            return entropy, 1
         #
     #
     #
     #
     wi_alt = wi + mode
-    r.propagate(li, ni, ii, wi_alt, 0)
-    mse_alt = r.get_cross_entropy()
-    if  mse_alt<mse_base:
+    entropy_alt = entropy
+    if r._gpu:
+        r.propagate(li, ni, ii, wi_alt, 0)
+        entropy_alt = r.get_cross_entropy()
+    else:
+        entropy_alt = self.set_alt(li, ni, ii, wi_alt)
+    #
+    if  entropy_alt<entropy:
         layer.set_weight_property(ni, ii, mode)
         layer.set_weight_index(ni, ii, wi_alt)
-        layer.update_weight_gpu()
-        return mse_alt, 1
+        if r._gpu:
+            layer.update_weight_gpu()
+        else:
+            entropy_alt = self.update(li, ni, ii, wi_alt)
+        #
+        return entropy_alt, 1
     #
     layer.set_weight_property(ni, ii, 0)
     #
-    return mse_base, 0
+    return entropy, 0
 #
 #
 #
@@ -238,8 +231,13 @@ def node_loop(it, r, limit, divider, entropy, layer, li, direction):
 #
 def layer_loop(it, r, limit, reverse, divider, direction):
     cnt = 0
-    r.propagate()
-    entropy = r.get_cross_entropy()
+    #
+    if r._gpu:
+        r.propagate()
+        entropy = r.get_cross_entropy()
+    else:
+        entropy = r._remote.self.evaluate()
+    #
     c = r.countLayers()
     list_of_layer_index = []
     #
@@ -267,14 +265,13 @@ def train(it, r, limit):
     divider = 4
     entropy = 0.0
     reverse = 0
-    direction = 1
     w_list = []
     t_cnt = 0
     h_cnt = 0
     c_cnt = 0
     #
+    direction = 1
     entropy, h_cnt = layer_loop(it, r, limit, reverse, divider, direction)
-    #
     direction = -1
     entropy, c_cnt = layer_loop(it, r, limit, reverse, divider, direction)
     #
@@ -327,24 +324,6 @@ def loop(it, r, package, debug=0):
     k = len(h_cnt_list)
     for j in range(k):
         print "%d, %d, %d, %f," % (j, h_cnt_list[j], c_cnt_list[j], ce_list[j])
-    
-    #
-#
-#
-#
-def init_WI(r, batch, batch_size, data_size):
-    r.set_batch(batch, batch_size, data_size, 10)
-    #labels = np.zeros(NUM_OF_CLASS, dtype=np.float32)
-    #
-    for i in range(100):
-        r.init_weight()
-        r.update_weight()
-        r.propagate()
-        cr =  evaluate(r, batch_size)
-        print cr
-        #
-        save_path = "./wi/wi.csv.%f" % cr
-        r.export_weight_index(save_path)
     #
 #
 #
@@ -353,13 +332,9 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-#    path = WEIGHT_INDEX_CSV_PATH
-#    if argc==2:
-#        path = argvs[1]
-#
     debug = 1
     it = 20*20
-    batch_size = 1000
+    batch_size = 2000
     #
     # GPU
     #
@@ -387,24 +362,20 @@ def main():
     package_id = 0
     print "- Select a package -"
     print "0 : MNIST"
-    print "1 : MNIST (2)"
     print "2 : CIFAR-10"
     menu = get_key_input("input command >")
     if menu==0:
         package_id = 0
     elif menu==1:
         package_id = 1
-    elif menu==2:
-        package_id = 2
     else:
         package_id = 0
     #
     #
     #
     print "0 : train"
-    print "1 : test"
-    print "2 : self-test"
-    print "3 : "
+    print "1 : test (batch)"
+    print "2 : test (single)"
     menu = get_key_input("input command >")
     if menu==0:
         mode = 0
@@ -414,8 +385,6 @@ def main():
         mode = 2
     else:
         mode = 1
-    #
-    #
     #
     package = util.Package(package_id)
     r = package.setup_dnn(my_gpu)
@@ -427,15 +396,18 @@ def main():
         package.load_batch()
         r.set_batch(package._train_image_batch, package._train_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
         loop(it, r, package, debug)
-    elif mode==1: # test
+    elif mode==1: # test (batch)
         package.load_batch()
         batch_size = package._test_batch_size
         r.set_batch(package._test_image_batch, package._test_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
         test(r)
-    elif mode==2: # self-test
-        package.load_batch()
-        r.set_batch(package._train_image_batch, package._train_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
-        test(r)
+    elif mode==2: # test (single)
+        pass
+ 
+# self-test
+#        package.load_batch()
+#        r.set_batch(package._train_image_batch, package._train_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
+#        test(r)
 #    elif mode==3 # init_WI
 #        package.load_batch()
 #        init_WI(r, batch, batch_size, data_size):

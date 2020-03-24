@@ -283,8 +283,13 @@ class Roster:
     def __init__(self):
         self._weight_list = []
         self._gpu = None
+        self._remote = None
         self.layers = []
         self._batch_size = 1
+    
+    def set_remote(self, remote):
+        self._gpu = None
+        self._remote = remote
     
     def set_batch(self, data, labels, start, batch_size, data_size, num_class, debug=0):
         print "Roster::set_batch()"
@@ -319,16 +324,23 @@ class Roster:
                 print layer._output_array[i]
             #
         # end of debug
+        
+    def set_data(self, data, data_size, label):
+        self._gpu.copy(self._gpu_input, data)
+        self._gpu.copy(self._gpu_labels, label)
+        layer = self.getLayerAt(0) # input layer
+        layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0), layer._num_node, 1, 0)
                     
-    def set_gpu(self, my_gpu):
-        self._gpu = my_gpu
+    def set_gpu(self, gpu):
+        self._gpu = gpu
+        self._remote = None
     
     def init_weight(self):
         c = self.countLayers()
         for i in range(1, c):
             layer = self.getLayerAt(i)
             layer.init_weight_with_random_index()
-
+        #
 
     def reset_weight_property(self, p=0):
         c = self.countLayers()
@@ -339,6 +351,9 @@ class Roster:
             for ni in range(nc):
                 for ii in range(ic):
                     layer.set_weight_property(ni, ii, p)
+                #
+            #
+        #
 
     def unlock_weight_all(self):
         c = self.countLayers()

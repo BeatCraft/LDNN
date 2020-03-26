@@ -365,3 +365,6 @@ class Package:
             r.update_weight()
         #
         return r
+
+def echo(data):
+    print data

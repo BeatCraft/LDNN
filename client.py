@@ -141,12 +141,13 @@ def main():
     SERVER_ADDR = "127.0.0.1"
     SERVER_PORT = 5005
     #
-    batch_size = 5000
+    batch_size = 1000
     batch_start = 0
-    device_id = 1#0
+    #
     # 0 : AMD Server"
     # 1 : Intel on MBP"
     # 2 : eGPU (AMD Radeon Pro 580)"
+    device_id = 1
     package_id = 0 # MNIST
     #
     client(BC_ADDR, BC_PORT, SERVER_ADDR, SERVER_PORT, batch_size, batch_start, device_id, package_id)

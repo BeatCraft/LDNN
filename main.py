@@ -144,7 +144,7 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
                 r.propagate()
                 entropy = r.get_cross_entropy()
             else:
-                entropy = self.update(li, ni, ii, wi-1)
+                entropy = r._remote.update(li, ni, ii, wi-1)
             #
             return entropy, 1
         #
@@ -157,7 +157,7 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
                 r.propagate()
                 entropy = r.get_cross_entropy()
             else:
-                entropy = self.update(li, ni, ii, wi+1)
+                entropy = r._remote.update(li, ni, ii, wi+1)
             #
             return entropy, 1
         #
@@ -170,7 +170,7 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
         r.propagate(li, ni, ii, wi_alt, 0)
         entropy_alt = r.get_cross_entropy()
     else:
-        entropy_alt = self.set_alt(li, ni, ii, wi_alt)
+        entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
     #
     if  entropy_alt<entropy:
         layer.set_weight_property(ni, ii, mode)
@@ -178,7 +178,7 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
         if r._gpu:
             layer.update_weight_gpu()
         else:
-            entropy_alt = self.update(li, ni, ii, wi_alt)
+            entropy_alt = r._remote.update(li, ni, ii, wi_alt)
         #
         return entropy_alt, 1
     #
@@ -236,7 +236,7 @@ def layer_loop(it, r, limit, reverse, divider, direction):
         r.propagate()
         entropy = r.get_cross_entropy()
     else:
-        entropy = r._remote.self.evaluate()
+        entropy = r._remote.evaluate()
     #
     c = r.countLayers()
     list_of_layer_index = []
@@ -276,6 +276,11 @@ def train(it, r, limit):
     entropy, c_cnt = layer_loop(it, r, limit, reverse, divider, direction)
     #
     return entropy, h_cnt, c_cnt
+#
+#
+#
+def echo(data):
+    print data
 #
 #
 #

@@ -89,6 +89,7 @@ def test(r, package):
         if index==class_array[0]:
             oks[index] = oks[index] +1
             ca = ca + 1
+        #
     #
     print "---------------------------------"
     print "result : %d / %d" % (ca, eval_size)

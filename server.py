@@ -29,6 +29,7 @@ class ServerLooper(netutil.Looper):
         #
         super(ServerLooper, self).__init__(local_addr, local_port, remote_addr, remote_port)
         #
+        self._package_id = package_id
         self._send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self._client_num = 0
@@ -171,208 +172,15 @@ class ServerLooper(netutil.Looper):
                 self.set_mode(0)
             elif mode==50: # train
                 it = 400
-                min = 0.000001
-                print "train"
-                #main.echo(min)
-                main.train(it, self._roster, min)
-                #self.train_loop()
+                debug = 0
+                #main.echo(self._package_id)
+                main.loop(it, r, self._package_id, debug)
                 self.set_mode(0)
             else:
                 self.set_mode(0)
             #
         #
         print "ServerLooper::loop() - end"
-
-    def weight_shift_mode(self, li, ni, ii, mse_base, mode):
-        r =  self._roster
-        layer = r.getLayerAt(li)
-        wp = layer.get_weight_property(ni, ii) # default : 0
-        #lock = layer.get_weight_lock(ni, ii)   # default : 0
-        wi = layer.get_weight_index(ni, ii)
-        wi_alt = wi
-        #
-        #if lock>0:
-        #    return mse_base, 0
-        #
-        if mode>0: # heat
-            if wp<0:
-                print "    skip"
-                return mse_base, 0
-            #
-            if wi==core.WEIGHT_INDEX_MAX:
-                layer.set_weight_property(ni, ii, 0)
-                layer.set_weight_index(ni, ii, wi-1)
-                mse_base = self.update(li, ni, ii, wi-1)
-                return mse_base, 1
-            #
-        else:
-            if wp>0:
-                print "    skip"
-                return mse_base, 0
-            #
-            if wi==core.WEIGHT_INDEX_MIN:
-                layer.set_weight_property(ni, ii, 0)
-                layer.set_weight_index(ni, ii, wi+1)
-                mse_base = self.update(li, ni, ii, wi+1)
-                return mse_base, 1
-            #
-        # if mode
-        #
-        wi_alt = wi + mode
-        mse_alt = self.set_alt(li, ni, ii, wi_alt)
-        if mse_alt<mse_base:
-            layer.set_weight_property(ni, ii, mode)
-            layer.set_weight_index(ni, ii, wi_alt)
-            #
-            mse_alt = self.update(li, ni, ii, wi_alt)
-            #
-            return mse_alt, 1
-        #
-        layer.set_weight_property(ni, ii, 0)
-        return mse_base, 0
-
-    def train(self, it, limit):
-        print "train"
-        r = self._roster
-        divider = 4
-        t_cnt = 0
-        h_cnt = 0
-        c_cnt = 0
-        w_list = []
-        #
-        # > > > >r.propagate()
-        # > > > >mse_base = r.get_cross_entropy()
-        mse_base = self.evaluate()
-        print mse_base
-        #
-        c = r.countLayers()
-        for li in range(1, c):
-            layer = r.getLayerAt(li)
-            num_node = layer._num_node
-            num_w = layer._num_input
-            #
-            node_index_list = list(range(num_node))
-            random.shuffle(node_index_list)
-            nc = 0
-            for ni in node_index_list:
-                nc = nc + 1
-                w_p = num_w/divider
-                for p in range(w_p):
-                    ii = random.randrange(num_w)
-                    #mse_base, ret = self.weight_shift_mode(li, ni, ii, mse_base, 1)
-                    mse_alt, ret = self.weight_shift_mode(li, ni, ii, mse_base, 1)
-                    if mse_alt>0.0:
-                        mse_base = mse_alt
-                    else:
-                        print "*** timeout error"
-                        print "*** wait for 10 secs"
-                        time.sleep(10)
-                        print "*** retry onece"
-                        #
-                        mse_alt, ret = self.weight_shift_mode(li, ni, ii, mse_base, 1)
-                        if mse_alt>0.0:
-                            print "*** recovered"
-                            mse_base = mse_alt
-                        else:
-                            print "*** error and exit"
-                            mse_base = -1
-                        #
-                    #
-                    if ret>0:
-                        print "[%d] H=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, h_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
-                    #print "    %f" % mse_base
-                    #
-                    h_cnt = h_cnt + ret
-                    t_cnt = t_cnt +1
-                    if mse_base<limit:
-                        print "exit iterations"
-                        return h_cnt, c_cnt, mse_base
-                    #
-                #
-            #
-        #
-        t_cnt = 0
-        c = r.countLayers()
-        for li in range(1, c):
-            layer = r.getLayerAt(li)
-            num_node = layer._num_node
-            num_w = layer._num_input
-            #
-            node_index_list = list(range(num_node))
-            random.shuffle(node_index_list)
-            nc = 0
-            for ni in node_index_list:
-                nc = nc + 1
-                w_p = num_w/divider
-                for p in range(w_p):
-                    ii = random.randrange(num_w)
-                    mse_base, ret = self.weight_shift_mode(li, ni, ii, mse_base, -1)
-                    if ret>0:
-                        print "[%d] C=%d/%d, N(%d/%d), W(%d/%d) : W(%d,%d,%d), CE:%f" % (it, c_cnt, t_cnt, nc, num_node, p, w_p, li, ni, ii, mse_base)
-                    #print "    %f" % mse_base
-                    #
-                    c_cnt = c_cnt + ret
-                    t_cnt = t_cnt + 1
-                    if mse_base<limit:
-                        print "exit iterations"
-                        return h_cnt, c_cnt, mse_base
-                    #
-                #
-            #
-        #
-        return h_cnt, c_cnt, mse_base
-    #
-    def train_loop(self, debug=0):
-        print "train_loop"
-        it = 20*20
-        r = self._roster
-        #
-        h_cnt_list = []
-        c_cnt_list = []
-        ce_list = []
-        #
-        limit = 0.000001
-        pre_ce = 0.0
-        lim_cnt = 0
-        #
-        start_time = time.time()
-        #
-        for i in range(it):
-            h_cnt, c_cnt, ce = self.train(i, limit)
-            #
-            h_cnt_list.append(h_cnt)
-            c_cnt_list.append(c_cnt)
-            ce_list.append(ce)
-            # debug
-#            if debug==1:
-#                save_path = "./debug/wi.csv.%f" % ce
-#                r.export_weight_index(save_path)
-            #
-            r.export_weight_index(self._package._wi_csv_path)
-            #
-            if pre_ce == ce:
-                lim_cnt = lim_cnt + 1
-                if lim_cnt>5:
-                    print "locked with local optimum"
-                    print "exit iterations"
-                    break
-                #
-            #
-            if ce<limit:
-                print "exit iterations"
-                break
-            #
-            pre_ce = ce
-        # for
-        elapsed_time = time.time() - start_time
-        t = format(elapsed_time, "0")
-        print "time = %s" % (t)
-        #
-        k = len(h_cnt_list)
-        for j in range(k):
-            print "%d, %d, %d, %f," % (j, h_cnt_list[j], c_cnt_list[j], ce_list[j])
-        #
-    # end of train_loop()
 #
 #
 #

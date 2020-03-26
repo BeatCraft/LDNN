@@ -174,7 +174,7 @@ class ServerLooper(netutil.Looper):
                 it = 400
                 debug = 0
                 #main.echo(self._package_id)
-                main.loop(it, self._roster, self._package_id, debug)
+                main.loop(it, self._roster, self._package, debug)
                 self.set_mode(0)
             else:
                 self.set_mode(0)

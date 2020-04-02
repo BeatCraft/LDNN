@@ -139,25 +139,18 @@ def main():
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
     #
-    #
-    #
     package_id = 0
     print "- Select a package -"
     print "0 : MNIST"
-    print "1 : MNIST (2)"
-    print "2 : CIFAR-10"
+    print "1 : CIFAR-10"
     menu = get_key_input("input command >")
     if menu==0:
         package_id = 0
     elif menu==1:
         package_id = 1
-    elif menu==2:
-        package_id = 2
     else:
         print "abort"
         return 0
-    #
-    #
     #
     print "0 : test"
     print "1 : self-test"
@@ -170,8 +163,6 @@ def main():
         print "abort"
         return 0
     #
-    #
-    #
     package = util.Package(package_id)
     r = package.setup_dnn(my_gpu)
     if r is None:
@@ -179,14 +170,13 @@ def main():
         return 0
     #
     if mode==0: # test
-#        package.load_batch()
-        #batch_size = 1#package._test_batch_size
-#        r.set_batch(package._test_image_batch, package._test_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
         test(r, package)
-    elif mode==1: # self-test
-        package.load_batch()
-        r.set_batch(package._train_image_batch, package._train_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
-        test(r)
+    #
+#    elif mode==1: # self-test
+#        package.load_batch()
+#        r.set_batch(package._train_image_batch, package._train_label_batch, 0,
+# batch_size, package._image_size, package._num_class, 0)
+#        test(r)
     #
     return 0
 #

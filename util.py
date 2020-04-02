@@ -251,37 +251,29 @@ def get_key_input(prompt):
 #
 #
 TRAIN_IMAGE_PATH = ["../ldnn_package/MNIST/train-images-idx3-ubyte",
-                    "../ldnn_package/MNIST/train-images-idx3-ubyte",
                     "../ldnn_package/cifar-10-batches-py/data_batch_1"]
 TRAIN_LABEL_PATH = ["../ldnn_package/MNIST/train-labels-idx1-ubyte",
-                    "../ldnn_package/MNIST/train-labels-idx1-ubyte",
                     "../ldnn_config/cifar-10-batches-py/train_label_batch.pickle"]
 TRAIN_IMAGE_BATCH_PATH = ["../ldnn_config/MNIST/train_image_batch.pickle",
-                          "../ldnn_config/MNIST2/train_image_batch.pickle",
                           "../ldnn_config/cifar-10-batches-py/train_image_batch.pickle"]
 TRAIN_LABEL_BATCH_PATH = ["../ldnn_config/MNIST/train_label_batch.pickle",
-                          "../ldnn_config/MNIST2/train_label_batch.pickle",
                           "../ldnn_config/cifar-10-batches-py/train_label_batch.pickle"]
-TRAIN_BATCH_SIZE = [60000, 6000, 10000]
-TEST_BATCH_SIZE = [10000, 10000, 10000]
+TRAIN_BATCH_SIZE = [60000, 10000]
+TEST_BATCH_SIZE = [10000, 10000]
 TEST_IMAGE_PATH = ["../ldnn_package/MNIST/t10k-images-idx3-ubyte",
-                   "../ldnn_package/MNIST/t10k-images-idx3-ubyte",
                    "./"]
 TEST_LABEL_PATH = ["../ldnn_package/MNIST/t10k-labels-idx1-ubyte",
-                   "../ldnn_package/MNIST/t10k-labels-idx1-ubyte",
                    "./"]
 TEST_IMAGE_BATCH_PATH = ["../ldnn_config/MNIST/test_image_batch.pickle",
-                         "../ldnn_config/MNIST2/test_image_batch.pickle",
                          "../ldnn_config/cifar-10-batches-py/test_image_batch.pickle"]
 TEST_LABEL_BATCH_PATH = ["../ldnn_config/MNIST/test_label_batch.pickle",
-                         "../ldnn_config/MNIST2/test_label_batch.pickle",
                          "../ldnn_config/cifar-10-batches-py/test_label_batch.pickle"]
 
-PACKAGE_NAME = ["MNIST", "MNIST2", "cifar-10-batches-py"]
-PACKAGE_IMAGE_WIDTH = [28, 28, 32]
-PACKAGE_IMAGE_HEIGHT = [28, 28, 32]
-PACKAGE_IMAGE_SIZE = [784, 784, 1024]
-PACKAGE_NUM_CLASS = [10, 10, 10]
+PACKAGE_NAME = ["MNIST", "cifar-10-batches-py"]
+PACKAGE_IMAGE_WIDTH = [28, 32]
+PACKAGE_IMAGE_HEIGHT = [28, 32]
+PACKAGE_IMAGE_SIZE = [784, 1024]
+PACKAGE_NUM_CLASS = [10, 10]
 
 class Package:
     def __init__(self, package_id=0):
@@ -339,16 +331,11 @@ class Package:
             hidden_layer_1 = r.add_layer(1, self._image_size, 64)
             hidden_layer_2 = r.add_layer(1, 64, 64)
             output_layer = r.add_layer(2, 64, self._num_class)
-        elif self._package_id==1: # MNIST : less layers
+        elif self._package_id==1: # cifa-10
             input_layer = r.add_layer(0, self._image_size, self._image_size)
-            hidden_layer_1 = r.add_layer(1, self._image_size, 32)
-            hidden_layer_2 = r.add_layer(1, 32, 32)
-            output_layer = r.add_layer(2, 32, self._num_class)
-        elif self._package_id==2: # cifa-10
-            input_layer = r.add_layer(0, self._image_size, self._image_size)
-            hidden_layer_1 = r.add_layer(1, self._image_size, 32)
-            hidden_layer_2 = r.add_layer(1, 32, 32)
-            output_layer = r.add_layer(2, 32, self._num_class)
+            hidden_layer_1 = r.add_layer(1, self._image_size, 64)
+            hidden_layer_2 = r.add_layer(1, 64, 64)
+            output_layer = r.add_layer(2, 64, self._num_class)
         else:
             print "package error"
             return None

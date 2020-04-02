@@ -15,11 +15,12 @@ import numpy as np
 import sys,os
 import random
 #
-import main
+#import main
 import core
 import util
 import gpu
 import netutil
+import train
 #
 #
 #
@@ -94,7 +95,7 @@ class ServerLooper(netutil.Looper):
             return -1.0
         #
         self._seq = self._seq + 1
-        return ret/float(self._client_num)
+        return ret
         #return ret/float(self._client_num)
     
     def execute_cmd(self, mode, a, b, c, d):
@@ -173,8 +174,7 @@ class ServerLooper(netutil.Looper):
             elif mode==50: # train
                 it = 400
                 debug = 0
-                #main.echo(self._package_id)
-                main.loop(it, self._roster, self._package, debug)
+                train.loop(it, self._roster, self._package, debug)
                 self.set_mode(0)
             else:
                 self.set_mode(0)
@@ -216,7 +216,7 @@ def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id):
 #
 #
 #
-def main2():
+def main():
     print "main() : start"
     #
     BC_ADDR = "127.0.0.1"
@@ -232,6 +232,6 @@ def main2():
 #
 #
 if __name__ == '__main__':
-	main2()
+	main()
 
 

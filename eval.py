@@ -44,7 +44,6 @@ def test(r, package):
     package.load_batch()
     eval_size = package._test_batch_size
     print ">>batch test mode (%d)" % (eval_size)
-    
     #
     data_size = package._image_size
     num_class = package._num_class
@@ -53,28 +52,20 @@ def test(r, package):
     #
     r.set_batch(data_array, class_array, 0, 1, data_size, num_class, 0)
     #
-    dist = [0,0,0,0,0,0,0,0,0,0] # data_class
-    rets = [0,0,0,0,0,0,0,0,0,0] # result of infs
-    oks  = [0,0,0,0,0,0,0,0,0,0] # num of correct
-    #
-#    data_array[0] = package._train_image_batch[0]
-#    class_array[0] = package._train_label_batch[0]
-#    r.set_data(data_array, data_size, class_array)
-    #
-#    r.propagate(-1, -1, -1, -1, 0)
-#    infs = r.get_inference()
-#    print infs[0]
+    dist = np.zeros(num_class, dtype=np.int32)
+    rets = np.zeros(num_class, dtype=np.int32)
+    oks = np.zeros(num_class, dtype=np.int32)
     #
     start_time = time.time()
     ca = 0
     for i in range(eval_size):
-        data_array[0] = package._train_image_batch[i]
-        class_array[0] = package._train_label_batch[i]
+        data_array[0] = package._test_image_batch[i]
+        answer = package._test_label_batch[i]
+        class_array[0] = answer
         r.set_data(data_array, data_size, class_array)
         r.propagate(-1, -1, -1, -1, 0)
         infs = r.get_inference()
-        #
-        dist[class_array[0]] = dist[class_array[0]] + 1
+        dist[answer] = dist[answer] + 1
         inf = infs[0]
         #print inf
         index = -1
@@ -83,10 +74,11 @@ def test(r, package):
             for k in range(10):
                 if inf[k] == mx:
                     index = k
+                #
+            #
         #
         rets[index] = rets[index] + 1
-        #
-        if index==class_array[0]:
+        if index==answer:
             oks[index] = oks[index] +1
             ca = ca + 1
         #

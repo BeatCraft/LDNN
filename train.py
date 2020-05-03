@@ -208,7 +208,7 @@ def loop(it, r, package, debug=0):
         ce_list.append(ce)
         # debug
         if debug==1:
-            save_path = "./debug/wi.csv.%f" % ce
+            save_path = "./debug/%04d-%f.csv" % (i, ce)
             r.export_weight_index(save_path)
         #
         r.export_weight_index(package._wi_csv_path)

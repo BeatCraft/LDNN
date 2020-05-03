@@ -24,32 +24,10 @@ sys.setrecursionlimit(10000)
 WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078125,
                 0.0,
                 0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
-
-# won't work at all
-WEIGHT_SET_1 = [0.0, 0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
-
-WEIGHT_SET_2 = [-1, -0.72363462, -0.52364706, -0.37892914, -0.27420624, -0.19842513, -0.14358729, -0.10390474,
-                -0.07518906, -0.05440941, -0.03937253, -0.02849133, -0.02061731, -0.0149194, -0.01079619, -0.0078125,
-                0,
-                0.0078125, 0.01079619, 0.0149194, 0.02061731, 0.02849133, 0.03937253, 0.05440941, 0.07518906,
-                0.10390474, 0.14358729, 0.19842513, 0.27420624, 0.37892914, 0.52364706, 0.72363462, 1]
-# upto 59 %
-WEIGHT_SET_3 = [-1.0, -0.5, -0.25, -0.125, 0.125, 0.25, 0.5, 1.0]
-
-# upto 50 %
-WEIGHT_SET_4 = [-1.0, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0.0,
-                0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-
-WEIGHT_SET_5 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, 0.0, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
-WEIGHT_SET_6 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, 0.0, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
-WEIGHT_SET_7 = [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0]
-WEIGHT_SET_8 = [-1.0, -0.5, -0.25, -0.125, 0.125, 0.25, 0.5, 1.0]
-
-WEIGHT_SET_9 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078125, -0.00390625, -0.001953125,
-                0.0,
-                0.001953125, 0.00390625, 0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
-
-WEIGHT_SET = WEIGHT_SET_0
+WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0]
+WEIGHT_SET_2 = [-1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0]
+#
+WEIGHT_SET = WEIGHT_SET_2
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -290,11 +268,24 @@ class Roster:
     def set_remote(self, remote):
         self._gpu = None
         self._remote = remote
-    
+
+    def init_mem(self, batch_size, data_size, num_class):
+        self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
+        self._gpu_input = self._gpu.dev_malloc(self._batch_data)
+        self._batch_class = np.zeros(batch_size, dtype=np.int32)
+        self._gpu_labels = self._gpu.dev_malloc(self._batch_class)
+        self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
+        self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
+        
+        self.num_class = num_class
+        self._batch_size = batch_size
+        for layer in self.layers:
+            layer.set_batch(batch_size)
+
     def set_batch(self, data, labels, start, batch_size, data_size, num_class, debug=0):
-        print "Roster::set_batch()"
-        print data.shape[0]
-        print len(labels)
+        #print "Roster::set_batch()"
+        #print data.shape[0]
+        #print len(labels)
         #
         self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
         self._gpu_input = self._gpu.dev_malloc(self._batch_data)
@@ -307,7 +298,9 @@ class Roster:
         self._batch_size = batch_size
         for layer in self.layers:
             layer.set_batch(batch_size)
-            
+        #
+        #
+        #
         for i in range(batch_size):
             self._batch_data[i] = data[start+i]
             self._batch_class[i] = labels[start+i]
@@ -421,7 +414,7 @@ class Roster:
                 writer.writerows(layer.export_weight_index())
 
     def import_weight_index(self, path):
-        print "Roster : import_weight_index(%s)" % path
+        #print "Roster : import_weight_index(%s)" % path
         with open(path, "r") as f:
             reader = csv.reader(f)
             lc = self.countLayers()

@@ -173,7 +173,7 @@ class ServerLooper(netutil.Looper):
                 self.set_mode(0)
             elif mode==50: # train
                 it = 400
-                debug = 0
+                debug = 1
                 train.loop(it, self._roster, self._package, debug)
                 self.set_mode(0)
             else:

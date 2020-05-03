@@ -298,25 +298,25 @@ class Package:
         
     def load_batch(self):
         if os.path.isfile(self._train_image_batch_path):
-            print "restore train image batch"
+            #print "restore train image batch"
             self._train_image_batch = pickle_load(self._train_image_batch_path)
         else:
             print "fatal error : no train image batch"
         #
         if os.path.isfile(self._train_label_batch_path):
-            print "restore train label batch"
+            #print "restore train label batch"
             self._train_label_batch = pickle_load(self._train_label_batch_path)
         else:
             print "fatal error : no train label batch"
         #
         if os.path.isfile(self._test_image_batch_path):
-            print "restore test image batch"
+            #print "restore test image batch"
             self._test_image_batch = pickle_load(self._test_image_batch_path)
         else:
             print "fatal error : no test image batch"
         #
         if os.path.isfile(self._test_label_batch_path) :
-            print "restore test label batch"
+            #print "restore test label batch"
             self._test_label_batch = pickle_load(self._test_label_batch_path)
         else:
             print "fatal error : no test label batch"
@@ -330,6 +330,8 @@ class Package:
             input_layer = r.add_layer(0, self._image_size, self._image_size)
             hidden_layer_1 = r.add_layer(1, self._image_size, 64)
             hidden_layer_2 = r.add_layer(1, 64, 64)
+            #hidden_layer_3 = r.add_layer(1, 64, 64)
+            #hidden_layer_4 = r.add_layer(1, 64, 64)
             output_layer = r.add_layer(2, 64, self._num_class)
         elif self._package_id==1: # cifa-10
             input_layer = r.add_layer(0, self._image_size, self._image_size)
@@ -341,10 +343,10 @@ class Package:
             return None
         #
         if os.path.isfile(self._wi_csv_path):
-            print "restore weight index"
+            #print "restore weight index"
             r.import_weight_index(self._wi_csv_path)
         else:
-            print "init weight index"
+            #print "init weight index"
             r.init_weight()
             r.export_weight_index(self._wi_csv_path)
         #

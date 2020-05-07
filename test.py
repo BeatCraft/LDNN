@@ -101,7 +101,7 @@ def test_single(r, package):
         data_array[0] = package._test_image_batch[i]
         answer = package._test_label_batch[i]
         class_array[0] = answer
-        r.set_data(data_array, data_size, class_array)
+        r.set_data(data_array, data_size, class_array, 1)
         r.propagate(-1, -1, -1, -1, 0)
         infs = r.get_inference()
         dist[answer] = dist[answer] + 1

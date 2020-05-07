@@ -144,6 +144,7 @@ def layer_loop(it, r, limit, reverse, divider, direction):
     if r._gpu:
         r.propagate()
         entropy = r.get_cross_entropy()
+        print entropy
     else:
         entropy = r._remote.evaluate()
     #
@@ -171,7 +172,7 @@ def layer_loop(it, r, limit, reverse, divider, direction):
 #
 #
 def train(it, r, limit):
-    divider = 4
+    divider = 64#4
     entropy = 0.0
     reverse = 0
     w_list = []
@@ -233,6 +234,39 @@ def loop(it, r, package, debug=0):
     k = len(h_cnt_list)
     for j in range(k):
         print "%d, %d, %d, %f," % (j, h_cnt_list[j], c_cnt_list[j], ce_list[j])
+    #
+#
+#
+#
+def train_minibatch(r, package, mini_batch_size, num, epoc):
+    limit = 0.000001
+    package.load_batch()
+    batch_size = package._train_batch_size
+    data_size = package._image_size
+    num_class = package._num_class
+    #
+    data_array = np.zeros((mini_batch_size, data_size), dtype=np.float32)
+    class_array = np.zeros(mini_batch_size, dtype=np.int32)
+    r.init_mem(mini_batch_size, data_size, num_class)
+    #
+    print ">>mini_batch_size(%d)" % (mini_batch_size)
+    #
+    start_time = time.time()
+    for j in range(num):
+        for i in range(mini_batch_size):
+            bi = random.randrange(batch_size)
+            data_array[i] = package._train_image_batch[bi]
+            class_array[i] = package._train_label_batch[bi]
+        #
+        #r.set_batch(data_array, class_array, 0, mini_batch_size, data_size, num_class)
+        r.set_data(data_array, data_size, class_array, mini_batch_size)
+        for k in range(epoc):
+            entropy, h_cnt, c_cnt = train(j, r, limit)
+            r.export_weight_index(package._wi_csv_path)
+    #
+    elapsed_time = time.time() - start_time
+    t = format(elapsed_time, "0")
+    print "time = %s" % (t)
     #
 #
 #

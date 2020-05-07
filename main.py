@@ -88,6 +88,7 @@ def main():
     debug = 1
     it = 20*20
     batch_size = 2000
+    mini_batch_size = 2000
     #
     # GPU
     #
@@ -132,6 +133,7 @@ def main():
     print "0 : train"
     print "1 : test (batch)"
     print "2 : test (single)"
+    print "3 : train (mini-batch)"
     menu = get_key_input("input command >")
     if menu==0:
         mode = 0
@@ -139,6 +141,8 @@ def main():
         mode = 1
     elif menu==2:
         mode = 2
+    elif menu==3:
+        mode = 3
     else:
         mode = 1
     #
@@ -159,6 +163,10 @@ def main():
         test.test(r)
     elif mode==2: # test (single)
         test.test_single(r, package)
+    elif mode==3: # train (mini-batch)
+        train.train_minibatch(r, package, mini_batch_size, 50, 5)
+    else:
+        print "input error"
         pass
  
 # self-test

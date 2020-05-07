@@ -283,21 +283,17 @@ class Roster:
             layer.set_batch(batch_size)
 
     def set_batch(self, data, labels, start, batch_size, data_size, num_class, debug=0):
-        #print "Roster::set_batch()"
-        #print data.shape[0]
-        #print len(labels)
-        #
-        self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
-        self._gpu_input = self._gpu.dev_malloc(self._batch_data)
-        self._batch_class = np.zeros(batch_size, dtype=np.int32)
-        self._gpu_labels = self._gpu.dev_malloc(self._batch_class)
-        self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
-        self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
-        #
-        self.num_class = num_class
-        self._batch_size = batch_size
-        for layer in self.layers:
-            layer.set_batch(batch_size)
+#        self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
+#        self._gpu_input = self._gpu.dev_malloc(self._batch_data)
+#        self._batch_class = np.zeros(batch_size, dtype=np.int32)
+#        self._gpu_labels = self._gpu.dev_malloc(self._batch_class)
+#        self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
+#        self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
+#        #
+#        self.num_class = num_class
+#        self._batch_size = batch_size
+#        for layer in self.layers:
+#            layer.set_batch(batch_size)
         #
         #
         #
@@ -318,11 +314,11 @@ class Roster:
             #
         # end of debug
         
-    def set_data(self, data, data_size, label):
+    def set_data(self, data, data_size, label, batch_size):
         self._gpu.copy(self._gpu_input, data)
         self._gpu.copy(self._gpu_labels, label)
         layer = self.getLayerAt(0) # input layer
-        layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0), layer._num_node, 1, 0)
+        layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0), layer._num_node, batch_size, 0)
                     
     def set_gpu(self, gpu):
         self._gpu = gpu

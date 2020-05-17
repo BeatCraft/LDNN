@@ -122,7 +122,11 @@ class ServerLooper(netutil.Looper):
     def update(self, li, ni, ii, wi):
         mode = 40
         return self.execute_cmd(mode, li, ni, ii, wi)
-        
+    
+    def set_batch(self, i):
+        mode = 20
+        return self.execute_cmd(mode, 0, 0, 0, 0)
+    
     def loop(self):
         print "ServerLooper::loop() - start"
         while not self.is_quite_requested():
@@ -130,7 +134,7 @@ class ServerLooper(netutil.Looper):
             if mode==0:
                 time.sleep(0.01)
                 continue
-            elif mode==10:  # init
+            elif mode==10: # init
                 #
                 cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)
                 self.send(cmd)
@@ -145,13 +149,6 @@ class ServerLooper(netutil.Looper):
                 self._client_num = len(self._client_list)
                 self._client_timeout = [0] * self._client_num
                 print self._client_num
-            elif mode==60: # debug
-                cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)
-                self.send(cmd)
-                self.set_mode(mode+5)
-                ret = self.recv_multi()
-                print ret
-                self.set_mode(0)
             elif mode==20: # evaluate
                 ce = self.evaluate()
                 print "evaluate :%f" % (ce)
@@ -174,7 +171,25 @@ class ServerLooper(netutil.Looper):
             elif mode==50: # train
                 it = 400
                 debug = 1
-                train.loop(it, self._roster, self._package, debug)
+                #train.loop(it, self._roster, self._package, debug)
+                mini_batch_size = 6000
+                num = 50
+                epoc = 5
+                train.train_minibatch_preset(self._roster, self._package, mini_batch_size, num, epoc)
+                self.set_mode(0)
+            elif mode==60: # debug / ping
+                cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)
+                self.send(cmd)
+                self.set_mode(mode+5)
+                ret = self.recv_multi()
+                print ret
+                self.set_mode(0)
+            elif mode==70: # set_batch()
+                print "set_batch()"
+                cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)
+                self.send(cmd)
+                ret = self.recv_multi()
+                print ret
                 self.set_mode(0)
             else:
                 self.set_mode(0)
@@ -210,6 +225,8 @@ def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id):
             s.set_mode(50)
         elif key=='d' or key=='D':
             s.set_mode(60)
+        elif key=='m' or key=='M':
+            s.set_mode(70)
         #
     #
     print "main() : end"

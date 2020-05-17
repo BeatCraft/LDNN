@@ -271,3 +271,45 @@ def train_minibatch(r, package, mini_batch_size, num, epoc):
 #
 #
 #
+def train_minibatch_preset(r, package, mini_batch_size, num, epoc):
+    limit = 0.000001
+    package.load_batch()
+    batch_size = package._train_batch_size
+    data_size = package._image_size
+    num_class = package._num_class
+    #
+    data_array = np.zeros((mini_batch_size, data_size), dtype=np.float32)
+    class_array = np.zeros(mini_batch_size, dtype=np.int32)
+    if r._gpu:
+        r.init_mem(mini_batch_size, data_size, num_class)
+    else:
+        pass
+    #
+    print ">> mini_batch_size(%d)" % (mini_batch_size)
+    #
+    start_time = time.time()
+    for j in range(num):
+        if r._gpu:
+            load_path = "../ldnn_config/%s/mini/%d/%03d.pickle" % (package._name, mini_batch_size, j)
+            print load_path
+            random_index = util.pickle_load(load_path)
+            print random_index
+            for i in range(mini_batch_size):
+                bi = random_index[i]
+                print bi
+                data_array[i] = package._train_image_batch[bi]
+                class_array[i] = package._train_label_batch[bi]
+            #
+            r.set_data(data_array, data_size, class_array, mini_batch_size)
+        else:
+             r._remote.set_batch(j)
+        #
+        for k in range(epoc):
+            entropy, h_cnt, c_cnt = train(j, r, limit)
+            r.export_weight_index(package._wi_csv_path)
+        #
+    #
+    elapsed_time = time.time() - start_time
+    t = format(elapsed_time, "0")
+    print "time = %s" % (t)
+#

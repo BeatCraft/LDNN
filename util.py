@@ -283,6 +283,7 @@ class Package:
         self._train_batch_size = TRAIN_BATCH_SIZE[package_id]
         self._test_batch_size = TEST_BATCH_SIZE[package_id]
         #
+        self._name = PACKAGE_NAME[package_id]
         self._wi_csv_path = "../ldnn_config/%s/wi.csv" % (PACKAGE_NAME[package_id])
         #
         self._train_image_path = TRAIN_IMAGE_PATH[package_id]

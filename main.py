@@ -87,8 +87,10 @@ def main():
     #
     debug = 1
     it = 20*20
-    batch_size = 2000
-    mini_batch_size = 2000
+    batch_size = 1000
+    data_size = 784
+    num_class = 10
+    mini_batch_size = 1000
     #
     # GPU
     #
@@ -143,6 +145,8 @@ def main():
         mode = 2
     elif menu==3:
         mode = 3
+    elif menu==4:
+        mode = 4
     else:
         mode = 1
     #
@@ -158,24 +162,22 @@ def main():
         train.loop(it, r, package, debug)
     elif mode==1: # test (batch)
         package.load_batch()
-        batch_size = package._test_batch_size
+        #batch_size = package._test_batch_size
+        r.init_mem(mini_batch_size, data_size, num_class)
         r.set_batch(package._test_image_batch, package._test_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
         test.test(r)
     elif mode==2: # test (single)
         test.test_single(r, package)
     elif mode==3: # train (mini-batch)
         train.train_minibatch(r, package, mini_batch_size, 50, 5)
+    elif mode==4: #
+        mini_batch_size = 2000
+        num = 50
+        epoc = 5
+        train.train_minibatch_preset(r, package, mini_batch_size, num, epoc)
     else:
         print "input error"
         pass
- 
-# self-test
-#        package.load_batch()
-#        r.set_batch(package._train_image_batch, package._train_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
-#        test(r)
-#    elif mode==3 # init_WI
-#        package.load_batch()
-#        init_WI(r, batch, batch_size, data_size):
     #
     return 0
 #

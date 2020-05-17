@@ -239,8 +239,14 @@ __kernel void multiple_x_by_w_batch(
     int i = get_global_id(0);  // num_input
     int j = get_global_id(1);  // num_node
     int bi = get_global_id(2); // batch id
-    
+    //int i = get_local_id(0);  // num_input
+    //printf(\"%d\\n\",i);
     y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
+//
+//    int bi = 0;
+//    for (bi=0;bi<1000;bi++){
+//        y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
+//    }
 };
 
 // stride_1 : num_node * num_input
@@ -351,6 +357,7 @@ class Gpu:
                                                d_x, d_w, d_y,
                                                np.int32(stride_1),
                                                np.int32(stride_2))
+        #event = self.prg.multiple_x_by_w_batch(self._queue,(col,bsize), None,
         event.wait()
         
     def multiple_x_by_w_batch_alt(self, d_x, d_w, d_y, bsize, stride_1, stride_2, row, col, ni, ii, wv):

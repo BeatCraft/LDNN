@@ -72,7 +72,7 @@ def main():
     package_id = 0
     package = util.Package(package_id)
     package.load_batch()
-    mini_batch_size = 2000
+    mini_batch_size = 20000
     num = 1000
     #
     if package_id==0:

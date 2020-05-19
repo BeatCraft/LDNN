@@ -97,7 +97,7 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
 #
 #
 #
-def weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction):
+def weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction, epoc=0):
     cnt = 0
     num_w = layer._num_input
     w_p = num_w/divider
@@ -107,7 +107,10 @@ def weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction):
         entropy, ret = weight_shift_mode(r, li, ni, ii, entropy, direction)
         if ret>0:
             cnt = cnt + ret
-            print "[%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (it, li, ni, ii, p, w_p, cnt, entropy)
+            if direction>0:
+                print "+[%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (it, epoc, li, ni, ii, p, w_p, cnt, entropy)
+            else:
+                print "-[%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (it, epoc, li, ni, ii, p, w_p, cnt, entropy)
         #
         if entropy<limit:
             print "reach to the limit(%f), exit iterations" %(limit)
@@ -118,7 +121,7 @@ def weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction):
 #
 #
 #
-def node_loop(it, r, limit, divider, entropy, layer, li, direction):
+def node_loop(it, r, limit, divider, entropy, layer, li, direction, epoc=0):
     cnt = 0
     num_node = layer._num_node
     num_w = layer._num_input
@@ -127,7 +130,7 @@ def node_loop(it, r, limit, divider, entropy, layer, li, direction):
     random.shuffle(node_index_list)
     nc = 0
     for ni in node_index_list:
-        entropy, ret = weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction)
+        entropy, ret = weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction, epoc)
         cnt = cnt + ret
         if entropy<limit:
             print "reach to the limit(%f), exit iterations" %(limit)
@@ -138,7 +141,7 @@ def node_loop(it, r, limit, divider, entropy, layer, li, direction):
 #
 #
 #
-def layer_loop(it, r, limit, reverse, divider, direction):
+def layer_loop(it, r, limit, reverse, divider, direction, epoc=0):
     cnt = 0
     #
     if r._gpu:
@@ -160,7 +163,7 @@ def layer_loop(it, r, limit, reverse, divider, direction):
     #
     for li in list_of_layer_index:
         layer = r.getLayerAt(li)
-        entropy, ret = node_loop(it, r, limit, divider, entropy, layer, li, direction)
+        entropy, ret = node_loop(it, r, limit, divider, entropy, layer, li, direction, epoc)
         cnt = cnt + ret
         if entropy<limit:
             print "reach to the limit(%f), exit iterations" %(limit)
@@ -171,7 +174,7 @@ def layer_loop(it, r, limit, reverse, divider, direction):
 #
 #
 #
-def train(it, r, limit):
+def train(it, r, limit, epoc=0):
     divider = 64#4
     entropy = 0.0
     reverse = 0
@@ -181,9 +184,9 @@ def train(it, r, limit):
     c_cnt = 0
     #
     direction = 1
-    entropy, h_cnt = layer_loop(it, r, limit, reverse, divider, direction)
+    entropy, h_cnt = layer_loop(it, r, limit, reverse, divider, direction, epoc)
     direction = -1
-    entropy, c_cnt = layer_loop(it, r, limit, reverse, divider, direction)
+    entropy, c_cnt = layer_loop(it, r, limit, reverse, divider, direction, epoc)
     #
     return entropy, h_cnt, c_cnt
 #
@@ -261,7 +264,7 @@ def train_minibatch(r, package, mini_batch_size, num, epoc):
         #r.set_batch(data_array, class_array, 0, mini_batch_size, data_size, num_class)
         r.set_data(data_array, data_size, class_array, mini_batch_size)
         for k in range(epoc):
-            entropy, h_cnt, c_cnt = train(j, r, limit)
+            entropy, h_cnt, c_cnt = train(j, r, limit, k)
             r.export_weight_index(package._wi_csv_path)
     #
     elapsed_time = time.time() - start_time

@@ -21,8 +21,10 @@ import client
 #
 #
 def main():
-    print "main() : start"
-    #
+    cid = 0
+    num = 4
+    batch_size = 20000
+    print "main() : start : %d" % (cid)
     # amd-0 : 192.168.0.150 / 192.168.200.10
     # amd-1 : 192.168.0.151 / 192.168.200.11
     # amd-2 : 192.168.0.152 / 192.168.200.12
@@ -31,17 +33,18 @@ def main():
     BC_PORT = 5000
     SERVER_ADDR = "192.168.200.10"
     SERVER_PORT = 5005
-    batch_size = 2000
-    batch_start = 0
-    # 0 : AMD Server"
-    # 1 : Intel on MBP"
-    # 2 : eGPU (AMD Radeon Pro 580)"
-    device_id = 0
-    # 0 : MNIST
-    # 1 : cifar-10
-    package_id = 0
     #
-    client.client(BC_ADDR, BC_PORT, SERVER_ADDR, SERVER_PORT, batch_size, batch_start, device_id, package_id)
+    batch_size = 20000
+    part_size = batch_size/num
+    part_start = part_size*cid
+    platform_id = 0
+    device_id = 0 # AMD Server"
+    package_id = 0 # MNIST
+    #
+    client.client(BC_ADDR, BC_PORT, SERVER_ADDR, SERVER_PORT,
+                  batch_size, part_start, part_size,
+                  platform_id, device_id, package_id)
+    #
 #
 #
 #

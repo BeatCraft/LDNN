@@ -42,7 +42,7 @@ def sigmoid(x):
     except OverflowError:
         a = float('inf')
         print "sigmoid(fuck)"
-    
+    #
     ret = 1.0 / (1.0 + a)
     return ret
 #
@@ -51,6 +51,7 @@ def sigmoid(x):
 def relu(x):
     if x<=0.0:
         return 0.0
+    #
     return x
 #
 #
@@ -66,6 +67,7 @@ def softmax_no_exp(x):
     sum_x = np.sum(x)
     if sum_x==0.0:
         return np.zeros_like((x))
+    #
     y = x / sum_x
     return y
 #
@@ -254,6 +256,68 @@ class Layer:
     
     def getType(self):
         return self._type
+#
+#
+#
+class InputLayer:
+    def __init__(self, i, type, num_input, num_node, gpu=None):
+        print "InputLayer::__init__()"
+        super(Layer, self).__init__(i, type, num_input, num_node, gpu)
+    
+    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+        pass
+#
+#
+#
+class HiddenLayer:
+    def __init__(self, i, type, num_input, num_node, gpu=None):
+        print "HiddenLayer::__init__()"
+        super(Layer, self).__init__(i, type, num_input, num_node, gpu)
+    
+    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+        stride_1 = self._num_node * self._num_input
+        stride_2 = self._num_input
+        if ni>=0: # alt
+            self._gpu.multiple_x_by_w_batch_alt(array_in, self._gpu_weight, self._gpu_product,
+                                                self._batch_size, stride_1, stride_2,
+                                                self._num_input, self._num_node, ni, ii, WEIGHT_SET[wi])
+        else: # propagation
+            self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
+                                            self._batch_size, stride_1, stride_2,
+                                            self._num_input, self._num_node)
+        #
+        activation = 0
+        self._gpu.k_sum(self._gpu_product, self._gpu_output,
+                        self._num_input, self._num_node, activation, self._batch_size)
+        #
+        # normalize
+        self._gpu.normalize(self._gpu_output, self._num_node, self._batch_size)
+#
+#
+#
+class OutputLayer:
+    def __init__(self, i, type, num_input, num_node, gpu=None):
+        print "OutputLayer::__init__()"
+        super(Layer, self).__init__(i, type, num_input, num_node, gpu)
+    
+    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+        stride_1 = self._num_node * self._num_input
+        stride_2 = self._num_input
+        
+        if ni>=0: # alt
+            self._gpu.multiple_x_by_w_batch_alt(array_in, self._gpu_weight, self._gpu_product,
+                                                self._batch_size, stride_1, stride_2,
+                                                self._num_input, self._num_node, ni, ii, WEIGHT_SET[wi])
+        else: # propagation
+            self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
+                                            self._batch_size, stride_1, stride_2,
+                                            self._num_input, self._num_node)
+        #
+        activation = 1
+        self._gpu.k_sum(self._gpu_product, self._gpu_output,
+                        self._num_input, self._num_node, activation, self._batch_size)
+        #
+        self._gpu.k_softmax(self._gpu_output, self._num_node, self._batch_size)
 #
 #
 #

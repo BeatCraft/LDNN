@@ -328,12 +328,10 @@ class Package:
         r.set_gpu(my_gpu)
         #
         if self._package_id==0: # MNIST
-            input_layer = r.add_layer(0, self._image_size, self._image_size)
-            hidden_layer_1 = r.add_layer(1, self._image_size, 64)
-            hidden_layer_2 = r.add_layer(1, 64, 64)
-            #hidden_layer_3 = r.add_layer(1, 64, 64)
-            #hidden_layer_4 = r.add_layer(1, 64, 64)
-            output_layer = r.add_layer(2, 64, self._num_class)
+            r.add_layer(0, self._image_size, self._image_size)  # input
+            r.add_layer(1, self._image_size, 64)                # hidden 1
+            r.add_layer(1, 64, 64)                              # hidden 2
+            r.add_layer(2, 64, self._num_class)                 # out
         elif self._package_id==1: # cifa-10
             input_layer = r.add_layer(0, self._image_size, self._image_size)
             hidden_layer_1 = r.add_layer(1, self._image_size, 64)

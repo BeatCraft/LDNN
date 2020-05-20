@@ -93,7 +93,9 @@ def test_single(r, package):
     data_array = np.zeros((1, data_size), dtype=np.float32)
     class_array = np.zeros(1, dtype=np.int32)
     #r.set_batch(data_array, class_array, 0, 1, data_size, num_class, 0)
-    r.init_mem(1, data_size, num_class)
+    #r.init_mem(1, data_size, num_class)
+    batch_size = 1
+    r.prepare(batch_size, data_size, num_class)
     #
     start_time = time.time()
     ca = 0
@@ -154,7 +156,9 @@ def stat(r, package, path, debug):
     data_array = np.zeros((1, data_size), dtype=np.float32)
     class_array = np.zeros(1, dtype=np.int32)
     #r.set_batch(data_array, class_array, 0, 1, data_size, num_class, 0)
-    r.init_mem(1, data_size, num_class)
+    #r.init_mem(1, data_size, num_class)
+    batch_size = 1
+    r.prepare(batch_size, data_size, num_class)
     #
     r.import_weight_index(path)
     r.update_weight()

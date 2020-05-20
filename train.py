@@ -250,7 +250,9 @@ def train_minibatch(r, package, mini_batch_size, num, epoc):
     #
     data_array = np.zeros((mini_batch_size, data_size), dtype=np.float32)
     class_array = np.zeros(mini_batch_size, dtype=np.int32)
-    r.init_mem(mini_batch_size, data_size, num_class)
+    #r.init_mem(mini_batch_size, data_size, num_class)
+    #
+    r.prepare(mini_batch_size, data_size, num_class)
     #
     print ">>mini_batch_size(%d)" % (mini_batch_size)
     #
@@ -283,10 +285,13 @@ def train_minibatch_preset(r, package, mini_batch_size, num, epoc):
     #
     data_array = np.zeros((mini_batch_size, data_size), dtype=np.float32)
     class_array = np.zeros(mini_batch_size, dtype=np.int32)
-    if r._gpu:
-        r.init_mem(mini_batch_size, data_size, num_class)
-    else:
-        pass
+    #
+    r.prepare(mini_batch_size, data_size, num_class)
+    #
+#    if r._gpu:
+#        r.init_mem(mini_batch_size, data_size, num_class)
+#    else:
+#        pass
     #
     print ">> mini_batch_size(%d)" % (mini_batch_size)
     #

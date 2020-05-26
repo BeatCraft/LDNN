@@ -124,7 +124,7 @@ class ServerLooper(netutil.Looper):
         return self.execute_cmd(mode, li, ni, ii, wi)
     
     def set_batch(self, i):
-        mode = 20
+        mode = 70
         return self.execute_cmd(mode, 0, 0, 0, 0)
     
     def loop(self):

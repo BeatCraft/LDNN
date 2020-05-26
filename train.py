@@ -49,7 +49,7 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_index(ni, ii, wi-1)
             if r._gpu:
-                layer.update_weight_gpu()
+                layer.update_weight()
                 r.propagate()
                 entropy = r.get_cross_entropy()
             else:
@@ -62,7 +62,7 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_index(ni, ii, wi+1)
             if r._gpu:
-                layer.update_weight_gpu()
+                layer.update_weight()
                 r.propagate()
                 entropy = r.get_cross_entropy()
             else:
@@ -85,7 +85,7 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
         layer.set_weight_property(ni, ii, mode)
         layer.set_weight_index(ni, ii, wi_alt)
         if r._gpu:
-            layer.update_weight_gpu()
+            layer.update_weight()
         else:
             entropy_alt = r._remote.update(li, ni, ii, wi_alt)
         #
@@ -310,11 +310,21 @@ def train_minibatch_preset(r, package, mini_batch_size, num, epoc):
             #
             r.set_data(data_array, data_size, class_array, mini_batch_size)
         else:
-             r._remote.set_batch(j)
+            r._remote.set_batch(j)
         #
+        entropy = 0.0
         for k in range(epoc):
             entropy, h_cnt, c_cnt = train(j, r, limit)
             r.export_weight_index(package._wi_csv_path)
+            #
+            if entropy<limit:
+                print "exit iterations"
+                break
+            #
+        #
+        if entropy<limit:
+            print "exit iterations"
+            break
         #
     #
     elapsed_time = time.time() - start_time

@@ -71,13 +71,13 @@ class ClientLooper(netutil.Looper):
         part_start = self._part_start
         part_size = self._part_size
         load_path = "../ldnn_config/%s/mini/%d/%03d.pickle" % (self._package._name, batch_size, mini_index)
-        print load_path
+        print "loading a batch : %s" % (load_path)
         #
         random_index = util.pickle_load(load_path)
         #print random_index
         for i in range(part_size):
             bi = random_index[part_start+i]
-            print bi
+            #print bi
             self._data_array[i] = self._package._train_image_batch[bi]
             self._class_array[i] = self._package._train_label_batch[bi]
         #
@@ -118,7 +118,8 @@ class ClientLooper(netutil.Looper):
             elif a==40: # update
                 layer = self._roster.getLayerAt(b)
                 layer.set_weight_index(c, d, e)
-                layer.update_weight_gpu()
+                #layer.update_weight_gpu()
+                layer.update_weight()
                 self._roster.propagate()
                 ce = self._roster.get_cross_entropy()
                 cmd = netutil.pack_if(seq, ce)

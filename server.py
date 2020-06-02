@@ -125,7 +125,7 @@ class ServerLooper(netutil.Looper):
     
     def set_batch(self, i):
         mode = 70
-        return self.execute_cmd(mode, 0, 0, 0, 0)
+        return self.execute_cmd(mode, i, 0, 0, 0)
     
     def loop(self):
         print "ServerLooper::loop() - start"
@@ -169,12 +169,11 @@ class ServerLooper(netutil.Looper):
                 print ret
                 self.set_mode(0)
             elif mode==50: # train
-                it = 400
                 debug = 1
                 #train.loop(it, self._roster, self._package, debug)
                 mini_batch_size = 6000
-                num = 50
-                epoc = 5
+                num = 200
+                epoc = 2
                 train.train_minibatch_preset(self._roster, self._package, mini_batch_size, num, epoc)
                 self.set_mode(0)
             elif mode==60: # debug / ping

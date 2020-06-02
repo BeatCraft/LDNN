@@ -51,7 +51,9 @@ class ClientLooper(netutil.Looper):
         #
         self._data_array = np.zeros((self._part_size , self._data_size), dtype=np.float32)
         self._class_array = np.zeros(self._part_size , dtype=np.int32)
-        self._roster.init_mem(self._part_size, self._data_size, self._num_class)
+        #self._roster.init_mem(self._part_size, self._data_size, self._num_class)
+        self._roster.prepare(self._part_size, self._data_size, self._num_class)
+        
         #
         self.set_batch(0)
         #

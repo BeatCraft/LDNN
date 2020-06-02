@@ -139,7 +139,10 @@ class Layer(object):
     def __init__(self, i, type, num_input, num_node, gpu=None):
         self._index = i
         self._type = type
-        self._gpu = gpu
+        if gpu is not None:
+            #print "GPU"
+            self._gpu = gpu
+        #
         self._id = -1
         self._num_input = num_input
         self._num_node = num_node
@@ -149,14 +152,17 @@ class Layer(object):
         self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
     
-    def set_batch(self, batch_size):
-        self._batch_size = batch_size
-        if self._type>0:
-            self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
-            self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
-
-        self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-        self._gpu_output = self._gpu.dev_malloc(self._output_array)
+    def prepare(self, batch_size):
+        pass
+        
+#    def set_batch(self, batch_size):
+#        self._batch_size = batch_size
+#        if self._type>0:
+#            self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
+#            self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
+#
+#        self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+#        self._gpu_output = self._gpu.dev_malloc(self._output_array)
             
     def update_weight(self):
         # gpu must be checked before this method is called
@@ -237,16 +243,20 @@ class HiddenLayer(Layer):
     def __init__(self, i, num_input, num_node, gpu=None):
         print "HiddenLayer::__init__()"
         super(HiddenLayer, self).__init__(i, LAYER_TYPE_HIDDEN, num_input, num_node, gpu)
-        self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+        if gpu:
+            self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
     
     def prepare(self, batch_size):
         self._batch_size = batch_size
         #
         self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
-        self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
+        
+        if self._gpu:
+            self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
         #
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-        self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        if self._gpu:
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
     
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
@@ -277,16 +287,19 @@ class OutputLayer(Layer):
     def __init__(self, i, num_input, num_node, gpu=None):
         print "OutputLayer::__init__()"
         super(OutputLayer, self).__init__(i, LAYER_TYPE_OUTPUT, num_input, num_node, gpu)
-        self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+        if gpu:
+            self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
 
     def prepare(self, batch_size):
         self._batch_size = batch_size
         #
         self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
-        self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
+        if self._gpu:
+            self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
         #
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-        self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        if self._gpu:
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
         
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
@@ -313,26 +326,57 @@ class OutputLayer(Layer):
 #
 # w : image width, i : index, h : image height, stride : size of convolusion matrix
 class ConvLayer(Layer):
-    def __init__(self, i,  w, h, stride, num_input, gpu=None):
+    def __init__(self, i,  w, h, stride, gpu=None):
         print "ConvLayer::__init__()"
         #
-        kx = w - (stride-1)
-        ky = h - (stride-1)
-        knum = kx * ky
-        self._num_node = knum
+        self._index = i
+        self._type = LAYER_TYPE_CONV
+        self._gpu = gpu
+        self._id = -1
         #
-        super(HiddenLayer, self).__init__(i, LAYER_TYPE_CONV, num_input, num_node, gpu)
+        self._kernel_x = w - (stride-1)
+        self._kernel_y = h - (stride-1)
+        self._kernel_num = self._kernel_x * self._kernel_y
+        self._kernel_size = stride * stride
         #
-        self._cnv_map = np.zeros( (self._num_node, stride), dtype=np.int32)
-        self._weight_index = np.zeros( (self._num_node, stride), dtype=np.int32)
-        self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+#        self._num_node = self._kernel_num
+#        self._num_input = self._kernel_size
+        super(ConvLayer, self).__init__(i, LAYER_TYPE_CONV, self._kernel_num, self._kernel_size, gpu)
+        #
+        self._cnv_map = np.zeros( (self._kernel_num, self._kernel_size), dtype=np.int32)
+        #
+        cmap_index = 0
+        for y in range(self._kernel_y):
+            for x in range(self._kernel_x):
+                cmap = self._cnv_map[cmap_index]
+                cmap[0] = x + 0 + y*w
+                cmap[1] = x + 1 + y*w
+                cmap[2] = x + 2 + y*w
+                cmap[3] = x + 0 + (y+1)*w
+                cmap[4] = x + 1 + (y+1)*w
+                cmap[5] = x + 2 + (y+1)*w
+                cmap[6] = x + 0 + (y+2)*w
+                cmap[7] = x + 1 + (y+2)*w
+                cmap[8] = x + 2 + (y+2)*w
+                cmap_index = cmap_index + 1
+                #print cmap
+            #
+        #
+        #print self._cnv_map
+
+    def prepare(self, batch_size):
+        self._batch_size = batch_size
+        self._output_array = np.zeros((self._batch_size, self._kernel_num), dtype=np.float32)
+        #
+        if self._gpu:
+            #print "check"
+            self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+            self._gpu_cnv_map = self._gpu.dev_malloc(self._cnv_map)
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        #
         
-        self._weight_index_matrix = np.zeros( (self._num_node, stride), dtype=np.int32)
-        self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        
-        #self._cnv_map = np.zeros( (self._num_node, stride), dtype=np.int32)
-        #self._cnv_weight_index = np.zeros( (self._num_node, stride), dtype=np.int32)
+    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+        pass
 #
 #
 #
@@ -369,7 +413,7 @@ class Roster:
         self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
         #
         for layer in self.layers:
-            layer.set_batch(batch_size)
+            layer.prepare(batch_size)
         #
         
     def set_data(self, data, data_size, label, batch_size):

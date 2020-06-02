@@ -136,6 +136,7 @@ def main():
     print "1 : test (batch)"
     print "2 : test (single)"
     print "3 : train (mini-batch)"
+    print "3 : train (mini-batch pre)"
     menu = get_key_input("input command >")
     if menu==0:
         mode = 0
@@ -162,15 +163,19 @@ def main():
         train.loop(it, r, package, debug)
     elif mode==1: # test (batch)
         package.load_batch()
-        #batch_size = package._test_batch_size
-        r.init_mem(mini_batch_size, data_size, num_class)
-        r.set_batch(package._test_image_batch, package._test_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
-        test.test(r)
+        batch_size = package._test_batch_size
+        data_size = package._image_size
+        num_class = package._num_class
+        r.prepare(batch_size, data_size, num_class)
+        test.test(r, package)
     elif mode==2: # test (single)
         test.test_single(r, package)
     elif mode==3: # train (mini-batch)
-        train.train_minibatch(r, package, mini_batch_size, 50, 5)
-    elif mode==4: #
+        mini_batch_size = 100
+        num = 1000
+        epoc = 2
+        train.train_minibatch(r, package, mini_batch_size, num, epoc)
+    elif mode==4: # train (mini-batch pre)
         mini_batch_size = 2000
         num = 50
         epoc = 5

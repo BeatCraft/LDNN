@@ -328,10 +328,14 @@ class Package:
         r.set_gpu(my_gpu)
         #
         if self._package_id==0: # MNIST
-            r.add_layer(0, self._image_size, self._image_size)  # input
-            r.add_layer(1, self._image_size, 64)                # hidden 1
-            r.add_layer(1, 64, 64)                              # hidden 2
-            r.add_layer(2, 64, self._num_class)                 # out
+            r.add_layer(core.LAYER_TYPE_INPUT, self._image_size, self._image_size)  # input
+            c = r.countLayers()
+            layer = core.ConvLayer(c,  28, 28, 3, my_gpu) # conv for MNIST
+            r.layers.append(layer)
+            r.add_layer(core.LAYER_TYPE_HIDDEN, layer._kernel_num, 64) # hidden 1
+            #r.add_layer(1, self._image_size, 64) # hidden 1
+            #r.add_layer(1, 64, 64) # hidden 2
+            r.add_layer(core.LAYER_TYPE_OUTPUT, 64, self._num_class) # out
         elif self._package_id==1: # cifa-10
             input_layer = r.add_layer(0, self._image_size, self._image_size)
             hidden_layer_1 = r.add_layer(1, self._image_size, 64)

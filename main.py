@@ -171,9 +171,9 @@ def main():
     elif mode==2: # test (single)
         test.test_single(r, package)
     elif mode==3: # train (mini-batch)
-        mini_batch_size = 100
+        mini_batch_size = 400
         num = 1000
-        epoc = 2
+        epoc = 4
         train.train_minibatch(r, package, mini_batch_size, num, epoc)
     elif mode==4: # train (mini-batch pre)
         mini_batch_size = 2000

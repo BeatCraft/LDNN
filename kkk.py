@@ -37,6 +37,10 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
+    test_matrix = np.zeros( (2, 3), dtype=np.int32)
+    print test_matrix
+    return 0
+    
     width = 32
     height = 32
     num_input = width * height # 1024

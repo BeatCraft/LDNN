@@ -32,6 +32,7 @@ sys.setrecursionlimit(10000)
 #
 #
 def weight_shift_mode(r, li, ni, ii, entropy, mode):
+    #print "li=%d, ni=%d, ii=%d" % (li, ni, ii)
     layer = r.getLayerAt(li)
     wp = layer.get_weight_property(ni, ii) # default : 0
     lock = layer.get_weight_lock(ni, ii)   # default : 0
@@ -99,8 +100,10 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
 #
 def weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction, epoc=0):
     cnt = 0
-    num_w = layer._num_input
-    w_p = num_w/divider
+    num_w = layer.get_num_input()#_num_input
+    w_p = num_w
+    if num_w>divider:
+        w_p = num_w/divider
     #
     for p in range(w_p):
         ii = random.randrange(num_w)
@@ -123,7 +126,7 @@ def weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction, epoc=0
 #
 def node_loop(it, r, limit, divider, entropy, layer, li, direction, epoc=0):
     cnt = 0
-    num_node = layer._num_node
+    num_node = layer.get_num_node()#_num_node
     num_w = layer._num_input
     #
     node_index_list = list(range(num_node))

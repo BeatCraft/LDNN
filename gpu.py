@@ -9,6 +9,86 @@ import numpy as np
 #                  0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
 #
 KERNEL_CODE = """
+
+__kernel void conv_batch_alt(
+    __global float* input,
+    __global int* map,
+    __global float* w,
+    __global float* output,
+    const int ksize,
+    const int kx,
+    const int ky,
+    const int batch_stride,
+    const int alt_x,
+    const int alt_y,
+    const int alt_i,
+    const float alt_w)
+{
+    int bi = get_global_id(0);
+    int kiy = get_global_id(1);
+    int kix = get_global_id(2);
+    
+    int ofset_input = batch_stride*bi;
+    int offset_map = (kx*kiy + kix)*ksize;
+    int offset_out = kx*ky*bi + kx*kiy + kix;
+    float sum = 0.0;
+    
+    if (alt_x==kix && alt_y==kiy){
+        for (int i=0;i<ksize;i++){
+            int k = map[offset_map+i];
+            if (i==alt_i){
+                sum += (input[ofset_input+k] * alt_w);
+            }else{
+                sum += (input[ofset_input+k] * w[offset_map+i]);
+            }
+        }
+    }else{
+        for (int i=0;i<ksize;i++){
+            int k = map[offset_map+i];
+            sum += (input[ofset_input+k] * w[offset_map+i]);
+        }
+    }
+    // relu
+    if (sum<0.0){
+        output[offset_out] = 0.0;
+    }else{
+        output[offset_out] = sum;
+    }
+}
+
+__kernel void conv_batch(
+    __global float* input,
+    __global int* map,
+    __global float* w,
+    __global float* output,
+    const int ksize,
+    const int kx,
+    const int ky,
+    const int batch_stride)
+{
+    int bi = get_global_id(0);
+    int kiy = get_global_id(1);
+    int kix = get_global_id(2);
+    // batch index
+    int ofset_input = batch_stride*bi;
+    int offset_map = (kx*kiy + kix)*ksize;
+    int offset_out = kx*ky*bi + kx*kiy + kix;
+    float sum = 0.0;
+    
+    for (int i=0;i<ksize;i++){
+        int k = map[offset_map+i];
+        sum += (input[ofset_input+k] * w[offset_map+i]);
+        //sum += input[ofset_input+k];
+    }
+
+    // relu
+    if (sum<0.0){
+        output[offset_out] = 0.0;
+    }else{
+        output[offset_out] = sum;
+    }
+};
+
 __kernel void scale(
     __global float* x,
     __global float* y,
@@ -241,6 +321,7 @@ __kernel void multiple_x_by_w_batch(
     int bi = get_global_id(2); // batch id
     //int i = get_local_id(0);  // num_input
     //printf(\"%d\\n\",i);
+    //printf(\"%d, %f : %d, %d\\n\", i, x[stride_2*bi+i], stride_2, stride_1);
     y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
 //
 //    int bi = 0;
@@ -396,6 +477,19 @@ class Gpu:
     def k_cross_entropy(self, infs, output, labels, size, num_batch):
         event = self.prg.k_cross_entropy(self._queue, (num_batch,), None,
                                         infs, output, labels, np.int32(size))
+        event.wait()
+        
+    def conv_batch(self, input, map, w, output, ksize, kx, ky, num_batch, batch_stride):
+        event = self.prg.conv_batch(self._queue, (num_batch, kx, ky), None,
+                                    input, map, w, output,
+                                    np.int32(ksize), np.int32(kx), np.int32(ky), np.int32(batch_stride))
+        event.wait()
+
+    def conv_batch_alt(self, input, map, w, output, ksize, kx, ky, num_batch, batch_stride, alt_x, alt_y, alt_i, alt_w):
+        event = self.prg.conv_batch_alt(self._queue, (num_batch, kx, ky), None,
+                                    input, map, w, output,
+                                    np.int32(ksize), np.int32(kx), np.int32(ky), np.int32(batch_stride),
+                                    np.int32(alt_x), np.int32(alt_y), np.int32(alt_i), np.float32(alt_w))
         event.wait()
 #
 #

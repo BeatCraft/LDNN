@@ -26,6 +26,8 @@ WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078
                 0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
 WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0]
 WEIGHT_SET_2 = [-1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0]
+
+WEIGHT_SET_3 = [0.0, 0.0625, 0.125, 0.25, 0.5, 1.0]
 #
 WEIGHT_SET = WEIGHT_SET_2
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
@@ -154,7 +156,13 @@ class Layer(object):
     
     def prepare(self, batch_size):
         pass
+    
+    def get_num_node(self):
+        return self._num_node
         
+    def get_num_input(self):
+        return self._num_input
+    
 #    def set_batch(self, batch_size):
 #        self._batch_size = batch_size
 #        if self._type>0:
@@ -334,14 +342,13 @@ class ConvLayer(Layer):
         self._gpu = gpu
         self._id = -1
         #
-        self._kernel_x = w - (stride-1)
-        self._kernel_y = h - (stride-1)
-        self._kernel_num = self._kernel_x * self._kernel_y
-        self._kernel_size = stride * stride
+        self._batch_stride = w * h
+        self._kernel_x = w - (stride-1) # 26
+        self._kernel_y = h - (stride-1) # 26
+        self._kernel_num = self._kernel_x * self._kernel_y # 676
+        self._kernel_size = stride * stride # 9
         #
-#        self._num_node = self._kernel_num
-#        self._num_input = self._kernel_size
-        super(ConvLayer, self).__init__(i, LAYER_TYPE_CONV, self._kernel_num, self._kernel_size, gpu)
+        super(ConvLayer, self).__init__(i, LAYER_TYPE_CONV, self._kernel_size, self._kernel_num, gpu)
         #
         self._cnv_map = np.zeros( (self._kernel_num, self._kernel_size), dtype=np.int32)
         #
@@ -362,21 +369,73 @@ class ConvLayer(Layer):
                 #print cmap
             #
         #
-        #print self._cnv_map
 
     def prepare(self, batch_size):
         self._batch_size = batch_size
         self._output_array = np.zeros((self._batch_size, self._kernel_num), dtype=np.float32)
         #
         if self._gpu:
-            #print "check"
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
             self._gpu_cnv_map = self._gpu.dev_malloc(self._cnv_map)
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
+            #
+            #print self._cnv_map[0]
+            self._gpu.copy(self._gpu_cnv_map, self._cnv_map)
         #
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+        #stride_1 = self._num_node * self._num_input
+        #stride_2 = self._num_input
+        if ni>=0: # alt
+            alt_y, alt_x = divmod(ni, self._kernel_x)
+#            print "ni=%d, ii=%d : (%d, %d)" % (ni, ii, x, y)
+            self._gpu.conv_batch_alt(array_in, self._gpu_cnv_map, self._gpu_weight, self._gpu_output,
+                                     self._kernel_size, self._kernel_x, self._kernel_y,
+                                     self._batch_size, self._batch_stride,
+                                     alt_x, alt_y, ii, WEIGHT_SET[wi])
+                                     
+            #self._gpu.copy(self._output_array, self._gpu_output)
+            #print self._output_array[0]
+        else: # propagation                                                
+            self._gpu.conv_batch(array_in, self._gpu_cnv_map, self._gpu_weight, self._gpu_output,
+                                 self._kernel_size, self._kernel_x, self._kernel_y,
+                                 self._batch_size, self._batch_stride)
+                                 
+            self._gpu.copy(self._output_array, self._gpu_output)
+            #print self._output_array[0]#.sum()
+            #ddd = self._output_array[0]
+            #for i in range(self._kernel_num):
+            #    print "%d : %f" % (i, ddd[i])
+            #
+            
+        #
+        
+#
+# 2 x 2 simple max filter for 2D image data
+# w : image width, i : index, h : image height
+class MaxLayer(Layer):
+    def __init__(self, i, w, h, gpu=None):
+        print "MaxLayer::__init__()"
+        #
+        self._index = i
+        self._type = LAYER_TYPE_MAX
+        self._gpu = gpu
+        self._id = -1 # reserved
+        #
+        num_input = w * h
+        self._x = w/2
+        self._y = h/2
+        num_node = self._x * self._y
+        #
+        super(MaxLayer, self).__init__(i, LAYER_TYPE_MAX, num_input, num_node, gpu)
+        #
+    
+    def prepare(self, batch_size):
         pass
+    
+    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+        pass
+        
 #
 #
 #
@@ -417,11 +476,21 @@ class Roster:
         #
         
     def set_data(self, data, data_size, label, batch_size):
+    
+        #print data[0]
+    
         self._gpu.copy(self._gpu_input, data)
         self._gpu.copy(self._gpu_labels, label)
         layer = self.getLayerAt(0) # input layer
         layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0),
                          layer._num_node, batch_size, 0)
+                         
+        #layer._gpu.copy(layer._output_array, layer._gpu_output)
+        #print self._output_array[0]#.sum()
+        #ddd = layer._output_array[0]
+        #for i in range(784):
+        #    print "%d : %f" % (i, ddd[i])
+        #
     
     def init_weight(self):
         c = self.countLayers()
@@ -497,6 +566,7 @@ class Roster:
         c = self.countLayers()
         output = self.getLayerAt(c-1)
         output._gpu.copy(output._output_array, output._gpu_output)
+        #print output._output_array[0]
         return output._output_array
         
     def get_cross_entropy(self):

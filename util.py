@@ -332,6 +332,7 @@ class Package:
             c = r.countLayers()
             layer = core.ConvLayer(c,  28, 28, 3, my_gpu) # conv for MNIST
             r.layers.append(layer)
+            #print layer._kernel_num
             r.add_layer(core.LAYER_TYPE_HIDDEN, layer._kernel_num, 64) # hidden 1
             #r.add_layer(1, self._image_size, 64) # hidden 1
             #r.add_layer(1, 64, 64) # hidden 2

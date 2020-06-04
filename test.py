@@ -100,6 +100,7 @@ def test_single(r, package):
     start_time = time.time()
     ca = 0
     for i in range(eval_size):
+        #i = 60
         data_array[0] = package._test_image_batch[i]
         answer = package._test_label_batch[i]
         class_array[0] = answer
@@ -117,6 +118,9 @@ def test_single(r, package):
                     index = k
                 #
             #
+        #
+        #if index>0:
+        #    print i
         #
         rets[index] = rets[index] + 1
         if index==answer:

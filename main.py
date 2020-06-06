@@ -162,11 +162,6 @@ def main():
         r.set_batch(package._train_image_batch, package._train_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
         train.loop(it, r, package, debug)
     elif mode==1: # test (batch)
-        package.load_batch()
-        batch_size = package._test_batch_size
-        data_size = package._image_size
-        num_class = package._num_class
-        r.prepare(batch_size, data_size, num_class)
         test.test(r, package)
     elif mode==2: # test (single)
         test.test_single(r, package)

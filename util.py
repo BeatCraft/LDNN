@@ -329,11 +329,17 @@ class Package:
         #
         if self._package_id==0: # MNIST
             r.add_layer(core.LAYER_TYPE_INPUT, self._image_size, self._image_size)  # input
+            #
             c = r.countLayers()
-            layer = core.ConvLayer(c,  28, 28, 3, my_gpu) # conv for MNIST
+            #layer = core.ConvLayer(c,  28, 28, 3, my_gpu) # conv for MNIST
+            layer = core.Conv2dLayer(c,  28, 28, 1, 8, my_gpu)
             r.layers.append(layer)
-            #print layer._kernel_num
-            r.add_layer(core.LAYER_TYPE_HIDDEN, layer._kernel_num, 64) # hidden 1
+            #
+            c = r.countLayers()
+            layer = core.MaxLayer(c, 8, 28, 28, my_gpu)
+            r.layers.append(layer)
+            # 14 x 14 x 32 = 6272
+            r.add_layer(core.LAYER_TYPE_HIDDEN, 196*8, 64) # hidden 1
             #r.add_layer(1, self._image_size, 64) # hidden 1
             #r.add_layer(1, 64, 64) # hidden 2
             r.add_layer(core.LAYER_TYPE_OUTPUT, 64, self._num_class) # out

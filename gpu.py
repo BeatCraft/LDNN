@@ -2,13 +2,307 @@ import pyopencl as cl
 import os, sys, time
 from time import time
 import numpy as np
+
+import os
+os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 #
 #
-# WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078125,
-#                  0.0,
-#                  0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
 #
 KERNEL_CODE = """
+__kernel void conv2d_batch_alt(
+    __global float* input,
+    __global float* weight,
+    __global float* output,
+    const int w,
+    const int h,
+    const int ch,
+    const int filter,
+    const int ni,
+    const int ii,
+    const float alt)
+{
+    int bi = get_global_id(0);
+    int xi = get_global_id(1);
+    int yi = get_global_id(2);
+    int image_stride = w * h;
+    int batch_stride = image_stride*ch;
+    int output_stride = w * h * filter;
+    int ofset_input = batch_stride * bi;
+    int offset_out = output_stride * bi + yi*w + xi;
+    int filetr_size = 9;
+    int offset_w = filetr_size * (filter-1);
+    float sum = 0.0;
+    float a[9];
+    int x = xi - 1;
+    int y = yi - 1;
+    float backup = 0.0;
+    //
+    for (int f=0;f<filter;f++){
+        sum = 0.0;
+        //offset_w = offset_w +
+        if (f==ni){
+            backup = weight[offset_w+ii];
+            weight[offset_w+ii] = alt;
+        }
+        for (int c=0;c<ch;c++){
+            int offset = ofset_input+image_stride*c;
+            if (yi==0){ // on the top
+                if (xi==0){ // top left corner
+                    a[0] = 0.0;
+                    a[1] = 0.0;
+                    a[2] = 0.0;
+                    a[3] = 0.0;
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = 0;
+                    a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                    a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+                }else if (xi==w-1){ // top right corner
+                    a[0] = 0;
+                    a[1] = 0;
+                    a[2] = 0;
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = 0;
+                    a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+                    a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                    a[8] = 0;
+                }else{ // top line
+                    a[0] = 0;
+                    a[1] = 0;
+                    a[2] = 0;
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+                    a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                    a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+                }
+            }else if (yi==h-1){ //on the bottom
+                if (xi==0){ // bottom left corner
+                    a[0] = 0;
+                    a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                    a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+                    a[3] = 0;
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = 0;
+                    a[7] = 0;
+                    a[8] = 0;
+                }else if (xi==w-1){ // bottom right corner
+                    a[0] = input[offset+w*y+x] * weight[offset_w];
+                    a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                    a[2] = 0;
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = 0;
+                    a[6] = 0;
+                    a[7] = 0;
+                    a[8] = 0;
+                }else{ // bottom line
+                    a[0] = input[offset+w*y+x] * weight[offset_w];
+                    a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                    a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = 0;
+                    a[7] = 0;
+                    a[8] = 0;
+                }
+            }else{ // in the middle
+                a[0] = input[offset+w*y+x] * weight[offset_w];
+                a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+                a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+                a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+            }
+            for (int i=0;i<9;i++){
+                sum += a[i];
+            }
+        } // ch loop
+        // relu
+        if (sum<0.0){
+            output[offset_out+image_stride*f] = 0.0;
+        }else{
+            output[offset_out+image_stride*f] = sum;
+        }
+        if (f==ni){
+            weight[offset_w+ii] = backup;
+        }
+        offset_w += filetr_size;
+    } // filter loop
+    //printf(\"(%d, %d, %d)=%f\\n\",bi, xi, yi, sum);
+};
+
+__kernel void conv2d_batch(
+    __global float* input,
+    __global float* weight,
+    __global float* output,
+    const int w,
+    const int h,
+    const int ch,
+    const int filter)
+{
+    int bi = get_global_id(0);
+    int xi = get_global_id(1);
+    int yi = get_global_id(2);
+    int image_stride = w * h;
+    int batch_stride = image_stride*ch;
+    int output_stride = w * h * filter;
+    int ofset_input = batch_stride * bi;
+    int offset_out = output_stride * bi + yi*w + xi;
+    int filetr_size = 9;
+    int offset_w = filetr_size * (filter-1);
+    float sum = 0.0;
+    float a[9];
+    int x = xi - 1;
+    int y = yi - 1;
+    //
+    
+    for (int f=0;f<filter;f++){
+        sum = 0.0;
+        for (int c=0;c<ch;c++){
+            int offset = ofset_input+image_stride*c;
+            if (yi==0){ // on the top
+                if (xi==0){ // top left corner
+                    a[0] = 0.0;
+                    a[1] = 0.0;
+                    a[2] = 0.0;
+                    a[3] = 0.0;
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = 0;
+                    a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                    a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+                }else if (xi==w-1){ // top right corner
+                    a[0] = 0;
+                    a[1] = 0;
+                    a[2] = 0;
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = 0;
+                    a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+                    a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                    a[8] = 0;
+                }else{ // top line
+                    a[0] = 0;
+                    a[1] = 0;
+                    a[2] = 0;
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+                    a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                    a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+                }
+            }else if (yi==h-1){ //on the bottom
+                if (xi==0){ // bottom left corner
+                    a[0] = 0;
+                    a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                    a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+                    a[3] = 0;
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = 0;
+                    a[7] = 0;
+                    a[8] = 0;
+                }else if (xi==w-1){ // bottom right corner
+                    a[0] = input[offset+w*y+x] * weight[offset_w+0];
+                    a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                    a[2] = 0;
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = 0;
+                    a[6] = 0;
+                    a[7] = 0;
+                    a[8] = 0;
+                }else{ // bottom line
+                    a[0] = input[offset+w*y+x] * weight[offset_w+0];
+                    a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                    a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = 0;
+                    a[7] = 0;
+                    a[8] = 0;
+                }
+            }else{ // in the middle
+                a[0] = input[offset+w*y+x] * weight[offset_w+0];
+                a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+                a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+                a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+            }
+            for (int i=0;i<9;i++){
+                sum += a[i];
+            }
+        } // ch loop
+        // relu
+        if (sum<0.0){
+            output[offset_out+image_stride*f] = 0.0;
+        }else{
+            output[offset_out+image_stride*f] = sum;
+        }
+    } // filter loop
+
+    //printf(\"(%d, %d, %d)=%f\\n\",bi, xi, yi, sum);
+};
+
+__kernel void max_batch(
+    __global float* input,
+    __global float* output,
+    const int ch,
+    const int w, // output w
+    const int h,
+    const int batch_stride)
+{
+    int bi = get_global_id(0);
+    int y = get_global_id(1);
+    int x = get_global_id(2);
+    
+    int input_w = w*2;
+    int input_h = h*2;
+    int ich_stride = input_w * input_h;
+    int input_stride = ich_stride * ch;
+    int input_offset = input_stride * bi;
+    
+    int output_w = w;
+    int output_h = h;
+    int och_stride = output_w * output_h;
+    int output_stride = och_stride * ch;
+    int output_offset = output_stride * bi;
+
+    float max = 0.0;
+    float a[4];
+    //int k = 0;
+    //int offset_out = w * h * bi;
+    //int k = ofset_input + y*w*2 + x*2;
+    
+    
+    for (int c=0;c<ch;c++){
+        int k = input_offset + (ich_stride*c) + (w*2)*y + x*2;
+        a[0] = input[k];
+        a[1] = input[k + 1];
+        a[2] = input[k + w*2];
+        a[3] = input[k + w*2 + 1];
+        for (int i=0;i<4;i++){
+            if (a[i]>max){
+                max = a[i];
+            }
+        }
+        output[output_offset + och_stride*c + w*y + x] = max;
+    }
+}
 
 __kernel void conv_batch_alt(
     __global float* input,
@@ -25,8 +319,8 @@ __kernel void conv_batch_alt(
     const float alt_w)
 {
     int bi = get_global_id(0);
-    int kiy = get_global_id(1);
-    int kix = get_global_id(2);
+    int kix = get_global_id(1);
+    int kiy = get_global_id(2);
     
     int ofset_input = batch_stride*bi;
     int offset_map = (kx*kiy + kix)*ksize;
@@ -67,9 +361,8 @@ __kernel void conv_batch(
     const int batch_stride)
 {
     int bi = get_global_id(0);
-    int kiy = get_global_id(1);
-    int kix = get_global_id(2);
-    // batch index
+    int kix = get_global_id(1);
+    int kiy = get_global_id(2);
     int ofset_input = batch_stride*bi;
     int offset_map = (kx*kiy + kix)*ksize;
     int offset_out = kx*ky*bi + kx*kiy + kix;
@@ -78,7 +371,6 @@ __kernel void conv_batch(
     for (int i=0;i<ksize;i++){
         int k = map[offset_map+i];
         sum += (input[ofset_input+k] * w[offset_map+i]);
-        //sum += input[ofset_input+k];
     }
 
     // relu
@@ -109,17 +401,7 @@ __kernel void scale(
 __kernel void p_softmax(__global float* in, int num)
 {
     int bi = get_global_id(0);
-    float max;
-    float sum;
-    
-    max = 0.0;
-    sum = 0.0;
-    
-//    for (int i=0;i<num;i++){
-//        if (in[bi*num+i]>max){
-//            max = in[bi*num+i];
-//        }
-//    }
+    float sum = 0.0;
 
     for (int i=0;i<num;i++){
         in[bi*num+i] = exp(in[bi*num+i]);
@@ -132,22 +414,13 @@ __kernel void p_softmax(__global float* in, int num)
     for (int i=0;i<num;i++){
         in[bi*num+i] = in[bi*num+i]/sum;
     }
-
-//    for (int i=0;i<num;i++){
-//        sum += in[bi*num+i];
-//    }
-//
-//   for (int i=0;i<num;i++){
-//        in[bi*num+i] = in[bi*num+i]/sum;
-//    }
 }
 
 __kernel void k_normalize(__global float* in, int num)
 {
     int bi = get_global_id(0);
-    float max;
+    float max = 0.0;
     
-    max = 0.0;
     for (int i=0;i<num;i++){
         if (in[bi*num+i]>max){
             max = in[bi*num+i];
@@ -162,19 +435,12 @@ __kernel void k_normalize(__global float* in, int num)
 __kernel void p_normalize(__global float* in, int num)
 {
     int bi = get_global_id(0);
-    float max;
-    float sum;
-    float avg;
-    float std;
-    float tmp;
-    float k;
-    
-    max = 0.0;
-    sum = 0.0;
-    avg = 0.0;
-    std = 0.0;
-    tmp = 0.0;
-    k = 0.0;
+    float max = 0.0;
+    float sum = 0.0;
+    float avg = 0.0;
+    float std = 0.0;
+    float tmp = 0.0;
+    float k = 0.0;
     
     for (int i=0;i<num;i++){
         sum += in[bi*num+i];
@@ -191,7 +457,6 @@ __kernel void p_normalize(__global float* in, int num)
         in[bi*num+i] = (in[bi*num+i]-avg)/std;
     }
     
-    max = 0.0;
     for (int i=0;i<num;i++){
         tmp = in[bi*num+i];
         k = fabs(tmp);
@@ -208,21 +473,11 @@ __kernel void p_normalize(__global float* in, int num)
 __kernel void q_normalize(__global float* in, int num)
 {
     int bi = get_global_id(0);
-    float max;
-    float min;
-    float sum;
-    float avg;
-    float div;
-    float std;
-    float tmp;
-    
-    max = 0.0;
-    min = 0.0;
-    sum = 0.0;
-    avg = 0.0;
-    div = 0.0;
-    std = 0.0;
-    tmp = 0.0;
+    float sum = 0.0;
+    float avg = 0.0;
+    float div = 0.0;
+    float std = 0.0;
+    float tmp = 0.0;
     
     for (int i=0;i<num;i++){
         sum += in[bi*num+i];
@@ -255,18 +510,15 @@ __kernel void k_cross_entropy(__global float* infs,
     
     delta = 0.0000001;
     i = labels[bi];
-    k = infs[bi*10+i]+delta;    
+    k = infs[bi*num+i]+delta;
     output[bi] = -log(k);
 }
 
 __kernel void k_softmax(__global float* in, int num)
 {
     int bi = get_global_id(0);
-    float max;
-    float sum;
-    
-    max = 0.0;
-    sum = 0.0;
+    float max = 0.0;
+    float sum = 0.0;
     
     for (int i=0;i<num;i++){
         if (in[bi*num+i]>max){
@@ -291,11 +543,8 @@ __kernel void k_sum(__global float* in,
 {
     int ni = get_global_id(0);
     int bi = get_global_id(1);
-    int ii;
-    float sum;
-
-    ii = 0;
-    sum = 0.0;
+    int ii = 0;
+    float sum = 0.0;
     
     for (ii=0;ii<num_input;ii++){
         sum += in[num_node*num_input*bi + num_input*ni + ii];
@@ -319,15 +568,8 @@ __kernel void multiple_x_by_w_batch(
     int i = get_global_id(0);  // num_input
     int j = get_global_id(1);  // num_node
     int bi = get_global_id(2); // batch id
-    //int i = get_local_id(0);  // num_input
-    //printf(\"%d\\n\",i);
-    //printf(\"%d, %f : %d, %d\\n\", i, x[stride_2*bi+i], stride_2, stride_1);
+
     y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
-//
-//    int bi = 0;
-//    for (bi=0;bi<1000;bi++){
-//        y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
-//    }
 };
 
 // stride_1 : num_node * num_input
@@ -388,7 +630,6 @@ __kernel void multiple_x_by_w_alt(
         y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * w[stride_2*j + i];
     }
 };
-
 """
 #
 #
@@ -490,6 +731,24 @@ class Gpu:
                                     input, map, w, output,
                                     np.int32(ksize), np.int32(kx), np.int32(ky), np.int32(batch_stride),
                                     np.int32(alt_x), np.int32(alt_y), np.int32(alt_i), np.float32(alt_w))
+        event.wait()
+
+    def max_batch(self, input, output, ch, w, h, num_batch, batch_stride):
+        event = self.prg.max_batch(self._queue, (num_batch, w, h), None,
+                                   input, output, np.int32(ch), np.int32(w), np.int32(h), np.int32(batch_stride))
+        event.wait()
+        
+    def conv2d_batch(self, input, weight, output, w, h, ch, filter, batch_size):
+        event = self.prg.conv2d_batch(self._queue, (batch_size, w, h), None,
+                                      input, weight, output, np.int32(w), np.int32(h),
+                                      np.int32(ch), np.int32(filter))
+        event.wait()
+        
+    def conv2d_batch_alt(self, input, weight, output, w, h, ch, filter, batch_size, ni, ii, alt):
+        event = self.prg.conv2d_batch_alt(self._queue, (batch_size, w, h), None,
+                                          input, weight, output, np.int32(w), np.int32(h),
+                                          np.int32(ch), np.int32(filter),
+                                          np.int32(ni), np.int32(ii), np.float32(alt))
         event.wait()
 #
 #

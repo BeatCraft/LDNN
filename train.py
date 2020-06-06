@@ -166,6 +166,9 @@ def layer_loop(it, r, limit, reverse, divider, direction, epoc=0):
     #
     for li in list_of_layer_index:
         layer = r.getLayerAt(li)
+        if layer.get_type()==core.LAYER_TYPE_POOL:
+            continue
+        #
         entropy, ret = node_loop(it, r, limit, divider, entropy, layer, li, direction, epoc)
         cnt = cnt + ret
         if entropy<limit:
@@ -261,9 +264,9 @@ def train_minibatch(r, package, mini_batch_size, num, epoc):
     start_time = time.time()
     for j in range(num):
         for i in range(mini_batch_size):
-            bi = random.randrange(batch_size)
-            data_array[i] = package._train_image_batch[bi]
-            class_array[i] = package._train_label_batch[bi]
+            #bi = random.randrange(batch_size)
+            data_array[i] = package._train_image_batch[i]
+            class_array[i] = package._train_label_batch[i]
         #
         #r.set_batch(data_array, class_array, 0, mini_batch_size, data_size, num_class)
         r.set_data(data_array, data_size, class_array, mini_batch_size)

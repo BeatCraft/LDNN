@@ -31,8 +31,22 @@ sys.setrecursionlimit(10000)
 #
 #
 #
-def test(r):
-    batch_size = r._batch_size
+def test(r, package):
+    package.load_batch()
+    batch_size = 10#package._test_batch_size
+    data_size = package._image_size
+    num_class = package._num_class
+    #
+    data_array = np.zeros((batch_size, data_size), dtype=np.float32)
+    class_array = np.zeros(batch_size, dtype=np.int32)
+    #
+    for i in range(batch_size):
+        data_array[i] = package._test_image_batch[i]
+        class_array[i] = package._test_label_batch[i]
+    #
+    r.prepare(batch_size, data_size, num_class)
+    r.set_data(data_array, data_size, class_array, batch_size)
+    #
     print ">>batch test mode (%d)" % (batch_size)
     dist = [0,0,0,0,0,0,0,0,0,0] # data_class
     rets = [0,0,0,0,0,0,0,0,0,0] # result of infs
@@ -84,7 +98,7 @@ def test_single(r, package):
     package.load_batch()
     data_size = package._image_size
     num_class = package._num_class
-    eval_size = package._test_batch_size
+    eval_size = package._test_batch_size #
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
@@ -100,6 +114,8 @@ def test_single(r, package):
     start_time = time.time()
     ca = 0
     for i in range(eval_size):
+        if i%100==0:
+            print i
         #i = 60
         data_array[0] = package._test_image_batch[i]
         answer = package._test_label_batch[i]

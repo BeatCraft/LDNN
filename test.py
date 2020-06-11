@@ -106,8 +106,6 @@ def test_single(r, package):
     #
     data_array = np.zeros((1, data_size), dtype=np.float32)
     class_array = np.zeros(1, dtype=np.int32)
-    #r.set_batch(data_array, class_array, 0, 1, data_size, num_class, 0)
-    #r.init_mem(1, data_size, num_class)
     batch_size = 1
     r.prepare(batch_size, data_size, num_class)
     #
@@ -125,6 +123,7 @@ def test_single(r, package):
         infs = r.get_inference()
         dist[answer] = dist[answer] + 1
         inf = infs[0]
+        #print inf
         #
         index = -1
         mx = max(inf)

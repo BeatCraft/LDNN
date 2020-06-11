@@ -31,7 +31,7 @@ sys.setrecursionlimit(10000)
 #
 #
 #
-def weight_shift_mode(r, li, ni, ii, entropy, mode):
+def weight_shift_mode(r, li, ni, ii, entropy, mode, zero=0):
     #print "li=%d, ni=%d, ii=%d" % (li, ni, ii)
     layer = r.getLayerAt(li)
     wp = layer.get_weight_property(ni, ii) # default : 0
@@ -59,7 +59,12 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
             return entropy, 1
         #
     else: # cool
-        if wi==core.WEIGHT_INDEX_MIN:
+        minimum = core.WEIGHT_INDEX_MIN
+        if zero==1:
+            minimum = core.WEIGHT_INDEX_ZERO
+        #
+        #if wi==core.WEIGHT_INDEX_MIN:
+        if wi==minimum:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_index(ni, ii, wi+1)
             if r._gpu:
@@ -98,16 +103,26 @@ def weight_shift_mode(r, li, ni, ii, entropy, mode):
 #
 #
 #
-def weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction, epoc=0):
+def weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction, epoc=0, zero=0):
     cnt = 0
     num_w = layer.get_num_input()#_num_input
+    #
+    #
+    #
     w_p = num_w
     if num_w>divider:
         w_p = num_w/divider
+    else:
+        w_p = num_w/4
+        if w_p<1:
+            w_p = 3
+        #
+    #
+    #
     #
     for p in range(w_p):
         ii = random.randrange(num_w)
-        entropy, ret = weight_shift_mode(r, li, ni, ii, entropy, direction)
+        entropy, ret = weight_shift_mode(r, li, ni, ii, entropy, direction, zero)
         if ret>0:
             cnt = cnt + ret
             if direction>0:
@@ -124,7 +139,7 @@ def weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction, epoc=0
 #
 #
 #
-def node_loop(it, r, limit, divider, entropy, layer, li, direction, epoc=0):
+def node_loop(it, r, limit, divider, entropy, layer, li, direction, epoc=0, zero=0):
     cnt = 0
     num_node = layer.get_num_node()#_num_node
     num_w = layer._num_input
@@ -133,7 +148,7 @@ def node_loop(it, r, limit, divider, entropy, layer, li, direction, epoc=0):
     random.shuffle(node_index_list)
     nc = 0
     for ni in node_index_list:
-        entropy, ret = weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction, epoc)
+        entropy, ret = weight_loop(it, r, limit, divider, entropy, layer, li, ni, direction, epoc, zero)
         cnt = cnt + ret
         if entropy<limit:
             print "reach to the limit(%f), exit iterations" %(limit)
@@ -165,11 +180,15 @@ def layer_loop(it, r, limit, reverse, divider, direction, epoc=0):
             list_of_layer_index.append(i)
     #
     for li in list_of_layer_index:
+        zero = 0
         layer = r.getLayerAt(li)
-        if layer.get_type()==core.LAYER_TYPE_POOL:
+        layer_type = layer.get_type()
+        if layer_type==core.LAYER_TYPE_POOL:
             continue
+        elif layer_type==core.LAYER_TYPE_CONV_2D:
+            zero = 1
         #
-        entropy, ret = node_loop(it, r, limit, divider, entropy, layer, li, direction, epoc)
+        entropy, ret = node_loop(it, r, limit, divider, entropy, layer, li, direction, epoc, zero)
         cnt = cnt + ret
         if entropy<limit:
             print "reach to the limit(%f), exit iterations" %(limit)
@@ -265,8 +284,8 @@ def train_minibatch(r, package, mini_batch_size, num, epoc):
     for j in range(num):
         for i in range(mini_batch_size):
             #bi = random.randrange(batch_size)
-            data_array[i] = package._train_image_batch[i]
-            class_array[i] = package._train_label_batch[i]
+            data_array[i] = package._train_image_batch[mini_batch_size*j+i]
+            class_array[i] = package._train_label_batch[mini_batch_size*j+i]
         #
         #r.set_batch(data_array, class_array, 0, mini_batch_size, data_size, num_class)
         r.set_data(data_array, data_size, class_array, mini_batch_size)

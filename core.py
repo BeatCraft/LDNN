@@ -29,7 +29,7 @@ WEIGHT_SET_2 = [-1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0]
 
 WEIGHT_SET_3 = [0.0, 0.0625, 0.125, 0.25, 0.5, 1.0]
 #
-WEIGHT_SET = WEIGHT_SET_2
+WEIGHT_SET = WEIGHT_SET_1
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -415,13 +415,17 @@ class MaxLayer(Layer):
         self._id = -1 # reserved
         #
         self._ch = ch
-        num_input = w * h
+        self._num_input = w * h
         self._x = w/2
         self._y = h/2
-        num_node = self._x * self._y
+        self._num_node = self._x * self._y
+        self._batch_stride = w * h * ch
         #
-        super(MaxLayer, self).__init__(i, LAYER_TYPE_POOL, num_input, num_node, gpu)
-        #
+        #super(MaxLayer, self).__init__(i, LAYER_TYPE_POOL, num_input, num_node, gpu)
+        #    
+    
+    def set_weight_index(self, ni, ii, wi):
+        pass
     
     def export_weight_index(self):
         return None
@@ -502,9 +506,18 @@ class Conv2dLayer(Layer):
 
             #self._gpu.copy(self._output_array, self._gpu_output)
             #print self._output_array[0][0]
-            #print self._weight_matrix
-            
-            
+            #print self._weight_matrix[0]
+            #print self._output_array[1]
+            #print self._weight_matrix[1]
+    
+    def init_weight_with_random_index(self):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                wi = random.randrange(WEIGHT_INDEX_ZERO, WEIGHT_INDEX_SIZE)
+                self.set_weight_index(ni, ii, wi)
+            #
+        #
+        
 #
 #
 #
@@ -565,7 +578,11 @@ class Roster:
         c = self.countLayers()
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            layer.init_weight_with_random_index()
+            if layer.get_type()==LAYER_TYPE_POOL:
+                pass
+            else:
+                layer.init_weight_with_random_index()
+            #
         #
 
     def reset_weight_property(self, p=0):
@@ -576,7 +593,11 @@ class Roster:
             ic = layer._num_input
             for ni in range(nc):
                 for ii in range(ic):
-                    layer.set_weight_property(ni, ii, p)
+                    if layer.get_type()==LAYER_TYPE_POOL:
+                        pass
+                    else:
+                        layer.set_weight_property(ni, ii, p)
+                    #
                 #
             #
         #
@@ -688,7 +709,7 @@ class Roster:
                 layer = self.getLayerAt(i)
                 print "%d : %d" % (i, layer.get_type())
                 if layer.get_type()==LAYER_TYPE_POOL:
-                    print "fuck"
+                    #print "fuck"
                     continue
                 #
                 nc  = layer._num_node

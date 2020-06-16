@@ -281,17 +281,18 @@ def train_minibatch(r, package, mini_batch_size, num, epoc):
     print ">>mini_batch_size(%d)" % (mini_batch_size)
     #
     start_time = time.time()
-    for j in range(num):
-        for i in range(mini_batch_size):
-            #bi = random.randrange(batch_size)
-            data_array[i] = package._train_image_batch[mini_batch_size*j+i]
-            class_array[i] = package._train_label_batch[mini_batch_size*j+i]
-        #
-        #r.set_batch(data_array, class_array, 0, mini_batch_size, data_size, num_class)
-        r.set_data(data_array, data_size, class_array, mini_batch_size)
-        for k in range(epoc):
+    for k in range(epoc):
+        for j in range(num):
+            for i in range(mini_batch_size):
+                #bi = random.randrange(batch_size)
+                data_array[i] = package._train_image_batch[mini_batch_size*j+i]
+                class_array[i] = package._train_label_batch[mini_batch_size*j+i]
+            #
+            r.set_data(data_array, data_size, class_array, mini_batch_size)
+            #
             entropy, h_cnt, c_cnt = train(j, r, limit, k)
             r.export_weight_index(package._wi_csv_path)
+        #
     #
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")

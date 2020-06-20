@@ -331,22 +331,17 @@ class Package:
             r.add_layer(core.LAYER_TYPE_INPUT, self._image_size, self._image_size)  # input
             #
             c = r.countLayers()
-            layer = core.Conv2dLayer(c, 28, 28, 1, 32, my_gpu)
+            layer = core.Conv2dLayer(c, 28, 28, 1, 8, my_gpu)
             r.layers.append(layer)
-            # 28 x 28 x 16
-            #c = r.countLayers()
-            #layer = core.Conv2dLayer(c,  28, 28, 32, 32, my_gpu)
-            #r.layers.append(layer)
-            # 28 x 28 x 16
+            # 28 x 28 x 8
             c = r.countLayers()
-            layer = core.MaxLayer(c, 32, 28, 28, my_gpu)
+            layer = core.MaxLayer(c, 8, 28, 28, my_gpu)
             r.layers.append(layer)
-            # 14 x 14 x 32
-            r.add_layer(core.LAYER_TYPE_HIDDEN, 14*14*32, 64) # hidden 1
-            r.add_layer(1, 64, 64)
+            # 14 x 14 x 8
+            #
+            r.add_layer(core.LAYER_TYPE_HIDDEN, 14*14*8, 64) # hidden 1
+            r.add_layer(1, 64, 64) # hidden 2
             r.add_layer(core.LAYER_TYPE_OUTPUT, 64, self._num_class) # out
-            #r.add_layer(1, self._image_size, 64) # hidden 1
-            #r.add_layer(1, 64, 64) # hidden 2
         elif self._package_id==1: # cifa-10
             input_layer = r.add_layer(0, self._image_size, self._image_size)
             hidden_layer_1 = r.add_layer(1, self._image_size, 64)

@@ -672,6 +672,7 @@ class Roster:
         #print "    CE=%f" % (ret)
         #return ret
         s = np.sum(self._batch_cross_entropy)
+        s = s/float(self._batch_size)
 #        if np.isnan(s):
 #            for i in range(self._batch_size):
 #                if np.isnan(self._batch_cross_entropy[i]):
@@ -692,7 +693,7 @@ class Roster:
             c = self.countLayers()
             for i in range(1, c):
                 layer = self.getLayerAt(i)
-                print "%d : %d" % (i, layer.get_type())
+                #print "%d : %d" % (i, layer.get_type())
                 data = layer.export_weight_index()
                 if data:
                     writer.writerows(data)
@@ -707,7 +708,7 @@ class Roster:
             lc = self.countLayers()
             for i in range(1, lc):
                 layer = self.getLayerAt(i)
-                print "%d : %d" % (i, layer.get_type())
+                #print "%d : %d" % (i, layer.get_type())
                 if layer.get_type()==LAYER_TYPE_POOL:
                     #print "fuck"
                     continue

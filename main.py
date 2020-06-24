@@ -166,10 +166,18 @@ def main():
     elif mode==2: # test (single)
         test.test_single(r, package)
     elif mode==3: # train (mini-batch)
-        mini_batch_size = 150
-        num = package._train_batch_size / mini_batch_size
-        epoc = 4
-        train.train_minibatch(r, package, mini_batch_size, num, epoc)
+        #mini_batch_size = 150
+        #num = package._train_batch_size / mini_batch_size
+        #epoc = 4
+        t = train.Train(package, r)
+        t.set_limit(0.000001)
+        t.set_mini_batch_size(150)
+        t.set_divider(64)
+        t.set_iteration(package._train_batch_size/150)
+        t.set_epoc(4)
+        t.set_layer_direction(1) # output to input
+        t.loop()
+        #train.train_minibatch(r, package, mini_batch_size, num, epoc)
     elif mode==4: # train (mini-batch pre)
         mini_batch_size = 2000
         num = 50

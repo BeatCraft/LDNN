@@ -25,7 +25,7 @@ import train
 #
 #
 class ServerLooper(netutil.Looper):
-    def __init__(self, local_addr, local_port, remote_addr, remote_port, package_id):
+    def __init__(self, local_addr, local_port, remote_addr, remote_port, package_id, mini_batch_size, num_client):
         print "ServerLooper::__init__()"
         #
         super(ServerLooper, self).__init__(local_addr, local_port, remote_addr, remote_port)
@@ -33,6 +33,8 @@ class ServerLooper(netutil.Looper):
         self._package_id = package_id
         self._send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self._mini_batch_size = mini_batch_size
+        self._num_client = num_client
         self._client_num = 0
         self._client_list = []
         #
@@ -113,14 +115,21 @@ class ServerLooper(netutil.Looper):
     
     def evaluate(self):
         mode = 20
-        return self.execute_cmd(mode, 0, 0, 0, 0)
+        #
+        e = self.execute_cmd(mode, 0, 0, 0, 0)
+        return e / float(self._num_client)
         
     def set_alt(self, li, ni, ii, wi):
         mode = 30
-        return self.execute_cmd(mode, li, ni, ii, wi)
+        #
+        e = self.execute_cmd(mode, li, ni, ii, wi)
+        return e / float(self._num_client)
         
     def update(self, li, ni, ii, wi):
         mode = 40
+        #
+        #
+        #
         return self.execute_cmd(mode, li, ni, ii, wi)
     
     def set_batch(self, i):
@@ -136,7 +145,7 @@ class ServerLooper(netutil.Looper):
                 continue
             elif mode==10: # init
                 #
-                cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)
+                cmd = netutil.pack_i6(self._seq, mode, self._package_id, self._mini_batch_size, self._num_client, 0)
                 self.send(cmd)
                 self.set_mode(mode+5)
                 #
@@ -149,6 +158,10 @@ class ServerLooper(netutil.Looper):
                 self._client_num = len(self._client_list)
                 self._client_timeout = [0] * self._client_num
                 print self._client_num
+                if self._num_client!=self._client_num:
+                    print "error : %d expected, %d answered." % (self._num_client, self._client_num)
+                    #self.quit()
+                #
             elif mode==20: # evaluate
                 ce = self.evaluate()
                 print "evaluate :%f" % (ce)
@@ -171,10 +184,22 @@ class ServerLooper(netutil.Looper):
             elif mode==50: # train
                 debug = 1
                 #train.loop(it, self._roster, self._package, debug)
-                mini_batch_size = 6000
-                num = 200
-                epoc = 2
-                train.train_minibatch_preset(self._roster, self._package, mini_batch_size, num, epoc)
+                #mini_batch_size = 6000
+                #num = 200
+                #epoc = 2
+                #
+                #
+                t = train.Train(self._package, self._roster)
+                t.set_limit(0.000001)
+                t.set_mini_batch_size(150)
+                t.set_divider(64)
+                it = self._package._train_batch_size / (self._mini_batch_size*self._num_client)
+                t.set_iteration(it)
+                t.set_epoc(4)
+                t.set_layer_direction(1) # output to input
+                t.loop()
+                #
+                #train.train_minibatch_preset(self._roster, self._package, mini_batch_size, num, epoc)
                 self.set_mode(0)
             elif mode==60: # debug / ping
                 cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)
@@ -187,6 +212,9 @@ class ServerLooper(netutil.Looper):
                 print "set_batch()"
                 cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)
                 self.send(cmd)
+                #
+                time.sleep(10)
+                #
                 ret = self.recv_multi()
                 print ret
                 self.set_mode(0)
@@ -198,10 +226,10 @@ class ServerLooper(netutil.Looper):
 #
 #
 #
-def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id):
+def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, mini_batch_size, num_client):
     print "main() : start"
     #
-    s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id)
+    s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, mini_batch_size, num_client)
     s.init()
     s.run()
     #
@@ -239,9 +267,12 @@ def main():
     BC_PORT = 5000
     SERVER_ADDR = "127.0.0.1"
     SERVER_PORT = 5005
-    package_id = 0
     #
-    s = server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id)
+    package_id = 0
+    mini_batch_size = 400
+    num_client = 1
+    #
+    s = server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, mini_batch_size, num_client)
     #
     print "main() : end"
 #

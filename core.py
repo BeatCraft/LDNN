@@ -145,6 +145,8 @@ class Layer(object):
         if gpu is not None:
             #print "GPU"
             self._gpu = gpu
+        else:
+            self._gpu = None
         #
         self._id = -1
         self._num_input = num_input
@@ -233,8 +235,10 @@ class InputLayer(Layer):
         self._batch_size = batch_size
         #
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-        self._gpu_output = self._gpu.dev_malloc(self._output_array)
-    
+        if self._gpu:
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        #
+        
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         pass
 
@@ -542,16 +546,12 @@ class Roster:
         self._batch_size = batch_size
         #
         if self._gpu:
-            pass
-        else:
-            return
-        #
-        self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
-        self._gpu_input = self._gpu.dev_malloc(self._batch_data)
-        self._batch_class = np.zeros(batch_size, dtype=np.int32)
-        self._gpu_labels = self._gpu.dev_malloc(self._batch_class)
-        self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
-        self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
+            self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
+            self._gpu_input = self._gpu.dev_malloc(self._batch_data)
+            self._batch_class = np.zeros(batch_size, dtype=np.int32)
+            self._gpu_labels = self._gpu.dev_malloc(self._batch_class)
+            self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
+            self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
         #
         for layer in self.layers:
             layer.prepare(batch_size)

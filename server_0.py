@@ -28,9 +28,12 @@ def main():
     BC_PORT = 5000
     SERVER_ADDR = "192.168.200.10"
     SERVER_PORT = 5005
-    package_id = 0
     #
-    server.server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id)
+    package_id = 0
+    mini_batch_size = 400
+    num_client = 4
+    #
+    server.server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, mini_batch_size, num_client)
     #
     print "main() : end"
 #

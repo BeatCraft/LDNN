@@ -39,20 +39,23 @@ class Train:
         self._cnt_e = 0
         self._cnt_i = 0
         self._cnt_k = 0
-        #self._cnt_l = 0
-        #self._cnt_n = 0
-        #self._cnt_w = 0
     
     def reset_cnt(self):
         self._cnt_e = 0
         self._cnt_i = 0
         self._cnt_k = 0
-        #self._cnt_l = 0
-        #self._cnt_n = 0
-        #self._cnt_w = 0
         
     def set_mini_batch_size(self, size):
         self._mini_batch_size = size
+        self._data_array = np.zeros((self._mini_batch_size, self._package._image_size), dtype=np.float32)
+        self._class_array = np.zeros(self._mini_batch_size, dtype=np.int32)
+    
+    def set_mini_batch(self, it):
+        size = self._mini_batch_size
+        for i in range(size): # batch
+            self._data_array[i] = self._package._train_image_batch[size*it+i]
+            self._class_array[i] = self._package._train_label_batch[size*it+i]
+        #
         
     def set_epoc(self, n):
         self._epoc = n
@@ -174,7 +177,7 @@ class Train:
                 #
             #
             if entropy<limit:
-                print "reach to the limit(%f), exit iterations" %(limit)
+                print "reach to the limit(%f), exit w loop" %(limit)
                 break
             #
         # for p
@@ -193,7 +196,7 @@ class Train:
             entropy, ret = self.weight_loop(entropy, layer, li, ni, zero)
             cnt = cnt + ret
             if entropy<limit:
-                print "reach to the limit(%f), exit iterations" %(limit)
+                print "reach to the limit(%f), exit n loop" %(limit)
                 break
             #
         # for ni
@@ -238,7 +241,7 @@ class Train:
             entropy, ret = self.node_loop(entropy, layer, li, zero)
             cnt = cnt + ret
             if entropy<limit:
-                print "reach to the limit(%f), exit iterations" %(limit)
+                print "reach to the limit(%f), exit l loop" %(limit)
                 break
             #
         # for li
@@ -256,8 +259,6 @@ class Train:
         data_size = package._image_size
         num_class = package._num_class
         #
-        data_array = np.zeros((mini_batch_size, data_size), dtype=np.float32)
-        class_array = np.zeros(mini_batch_size, dtype=np.int32)
         r.prepare(mini_batch_size, data_size, num_class)
         print ">>mini_batch_size(%d)" % (mini_batch_size)
         #
@@ -266,11 +267,11 @@ class Train:
             self._cnt_e = e
             for j in range(num): # iteration
                 self._cnt_i = j
-                for i in range(mini_batch_size): # batch
-                    data_array[i] = package._train_image_batch[mini_batch_size*j+i]
-                    class_array[i] = package._train_label_batch[mini_batch_size*j+i]
-                #
-                r.set_data(data_array, data_size, class_array, mini_batch_size)
+                if r._gpu:
+                    self.set_mini_batch(j)
+                    r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
+                else:
+                    r._remote.set_batch(j)
                 #
                 for m in range(2):
                     self._cnt_k = m
@@ -279,6 +280,11 @@ class Train:
                     self.set_weight_shift_mode(-1)
                     entropy, c_cnt = self.layer_loop()
                     r.export_weight_index(package._wi_csv_path)
+                    #
+                    if entropy<limit:
+                        print "reach to the limit(%f), exit iterations" %(limit)
+                        return
+                    #
                 #
             #
         #

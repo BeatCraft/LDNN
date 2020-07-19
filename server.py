@@ -128,9 +128,8 @@ class ServerLooper(netutil.Looper):
     def update(self, li, ni, ii, wi):
         mode = 40
         #
-        #
-        #
-        return self.execute_cmd(mode, li, ni, ii, wi)
+        e = self.execute_cmd(mode, li, ni, ii, wi)
+        return e / float(self._num_client)
     
     def set_batch(self, i):
         mode = 70
@@ -182,24 +181,20 @@ class ServerLooper(netutil.Looper):
                 print ret
                 self.set_mode(0)
             elif mode==50: # train
-                debug = 1
-                #train.loop(it, self._roster, self._package, debug)
-                #mini_batch_size = 6000
-                #num = 200
-                #epoc = 2
-                #
-                #
                 t = train.Train(self._package, self._roster)
                 t.set_limit(0.000001)
-                t.set_mini_batch_size(150)
+                t.set_mini_batch_size(self._mini_batch_size)
                 t.set_divider(64)
                 it = self._package._train_batch_size / (self._mini_batch_size*self._num_client)
                 t.set_iteration(it)
                 t.set_epoc(4)
                 t.set_layer_direction(1) # output to input
+                #print "train_batch_size : %d" % (self._package._train_batch_size)
+                #print "mini_batch_size : %d" % (self._mini_batch_size)
+                #print "num_client : %d" % (self._num_client)
+                #print "div : %d" % (self._mini_batch_size*self._num_client)
+                #print "train it : %d" % (it)
                 t.loop()
-                #
-                #train.train_minibatch_preset(self._roster, self._package, mini_batch_size, num, epoc)
                 self.set_mode(0)
             elif mode==60: # debug / ping
                 cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)

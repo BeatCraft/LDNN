@@ -85,16 +85,15 @@ def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    debug = 1
-    it = 20*20
-    batch_size = 1000
-    data_size = 784
-    num_class = 10
-    mini_batch_size = 1000
-    #
     # GPU
     #
     platform_id = 0
+    device_id = 0
+    package_id = 0
+    config = 0
+    mode = 0
+    
+    
     print "- Select an GPU -"
     for platform in cl.get_platforms():
         d = 0
@@ -132,11 +131,25 @@ def main():
     #
     #
     #
-    print "0 : train"
-    print "1 : test (batch)"
-    print "2 : test (single)"
-    print "3 : train (mini-batch)"
-    print "3 : train (mini-batch pre)"
+    print "- Select a config-"
+    print "0 : FC for MNIST"
+    print "1 : CNN for MNIST"
+    menu = get_key_input("input command >")
+    if menu==0:
+        config = 0
+    elif menu==1:
+        config = 1
+    else:
+        config = 1
+    #
+    
+    #
+    #
+    #
+    print "- Select a command-"
+    print "0 : train (mini-batch)"
+    print "1 : test (500)"
+    print "2 : ?"
     menu = get_key_input("input command >")
     if menu==0:
         mode = 0
@@ -144,45 +157,44 @@ def main():
         mode = 1
     elif menu==2:
         mode = 2
-    elif menu==3:
-        mode = 3
-    elif menu==4:
-        mode = 4
     else:
         mode = 1
     #
     package = util.Package(package_id)
-    r = package.setup_dnn(my_gpu)
+    r = package.setup_dnn(my_gpu, config)
     if r is None:
         print "fatal DNN error"
         return 0
     #
     if mode==0: # train
-        package.load_batch()
-        r.set_batch(package._train_image_batch, package._train_label_batch, 0, batch_size, package._image_size, package._num_class, 0)
-        train.loop(it, r, package, debug)
-    elif mode==1: # test (batch)
-        test.test(r, package)
-    elif mode==2: # test (single)
-        test.test_single(r, package)
-    elif mode==3: # train (mini-batch)
-        #mini_batch_size = 150
-        #num = package._train_batch_size / mini_batch_size
-        #epoc = 4
+        epoc = 1
+        mini_batch_size = 30
+        it = package._train_batch_size/mini_batch_size
+        #
         t = train.Train(package, r)
         t.set_limit(0.000001)
-        t.set_mini_batch_size(150)
+        t.set_mini_batch_size(mini_batch_size)
         t.set_divider(64)
-        t.set_iteration(package._train_batch_size/150)
-        t.set_epoc(4)
+        t.set_iteration(it)
+        t.set_epoc(epoc)
         t.set_layer_direction(1) # output to input
         t.loop()
-        #train.train_minibatch(r, package, mini_batch_size, num, epoc)
-    elif mode==4: # train (mini-batch pre)
-        mini_batch_size = 2000
-        num = 50
-        epoc = 5
-        train.train_minibatch_preset(r, package, mini_batch_size, num, epoc)
+    elif mode==1: # test (batch)
+        test.test_n(r, package, 500)
+    elif mode==2: # test (batch)
+        epoc = 1
+        mini_batch_size = 200
+        it = package._train_batch_size/mini_batch_size
+        #
+        t = train.Train(package, r)
+        t.set_limit(0.000001)
+        t.set_mini_batch_size(mini_batch_size)
+        t.set_divider(64)
+        t.set_iteration(it)
+        t.set_epoc(epoc)
+        t.set_layer_direction(1) # output to input
+        #
+        t.loop_alt()
     else:
         print "input error"
         pass

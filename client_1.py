@@ -21,10 +21,6 @@ import client
 #
 #
 def main():
-    cid = 1
-    num = 4
-    batch_size = 20000
-    print "main() : start : %d" % (cid)
     # amd-0 : 192.168.0.150 / 192.168.200.10
     # amd-1 : 192.168.0.151 / 192.168.200.11
     # amd-2 : 192.168.0.152 / 192.168.200.12
@@ -35,8 +31,9 @@ def main():
     SERVER_PORT = 5005
     #
     platform_id = 0
-    device_id = 1
+    device_id = 0
     client_id = 1
+    print "main() : start : %d" % (client_id)
     #
     client.client(BC_ADDR, BC_PORT, SERVER_ADDR, SERVER_PORT, platform_id, device_id, client_id)
     #

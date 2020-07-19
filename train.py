@@ -65,6 +65,8 @@ class Train:
         
     def set_layer_direction(self, d):
         self._layer_direction = d
+        # 0 : input to output
+        # 1 : output to input
         
     def set_limit(self, n):
         self._limit = n
@@ -92,7 +94,11 @@ class Train:
             return entropy, 0
         #
         if mode>0: # heat
-            if wi==core.WEIGHT_INDEX_MAX:
+            maximum = core.WEIGHT_INDEX_MAX
+            if zero==1:
+                maximum = len(core.WEIGHT_SET_CNN)-1
+            #
+            if wi==maximum:
                 layer.set_weight_property(ni, ii, 0)
                 layer.set_weight_index(ni, ii, wi-1)
                 if r._gpu:
@@ -107,7 +113,11 @@ class Train:
         else: # cool
             minimum = core.WEIGHT_INDEX_MIN
             if zero==1:
-                minimum = core.WEIGHT_INDEX_ZERO
+                minimum = 0
+#                if wi==minimum:
+#                    layer.set_weight_property(ni, ii, 0)
+#                    return entropy, 0
+                #
             #
             if wi==minimum:
                 layer.set_weight_property(ni, ii, 0)
@@ -220,22 +230,37 @@ class Train:
         c = r.countLayers()
         list_of_layer_index = []
         #
+        for i in range(c):
+            layer = r.getLayerAt(i)
+            layer_type = layer.get_type()
+            if layer_type==core.LAYER_TYPE_INPUT:
+                continue
+            elif layer_type==core.LAYER_TYPE_OUTPUT:
+                pass
+            elif layer_type==core.LAYER_TYPE_HIDDEN:
+                pass
+            elif layer_type==core.LAYER_TYPE_CONV:
+                continue
+            elif layer_type==core.LAYER_TYPE_POOL:
+                continue
+            elif layer_type==core.LAYER_TYPE_CONV_2D:
+                #continue
+                pass
+            else:
+                continue
+            #
+            list_of_layer_index.append(i)
+        #
         if reverse==0: # input to output
-            for i in range(1, c):
-                list_of_layer_index.append(i)
-            #
-        else: # output to intput
-            for i in range(c-1, 0, -1):
-                list_of_layer_index.append(i)
-            #
+            pass
+        else: # output to input
+            list_of_layer_index.reverse()
         #
         for li in list_of_layer_index:
             zero = 0
             layer = r.getLayerAt(li)
             layer_type = layer.get_type()
-            if layer_type==core.LAYER_TYPE_POOL:
-                continue
-            elif layer_type==core.LAYER_TYPE_CONV_2D:
+            if layer_type==core.LAYER_TYPE_CONV_2D:
                 zero = 1
             #
             entropy, ret = self.node_loop(entropy, layer, li, zero)
@@ -251,7 +276,8 @@ class Train:
         r = self._r
         package = self._package
         mini_batch_size = self._mini_batch_size
-        num = self._it#self._num
+        #num = self._it
+        print "it : %d" % (self._it)
         epoc = self._epoc
         limit = self._limit#0.000001
         package.load_batch()
@@ -265,7 +291,7 @@ class Train:
         start_time = time.time()
         for e in range(epoc): # epoc
             self._cnt_e = e
-            for j in range(num): # iteration
+            for j in range(self._it): # iteration
                 self._cnt_i = j
                 if r._gpu:
                     self.set_mini_batch(j)
@@ -273,7 +299,7 @@ class Train:
                 else:
                     r._remote.set_batch(j)
                 #
-                for m in range(2):
+                for m in range(1):
                     self._cnt_k = m
                     self.set_weight_shift_mode(1)
                     entropy, h_cnt = self.layer_loop()
@@ -286,13 +312,101 @@ class Train:
                         return
                     #
                 #
+                #r.reset_weight_property()
             #
         #
         elapsed_time = time.time() - start_time
         t = format(elapsed_time, "0")
         print "time = %s" % (t)
     #
+    
+    def loop_alt(self):
+        print "< experimental train loop >"
+        r = self._r
+        package = self._package
+        mini_batch_size = self._mini_batch_size
+        epoc = self._epoc
+        limit = self._limit#0.000001
+        package.load_batch()
+        batch_size = package._train_batch_size
+        data_size = package._image_size
+        num_class = package._num_class
+        it = self._it
+        #
+        # core training
+        r.prepare(mini_batch_size, data_size, num_class)
+        self.set_mini_batch(0)
+        r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
+        #
+        # self test
+#        group = []
+#        r.propagate(-1, -1, -1, -1, 0)
+#        answes = r.get_answer()
+#        for i in range(mini_batch_size):
+#            if answes[i] == self._class_array[i]:
+#                pass
+#            else:
+#                group.append(i)
+            #
+        #
+        group = []
+        #
+        for i in range(1, it):
+            self.set_mini_batch(i)
+            r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
+            r.propagate(-1, -1, -1, -1, 0)
+            answes = r.get_answer()
+            for i in range(mini_batch_size):
+                if answes[i] == self._class_array[i]:
+                    pass
+                else:
+                    group.append(i)
+                #
+            #
+        #
+        print len(group)
+        #
+        # train extra
+        esize = 400
+        bsize = mini_batch_size + esize
+        print bsize
+        r.prepare(bsize, data_size, num_class)
+        data_array = np.zeros((bsize, data_size), dtype=np.float32)
+        class_array = np.zeros(bsize, dtype=np.int32)
+        #
+        for i in range(mini_batch_size):
+            data_array[i] = package._train_image_batch[i]
+            class_array[i] = package._train_label_batch[i]
+            #index = group[i]
+            #data_array[i] = package._train_image_batch[index]
+            #class_array[i] = package._train_label_batch[index]
+        #
+        start = mini_batch_size
+        end = bsize
+        k = 0
+        for i in range(start, end):
+            index = group[k]
+            data_array[i] = package._train_image_batch[index]
+            class_array[i] = package._train_label_batch[index]
+            k = k + 1
+        #
+        r.set_data(data_array, data_size, class_array, bsize)
+        for m in range(4):
+            self._cnt_k = m
+            self.set_weight_shift_mode(1)
+            entropy, h_cnt = self.layer_loop()
+            self.set_weight_shift_mode(-1)
+            entropy, c_cnt = self.layer_loop()
+            r.export_weight_index(package._wi_csv_path)
+            #
+            if entropy<limit:
+                print "reach to the limit(%f), exit iterations" %(limit)
+                return
+            #
+        #
 #
 #
 #
+
+
 

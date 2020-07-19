@@ -89,7 +89,7 @@ class ClientLooper(netutil.Looper):
         self._roster.propagate()
         ce = self._roster.get_cross_entropy()
         print "index=%d, entropy=%f" % (self._it_cnt, ce)
-        self._it_cnt = self._it_cnt + 1
+        #self._it_cnt = self._it_cnt + 1
         
 #        batch_size = self._batch_size
 #        part_start = self._part_start
@@ -159,6 +159,7 @@ class ClientLooper(netutil.Looper):
                 cmd = netutil.pack_if(seq, 1.0)
                 self.send(cmd)
             elif a==70: # set_batch()
+                self._it_cnt = b
                 print "set_batch(%d|%d)" % (b, self._it_cnt)
                 self.set_batch()
                 cmd = netutil.pack_if(seq, 1.0)

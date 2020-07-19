@@ -26,14 +26,14 @@ WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078
                 0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
 WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0]
 WEIGHT_SET_2 = [-1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0]
-
-WEIGHT_SET_3 = [0.0, 0.0625, 0.125, 0.25, 0.5, 1.0]
 #
 WEIGHT_SET = WEIGHT_SET_1
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
+#
+WEIGHT_SET_CNN = [0.0, 0.125, 0.25, 0.5, 1.0]
 #
 #
 #
@@ -495,6 +495,18 @@ class Conv2dLayer(Layer):
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
         #
     
+    def set_weight_index(self, ni, ii, wi):
+        self._weight_index_matrix[ni][ii] = wi
+        self._weight_matrix[ni][ii] = WEIGHT_SET_CNN[wi]
+    
+    def init_weight_with_random_index(self):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                wi = random.randrange(len(WEIGHT_SET_CNN))
+                self.set_weight_index(ni, ii, wi)
+            #
+        #
+    
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
         
@@ -503,7 +515,7 @@ class Conv2dLayer(Layer):
             pass
             self._gpu.conv2d_batch_alt(array_in, self._gpu_weight, self._gpu_output,
                                        self._w, self._h, self._ch, self._filter, self._batch_size,
-                                       ni, ii, wi)
+                                       ni, ii, WEIGHT_SET_CNN[wi])#wi)
         else:
             self._gpu.conv2d_batch(array_in, self._gpu_weight, self._gpu_output,
                                    self._w, self._h, self._ch, self._filter, self._batch_size)
@@ -514,13 +526,13 @@ class Conv2dLayer(Layer):
             #print self._output_array[1]
             #print self._weight_matrix[1]
     
-    def init_weight_with_random_index(self):
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                wi = random.randrange(WEIGHT_INDEX_ZERO, WEIGHT_INDEX_SIZE)
-                self.set_weight_index(ni, ii, wi)
-            #
-        #
+#    def init_weight_with_random_index(self):
+#        for ni in range(self._num_node):
+#            for ii in range(self._num_input):
+#                wi = random.randrange(WEIGHT_INDEX_ZERO, WEIGHT_INDEX_SIZE)
+#                self.set_weight_index(ni, ii, wi)
+#            #
+#        #
         
 #
 #
@@ -652,13 +664,33 @@ class Roster:
             return
  
     def get_inference(self):
-        ret = []
+        #ret = []
         c = self.countLayers()
         output = self.getLayerAt(c-1)
         output._gpu.copy(output._output_array, output._gpu_output)
         #print output._output_array[0]
         return output._output_array
-        
+
+    def get_answer(self):
+        ret = []
+        c = self.countLayers()
+        output = self.getLayerAt(c-1)
+        output._gpu.copy(output._output_array, output._gpu_output)
+        #
+        for i in range(self._batch_size):
+            inf = output._output_array[i]
+            max_index = -1
+            max = -1.0
+            for j in range(self.num_class):
+                if inf[j]>max:
+                    max = inf[j]
+                    max_index = j
+                #
+            #
+            ret.append(max_index)
+        #
+        return ret
+    
     def get_cross_entropy(self):
         c = self.countLayers()
         output = self.getLayerAt(c-1)

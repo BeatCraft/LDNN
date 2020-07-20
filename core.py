@@ -280,12 +280,19 @@ class HiddenLayer(Layer):
                                             self._batch_size, stride_1, stride_2,
                                             self._num_input, self._num_node)
         #
-        activation = 0
+        # sum
+        #
+        activation = 1#0
         self._gpu.k_sum(self._gpu_product, self._gpu_output,
                         self._num_input, self._num_node, activation, self._batch_size)
         #
         # normalize
-        self._gpu.normalize(self._gpu_output, self._num_node, self._batch_size)
+        #
+        self._gpu.normalize_batch(self._gpu_output, self._num_node, self._batch_size)
+        #
+        # relu
+        #
+        self._gpu.relu(self._gpu_output, self._batch_size, self._num_node, 1) #  self._num_node : stride
 #
 #
 #
@@ -520,6 +527,16 @@ class Conv2dLayer(Layer):
             self._gpu.conv2d_batch(array_in, self._gpu_weight, self._gpu_output,
                                    self._w, self._h, self._ch, self._filter, self._batch_size)
 
+        #
+        # normalize
+        #
+        self._gpu.normalize_batch_cnn(self._gpu_output, self._batch_size, self._image_size*self._filter, self._filter, self._image_size)
+        #
+        # relu
+        #
+        self._gpu.relu(self._gpu_output, self._batch_size, self._filter, self._image_size) #  self._num_node : stride
+        
+        
             #self._gpu.copy(self._output_array, self._gpu_output)
             #print self._output_array[0][0]
             #print self._weight_matrix[0]

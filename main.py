@@ -168,7 +168,7 @@ def main():
     #
     if mode==0: # train
         epoc = 1
-        mini_batch_size = 30
+        mini_batch_size = 400
         it = package._train_batch_size/mini_batch_size
         #
         t = train.Train(package, r)

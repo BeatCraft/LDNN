@@ -299,7 +299,7 @@ class Train:
                 else:
                     r._remote.set_batch(j)
                 #
-                for m in range(1):
+                for m in range(1): #4
                     self._cnt_k = m
                     self.set_weight_shift_mode(1)
                     entropy, h_cnt = self.layer_loop()
@@ -312,7 +312,7 @@ class Train:
                         return
                     #
                 #
-                #r.reset_weight_property()
+                r.reset_weight_property()
             #
         #
         elapsed_time = time.time() - start_time

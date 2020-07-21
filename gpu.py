@@ -533,19 +533,19 @@ __kernel void normalize_layer(__global float* data, int size)
     }
 }
 
-__kernel void k_normalize_layer(__global float* in, int num)
+__kernel void scale_layer(__global float* data, int size)
 {
     int bi = get_global_id(0);
     float max = 0.0;
     
-    for (int i=0;i<num;i++){
-        if (in[bi*num+i]>max){
-            max = in[bi*num+i];
+    for (int i=0;i<size;i++){
+        if (data[bi*size+i]>max){
+            max = data[bi*size+i];
         }
     }
     
-    for (int i=0;i<num;i++){
-        in[bi*num+i] = (in[bi*num+i]/max);
+    for (int i=0;i<size;i++){
+        data[bi*size+i] = (data[bi*size+i]/max);
     }
 }
 

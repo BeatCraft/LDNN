@@ -505,7 +505,35 @@ __kernel void normalize_batch(__global float* in, int bsize, int num_batch)
     }
 }
 
-__kernel void normalize_layer(__global float* in, int num)
+__kernel void normalize_layer(__global float* data, int size)
+{
+    int bi = get_global_id(0);
+    float sum = 0.0;
+    float mean = 0.0;
+    float delta = 0.0000001;
+    float div2 = 0.0;
+    float div = 0.0;
+
+    for (int i=0; i<size; i++){
+        sum += data[bi*size+i];
+    }
+    mean = sum / size;
+    
+    sum = 0.0;
+    for (int i=0; i<size; i++){
+        float k = data[bi*size+i] - mean;
+        sum += k * k;
+    }
+    div2 = sum / size + delta;
+    div =  sqrt(div2);
+    
+    for (int i=0; i<size; i++){
+        float k = data[bi*size+i] - mean;
+        data[bi*size+i] = k / div;
+    }
+}
+
+__kernel void k_normalize_layer(__global float* in, int num)
 {
     int bi = get_global_id(0);
     float max = 0.0;
@@ -819,8 +847,8 @@ class Gpu:
         event.wait()
     
     
-    def normalize_layer(self, data, size, num_batch):
-        event = self.prg.normalize_layer(self._queue, (num_batch,), None, data, np.int32(size))
+    def normalize_layer(self, data, size, batch_size):
+        event = self.prg.normalize_layer(self._queue, (batch_size,), None, data, np.int32(size))
         event.wait()
 
     def normalize_batch(self, data, size, batch_size):

@@ -288,11 +288,46 @@ class HiddenLayer(Layer):
         #
         # normalize
         #
-        self._gpu.normalize_batch(self._gpu_output, self._num_node, self._batch_size)
+        self._gpu.normalize_layer(self._gpu_output, self._num_node, self._batch_size)
         #
         # relu
         #
         self._gpu.relu(self._gpu_output, self._batch_size, self._num_node, 1) #  self._num_node : stride
+        
+        return
+        #
+        # CPU
+        #
+        self._gpu.copy(self._output_array, self._gpu_output)
+        #
+        delta = 0.0000001
+        for a in range(self._num_node):
+            sum = 0.0
+            bi = 0
+            for bi in range(self._batch_size):
+                data = self._output_array[bi]
+                sum = sum + data[a]
+            #
+            mean =  sum / self._batch_size
+            sum = 0.0
+            bi = 0
+            for bi in range(self._batch_size):
+                d = self._output_array[bi][a] - mean
+                d2 = d * d
+                sum = sum + d2
+            #
+            div2 = sum / self._batch_size + delta
+            div =  np.sqrt(div2)
+            #
+            bi = 0
+            for bi in range(self._batch_size):
+                k = self._output_array[bi][a] - mean
+                self._output_array[bi][a] = k / div
+            #
+        #
+        self._gpu.copy(self._gpu_output, self._output_array)
+        self._gpu.relu(self._gpu_output, self._batch_size, self._num_node, 1) #  self._num_node : stride
+        
 #
 #
 #

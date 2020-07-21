@@ -30,7 +30,7 @@ def main():
     SERVER_PORT = 5005
     #
     package_id = 0
-    mini_batch_size = 1500*2
+    mini_batch_size = 5000
     num_client = 4
     #
     server.server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, mini_batch_size, num_client)

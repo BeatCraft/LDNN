@@ -103,7 +103,8 @@ class Looper(object):
         #self._send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self._recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._recv_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._recv_sock.settimeout(1)
+        #self._recv_sock.settimeout(1)
+        self._recv_sock.settimeout(2)
         self._recv_sock.bind((self._local_addr, self._local_port))
     
     def send(self, cmd):

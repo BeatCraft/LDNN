@@ -41,7 +41,7 @@ class ClientLooper(netutil.Looper):
         my_gpu.set_kernel_code()
         #
         self._package = util.Package(self._package_id)
-        self._roster = self._package.setup_dnn(my_gpu)
+        self._roster = self._package.setup_dnn(my_gpu, 1)
         if self._roster is None:
             print "fatal DNN error"
             return 0

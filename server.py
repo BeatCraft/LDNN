@@ -41,7 +41,7 @@ class ServerLooper(netutil.Looper):
         #package_id = 0 # MNIST
         my_gpu = None
         self._package = util.Package(package_id)
-        self._roster = self._package.setup_dnn(my_gpu)
+        self._roster = self._package.setup_dnn(my_gpu, 1)
         if self._roster is None:
             print "fatal DNN error"
         #

@@ -125,19 +125,18 @@ __kernel void conv2d_batch_alt(
                 sum += a[i];
             }
         } // ch loop
-        output[offset_out+image_stride*f] = sum;
+        //
         // relu
-//        if (sum<0.0){
-//            output[offset_out+image_stride*f] = 0.0;
-//        }else{
-//            output[offset_out+image_stride*f] = sum;
-//        }
+        //
+        if (sum<0.0){
+            output[offset_out+image_stride*f] = 0.0;
+        }else{
+            output[offset_out+image_stride*f] = sum;
+        }
         if (f==ni){
             weight[offset_w+ii] = backup;
         }
-        //offset_w += filetr_size;
     } // filter loop
-    //printf(\"(%d, %d, %d)=%f\\n\",bi, xi, yi, sum);
 };
 
 __kernel void conv2d_batch(
@@ -249,17 +248,16 @@ __kernel void conv2d_batch(
                 sum += a[i];
             }
         } // ch loop
-        output[offset_out+image_stride*f] = sum;
         //
         // relu
-//        if (sum<0.0){
-//            output[offset_out+image_stride*f] = 0.0;
-//        }else{
-//            output[offset_out+image_stride*f] = sum;
-//        }
-    } // filter loop
+        //
+        if (sum<0.0){
+            output[offset_out+image_stride*f] = 0.0;
+        }else{
+            output[offset_out+image_stride*f] = sum;
 
-    //printf(\"(%d, %d, %d)=%f\\n\",bi, xi, yi, sum);
+        }
+    } // filter loop
 };
 
 __kernel void max_batch(
@@ -402,24 +400,6 @@ __kernel void scale(
     }
 };
 
-__kernel void p_softmax(__global float* in, int num)
-{
-    int bi = get_global_id(0);
-    float sum = 0.0;
-
-    for (int i=0;i<num;i++){
-        in[bi*num+i] = exp(in[bi*num+i]);
-    }
-
-    for (int i=0;i<num;i++){
-        sum += in[bi*num+i];
-    }
-
-    for (int i=0;i<num;i++){
-        in[bi*num+i] = in[bi*num+i]/sum;
-    }
-}
-
 __kernel void normalize_batch_cnn(__global float* data,
                                   int batch_size, int batch_stride,
                                   int filter_num, int image_size)
@@ -533,6 +513,24 @@ __kernel void normalize_layer(__global float* data, int size)
     }
 }
 
+__kernel void scale_cnn(__global float* data, int batch_stride, int filter_stride)
+{
+    int bi = get_global_id(0);
+    int fi = get_global_id(1);
+    float max = 0.0;
+    int offset = bi * batch_stride + fi * filter_stride;
+    
+    for (int i=0;i<filter_stride;i++){
+        if (data[offset+i]>max){
+            max = data[offset+i];
+        }
+    }
+    
+    for (int i=0;i<filter_stride;i++){
+        data[offset+i] = (data[offset+i]/max);
+    }
+}
+
 __kernel void scale_layer(__global float* data, int size)
 {
     int bi = get_global_id(0);
@@ -546,72 +544,6 @@ __kernel void scale_layer(__global float* data, int size)
     
     for (int i=0;i<size;i++){
         data[bi*size+i] = (data[bi*size+i]/max);
-    }
-}
-
-__kernel void p_normalize(__global float* in, int num)
-{
-    int bi = get_global_id(0);
-    float max = 0.0;
-    float sum = 0.0;
-    float avg = 0.0;
-    float std = 0.0;
-    float tmp = 0.0;
-    float k = 0.0;
-    
-    for (int i=0;i<num;i++){
-        sum += in[bi*num+i];
-    }
-    avg = sum/num;
-    
-    sum = 0.0;
-    for (int i=0;i<num;i++){
-        sum += ( (in[bi*num+i]-avg)*(in[bi*num+i]-avg) );
-    }
-    std = sqrt(sum/num);
-    
-    for (int i=0;i<num;i++){
-        in[bi*num+i] = (in[bi*num+i]-avg)/std;
-    }
-    
-    for (int i=0;i<num;i++){
-        tmp = in[bi*num+i];
-        k = fabs(tmp);
-        if (k>max){
-            max = k;
-        }
-    }
-    
-    for (int i=0;i<num;i++){
-        in[bi*num+i] = (in[bi*num+i]+max)/(max*2);
-    }
-}
-
-__kernel void q_normalize(__global float* in, int num)
-{
-    int bi = get_global_id(0);
-    float sum = 0.0;
-    float avg = 0.0;
-    float div = 0.0;
-    float std = 0.0;
-    float tmp = 0.0;
-    
-    for (int i=0;i<num;i++){
-        sum += in[bi*num+i];
-    }
-    avg = sum/num;
-    
-    sum = 0.0;
-    for (int i=0;i<num;i++){
-        tmp = in[bi*num+i]-avg;
-        sum += (tmp*tmp);
-    }
-    div = sum/num;
-    std = sqrt(div);
-    
-    for (int i=0;i<num;i++){
-        tmp = (in[bi*num+i]-avg)*10;
-        in[bi*num+i] = (tmp/std+50)/100;
     }
 }
 
@@ -629,6 +561,24 @@ __kernel void k_cross_entropy(__global float* infs,
     i = labels[bi];
     k = infs[bi*num+i]+delta;
     output[bi] = -log(k);
+}
+
+__kernel void p_softmax(__global float* in, int num)
+{
+    int bi = get_global_id(0);
+    float sum = 0.0;
+
+    for (int i=0;i<num;i++){
+        in[bi*num+i] = exp(in[bi*num+i]);
+    }
+
+    for (int i=0;i<num;i++){
+        sum += in[bi*num+i];
+    }
+
+    for (int i=0;i<num;i++){
+        in[bi*num+i] = in[bi*num+i]/sum;
+    }
 }
 
 __kernel void k_softmax(__global float* in, int num)
@@ -777,6 +727,7 @@ class Gpu:
         self._ctx = cl.Context([device])
         for dev in self._ctx.devices:
             assert dev.local_mem_size > 0
+        #
         self._queue = cl.CommandQueue(self._ctx)
         self._bufs = []
 
@@ -812,7 +763,6 @@ class Gpu:
                                                d_x, d_w, d_y,
                                                np.int32(stride_1),
                                                np.int32(stride_2))
-        #event = self.prg.multiple_x_by_w_batch(self._queue,(col,bsize), None,
         event.wait()
         
     def multiple_x_by_w_batch_alt(self, d_x, d_w, d_y, bsize, stride_1, stride_2, row, col, ni, ii, wv):
@@ -834,18 +784,25 @@ class Gpu:
         event = cl.enqueue_copy(self._queue, dist, src)
         event.wait()
         
-    def k_sum(self, data_in, data_out, num_input, num_node, activation, num_batch):
+    def sum(self, data_in, data_out, num_input, num_node, activation, num_batch):
         event = self.prg.k_sum(self._queue, (num_node, num_batch), None,
                                data_in, data_out,
                                np.int32(num_input), np.int32(num_node), np.int32(activation))
         event.wait()
     
-    #def relu(self, data_in, data_out, num_input, num_node, num_batch):
     def relu(self, data_out, batch_size, num_node, size):
         event = self.prg.relu(self._queue, (batch_size, num_node), None,
                               data_out, np.int32(size), np.int32(num_node))
         event.wait()
     
+    def scale_layer(self, data, size, batch_size):
+        event = self.prg.scale_layer(self._queue, (batch_size,), None, data, np.int32(size))
+        event.wait()
+        
+    def scale_cnn(self, data, batch_size, filter_size, batch_stride, filter_stride):
+        event = self.prg.scale_cnn(self._queue, (batch_size, filter_size), None,
+                                   data, np.int32(batch_stride), np.int32(filter_stride))
+        event.wait()
     
     def normalize_layer(self, data, size, batch_size):
         event = self.prg.normalize_layer(self._queue, (batch_size,), None, data, np.int32(size))
@@ -861,7 +818,7 @@ class Gpu:
                                            np.int32(filter_num), np.int32(image_size))
         event.wait()
     
-    def k_softmax(self, data, size, num_batch):
+    def softmax(self, data, size, num_batch):
         event = self.prg.p_softmax(self._queue, (num_batch,), None, data, np.int32(size))
         event.wait()
     

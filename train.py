@@ -312,7 +312,7 @@ class Train:
                         return
                     #
                 #
-                r.reset_weight_property()
+                #r.reset_weight_property()
             #
         #
         elapsed_time = time.time() - start_time

@@ -37,44 +37,6 @@ WEIGHT_SET_CNN = [0.0, 0.125, 0.25, 0.5, 1.0]
 #
 #
 #
-def sigmoid(x):
-    a = 0.0
-    try:
-        a = np.exp(-x)
-    except OverflowError:
-        a = float('inf')
-        print "sigmoid(fuck)"
-    #
-    ret = 1.0 / (1.0 + a)
-    return ret
-#
-#
-#
-def relu(x):
-    if x<=0.0:
-        return 0.0
-    #
-    return x
-#
-#
-#
-def softmax(x):
-    c = np.max(x)
-    exp_x = np.exp(x-c)
-    sum_exp_x = np.sum(exp_x)
-    y = exp_x / sum_exp_x
-    return y
-
-def softmax_no_exp(x):
-    sum_x = np.sum(x)
-    if sum_x==0.0:
-        return np.zeros_like((x))
-    #
-    y = x / sum_x
-    return y
-#
-#
-#
 class Weight:
     def __init__(self, li, ni, ii, wi):
         self._li = li
@@ -282,17 +244,18 @@ class HiddenLayer(Layer):
         #
         # sum
         #
-        activation = 1#0
-        self._gpu.k_sum(self._gpu_product, self._gpu_output,
+        activation = 0 # 0 : relu, 1 : skip
+        self._gpu.sum(self._gpu_product, self._gpu_output,
                         self._num_input, self._num_node, activation, self._batch_size)
+        self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
         #
         # normalize
         #
-        self._gpu.normalize_layer(self._gpu_output, self._num_node, self._batch_size)
+        #self._gpu.normalize_layer(self._gpu_output, self._num_node, self._batch_size)
         #
         # relu
         #
-        self._gpu.relu(self._gpu_output, self._batch_size, self._num_node, 1) #  self._num_node : stride
+        #self._gpu.relu(self._gpu_output, self._batch_size, self._num_node, 1) #  self._num_node : stride
         
 #
 #
@@ -332,10 +295,10 @@ class OutputLayer(Layer):
                                             self._num_input, self._num_node)
         #
         activation = 1
-        self._gpu.k_sum(self._gpu_product, self._gpu_output,
+        self._gpu.sum(self._gpu_product, self._gpu_output,
                         self._num_input, self._num_node, activation, self._batch_size)
         #
-        self._gpu.k_softmax(self._gpu_output, self._num_node, self._batch_size)
+        self._gpu.softmax(self._gpu_output, self._num_node, self._batch_size)
         #
         # debug
         #self._gpu.copy(self._output_array, self._gpu_output)
@@ -529,13 +492,16 @@ class Conv2dLayer(Layer):
                                    self._w, self._h, self._ch, self._filter, self._batch_size)
 
         #
+        
+        self._gpu.scale_cnn(self._gpu_output, self._batch_size, self._filter,
+                            self._image_size*self._filter, self._image_size)
         # normalize
         #
-        self._gpu.normalize_batch_cnn(self._gpu_output, self._batch_size, self._image_size*self._filter, self._filter, self._image_size)
+        #self._gpu.normalize_batch_cnn(self._gpu_output, self._batch_size, self._image_size*self._filter, self._filter, self._image_size)
         #
         # relu
         #
-        self._gpu.relu(self._gpu_output, self._batch_size, self._filter, self._image_size) #  self._num_node : stride
+        #self._gpu.relu(self._gpu_output, self._batch_size, self._filter, self._image_size) #  self._num_node : stride
         
         
             #self._gpu.copy(self._output_array, self._gpu_output)

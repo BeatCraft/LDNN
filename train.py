@@ -97,6 +97,10 @@ class Train:
             maximum = core.WEIGHT_INDEX_MAX
             if zero==1:
                 maximum = len(core.WEIGHT_SET_CNN)-1
+                if wi==maximum:
+                    layer.set_weight_property(ni, ii, 0)
+                    return entropy, 0
+                #
             #
             if wi==maximum:
                 layer.set_weight_property(ni, ii, 0)
@@ -114,9 +118,9 @@ class Train:
             minimum = core.WEIGHT_INDEX_MIN
             if zero==1:
                 minimum = 0
-#                if wi==minimum:
-#                    layer.set_weight_property(ni, ii, 0)
-#                    return entropy, 0
+                if wi==minimum:
+                    layer.set_weight_property(ni, ii, 0)
+                    return entropy, 0
                 #
             #
             if wi==minimum:
@@ -159,6 +163,7 @@ class Train:
         r = self._r
         limit = self._limit
         divider = self._divider
+        #divider = 1
         direction = self._weight_shift_mode
         epoc = self._epoc
         cnt = 0
@@ -232,19 +237,26 @@ class Train:
         #
         for i in range(c):
             layer = r.getLayerAt(i)
-            layer_type = layer.get_type()
-            if layer_type==core.LAYER_TYPE_INPUT:
-                continue
-            elif layer_type==core.LAYER_TYPE_OUTPUT:
-                pass
-            elif layer_type==core.LAYER_TYPE_HIDDEN:
-                pass
-            elif layer_type==core.LAYER_TYPE_CONV:
-                continue
-            elif layer_type==core.LAYER_TYPE_POOL:
-                continue
-            elif layer_type==core.LAYER_TYPE_CONV_2D:
-                #continue
+#            layer_type = layer.get_type()
+#            if layer_type==core.LAYER_TYPE_INPUT:
+#                continue
+#            elif layer_type==core.LAYER_TYPE_OUTPUT:
+#                #continue
+#                pass
+#            elif layer_type==core.LAYER_TYPE_HIDDEN:
+#                #continue
+#                pass
+#            elif layer_type==core.LAYER_TYPE_CONV:
+#                continue
+#            elif layer_type==core.LAYER_TYPE_POOL:
+#                continue
+#            elif layer_type==core.LAYER_TYPE_CONV_2D:
+#                continue
+#                pass
+#            else:
+#                continue
+            #
+            if layer.get_learning()>0:
                 pass
             else:
                 continue
@@ -279,7 +291,7 @@ class Train:
         #num = self._it
         print "it : %d" % (self._it)
         epoc = self._epoc
-        limit = self._limit#0.000001
+        limit = self._limit # 0.000001
         package.load_batch()
         batch_size = package._train_batch_size
         data_size = package._image_size
@@ -299,7 +311,7 @@ class Train:
                 else:
                     r._remote.set_batch(j)
                 #
-                for m in range(1): #4
+                for m in range(2): #4
                     self._cnt_k = m
                     self.set_weight_shift_mode(1)
                     entropy, h_cnt = self.layer_loop()

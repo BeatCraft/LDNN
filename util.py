@@ -338,16 +338,20 @@ class Package:
                 r.add_layer(core.LAYER_TYPE_INPUT, self._image_size, self._image_size)  # input
                 #
                 c = r.countLayers()
-                layer = core.Conv2dLayer(c, 28, 28, 1, 8, my_gpu)
+                layer = core.Conv2dLayer(c, 28, 28, 1, 4, my_gpu)
+                layer.set_num_update(3)
                 r.layers.append(layer)
-                # 28 x 28 x 8
+                #
                 c = r.countLayers()
-                layer = core.MaxLayer(c, 8, 28, 28, my_gpu)
+                layer = core.MaxLayer(c, 4, 28, 28, my_gpu)
                 r.layers.append(layer)
-                # 14 x 14 x 8 = 196 x 8 = 1560
-                r.add_layer(core.LAYER_TYPE_HIDDEN, 14*14*8, 64)
-                r.add_layer(core.LAYER_TYPE_HIDDEN, 64, 64)
-                r.add_layer(core.LAYER_TYPE_OUTPUT, 64, self._num_class) # out
+                #
+                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 14*14*4, 32*2)
+                layer.set_num_update(64)
+                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 32*2, 32*2)
+                layer.set_num_update(16)
+                layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 32*2, self._num_class) # out
+                layer.set_num_update(16)
             #
         elif self._package_id==1: # cifa-10
             input_layer = r.add_layer(0, self._image_size, self._image_size)
@@ -360,9 +364,9 @@ class Package:
             layer = core.MaxLayer(c, 8, 32, 32, my_gpu)
             r.layers.append(layer)
             # 16 x 16 x 8 = 256 x 8 = 2048
-            r.add_layer(core.LAYER_TYPE_HIDDEN, 16*16*8, 64)
-            r.add_layer(core.LAYER_TYPE_HIDDEN, 64, 64)
-            r.add_layer(core.LAYER_TYPE_OUTPUT, 64, self._num_class) # out
+            r.add_layer(core.LAYER_TYPE_HIDDEN, 16*16*8, 32*2)
+            r.add_layer(core.LAYER_TYPE_HIDDEN, 32*2, 32*2)
+            r.add_layer(core.LAYER_TYPE_OUTPUT, 32*2, self._num_class) # out
         else:
             print "package error"
             return None

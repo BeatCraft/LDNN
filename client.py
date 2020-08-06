@@ -41,7 +41,7 @@ class ClientLooper(netutil.Looper):
         my_gpu.set_kernel_code()
         #
         self._package = util.Package(self._package_id)
-        self._roster = self._package.setup_dnn(my_gpu, 1)
+        self._roster = self._package.setup_dnn(my_gpu, self._config_id)
         if self._roster is None:
             print "fatal DNN error"
             return 0
@@ -126,10 +126,11 @@ class ClientLooper(netutil.Looper):
             if a==10:   # init
                 print "init"
                 self._package_id = b
-                self._mini_batch_size = c
-                self._num_client = d
+                self._config_id = c
+                self._mini_batch_size = d
+                self._num_client = e
                 self._it_cnt = 0
-                print "package_id=%d, mini_batch_size=%d, num_client=%d" % (b, c, d)
+                print "package_id=%d, config_id=%d, mini_batch_size=%d, num_client=%d" % (b, c, d, e)
                 #
                 cmd = netutil.pack_if(15, 1.0)
                 self.send(cmd)

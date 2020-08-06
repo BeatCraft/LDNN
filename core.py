@@ -119,7 +119,25 @@ class Layer(object):
         self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
     
-    # allocate mems for output, also intermediate working area when it is needed
+        self._num_update = num_input/10
+        if self._num_update<1:
+            self._num_update = 1
+        #
+        self._learning = 1 # on
+        # allocate mems for output, also intermediate working area when it is needed
+    
+    def set_learning(self, v):
+        self._learning = v
+
+    def get_learning(self, v):
+        return self._learning
+
+    def set_num_update(self, n):
+        self._num_update = n
+    
+    def get_num_update(self):
+        return self._num_update
+        
     def prepare(self, batch_size):
         pass
     
@@ -192,6 +210,7 @@ class InputLayer(Layer):
     def __init__(self, i, num_input, num_node, gpu=None):
         print "InputLayer::__init__()"
         super(InputLayer, self).__init__(i, LAYER_TYPE_INPUT, num_input, num_node, gpu)
+        self._learning = 0 # off
     
     def prepare(self, batch_size):
         self._batch_size = batch_size
@@ -397,7 +416,8 @@ class MaxLayer(Layer):
         self._batch_stride = w * h * ch
         #
         #super(MaxLayer, self).__init__(i, LAYER_TYPE_POOL, num_input, num_node, gpu)
-        #    
+        #
+        self._learning = 0
     
     def set_weight_index(self, ni, ii, wi):
         pass
@@ -634,12 +654,15 @@ class Roster:
         if type==LAYER_TYPE_INPUT:
             layer = InputLayer(c, num_input, num_node, self._gpu)
             self.layers.append(layer)
+            return layer
         elif type==LAYER_TYPE_HIDDEN:
             layer = HiddenLayer(c, num_input, num_node, self._gpu)
             self.layers.append(layer)
+            return layer
         elif type==LAYER_TYPE_OUTPUT:
             layer = OutputLayer(c, num_input, num_node, self._gpu)
             self.layers.append(layer)
+            return layer
         elif type==LAYER_TYPE_CONV:
             print "not yet"
             return

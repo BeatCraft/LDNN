@@ -129,7 +129,7 @@ class Layer(object):
     def set_learning(self, v):
         self._learning = v
 
-    def get_learning(self, v):
+    def get_learning(self):
         return self._learning
 
     def set_num_update(self, n):

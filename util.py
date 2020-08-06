@@ -340,6 +340,7 @@ class Package:
                 c = r.countLayers()
                 layer = core.Conv2dLayer(c, 28, 28, 1, 4, my_gpu)
                 layer.set_num_update(3)
+                layer.set_learning(0) # on : 1, off : 0
                 r.layers.append(layer)
                 #
                 c = r.countLayers()

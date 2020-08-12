@@ -347,12 +347,12 @@ class Package:
                 layer = core.MaxLayer(c, 4, 28, 28, my_gpu)
                 r.layers.append(layer)
                 #
-                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 14*14*4, 32*2)
+                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 14*14*4, 32*8)
                 layer.set_num_update(64)
-                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 32*2, 32*2)
-                layer.set_num_update(16)
-                layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 32*2, self._num_class) # out
-                layer.set_num_update(16)
+                #layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 32*3, 32*3)
+                #layer.set_num_update(16) # 24
+                layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 32*8, self._num_class) # out
+                layer.set_num_update(32)
             #
         elif self._package_id==1: # cifa-10
             input_layer = r.add_layer(0, self._image_size, self._image_size)

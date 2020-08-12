@@ -33,8 +33,9 @@ def main():
     config_id = 1
     mini_batch_size = 5000
     num_client = 4
+    epoc = 12
     #
-    server.server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client)
+    server.server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client, epoc)
     #
     print "main() : end"
 #

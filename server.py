@@ -26,7 +26,7 @@ import train
 #
 class ServerLooper(netutil.Looper):
     def __init__(self, local_addr, local_port, remote_addr, remote_port,
-                 package_id, config_id, mini_batch_size, num_client):
+                 package_id, config_id, mini_batch_size, num_client, epoc):
         print "ServerLooper::__init__()"
         #
         super(ServerLooper, self).__init__(local_addr, local_port, remote_addr, remote_port)
@@ -49,6 +49,7 @@ class ServerLooper(netutil.Looper):
         #
         self._roster.set_remote(self)
         self._seq = 0
+        self._epoc = epoc
         
     def set_client_num(self, num):
         self._client_num = num
@@ -187,10 +188,10 @@ class ServerLooper(netutil.Looper):
                 t = train.Train(self._package, self._roster)
                 t.set_limit(0.000001)
                 t.set_mini_batch_size(self._mini_batch_size)
-                t.set_divider(64)
+                #t.set_divider(64)
                 it = self._package._train_batch_size / (self._mini_batch_size*self._num_client)
                 t.set_iteration(it)
-                t.set_epoc(4*3)
+                t.set_epoc(self._epoc)
                 t.set_layer_direction(1) # output to input
                 #print "train_batch_size : %d" % (self._package._train_batch_size)
                 #print "mini_batch_size : %d" % (self._mini_batch_size)
@@ -224,10 +225,10 @@ class ServerLooper(netutil.Looper):
 #
 #
 #
-def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client):
+def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client, epoc):
     print "main() : start"
     #
-    s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client)
+    s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client, epoc)
     s.init()
     s.run()
     #
@@ -270,8 +271,9 @@ def main():
     config_id = 1 # CNN
     mini_batch_size = 400
     num_client = 1
+    epoc = 12
     #
-    s = server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client)
+    s = server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client, epoc)
     #
     print "main() : end"
 #

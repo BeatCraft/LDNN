@@ -574,22 +574,22 @@ class Roster:
         #
         
     def set_data(self, data, data_size, label, batch_size):
-    
-        #print data[0]
-    
         self._gpu.copy(self._gpu_input, data)
         self._gpu.copy(self._gpu_labels, label)
         layer = self.getLayerAt(0) # input layer
         layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0),
                          layer._num_node, batch_size, 0)
-                         
-        #layer._gpu.copy(layer._output_array, layer._gpu_output)
-        #print self._output_array[0]#.sum()
-        #ddd = layer._output_array[0]
-        #for i in range(784):
-        #    print "%d : %f" % (i, ddd[i])
         #
-    
+        # preprocess cnn and max
+        #
+        debug = 0
+        cnn_layer = self.getLayerAt(1) # cnn
+        cnn_layer.propagate(layer._gpu_output, -1, -1, -1, debug)
+        #
+        max_layer = self.getLayerAt(2) # cnn
+        max_layer.propagate(cnn_layer._gpu_output, -1, -1, -1, debug)
+        
+            
     def init_weight(self):
         c = self.countLayers()
         for i in range(1, c):
@@ -771,21 +771,21 @@ class Roster:
     def propagate(self, li=-1, ni=-1, ii=-1, wi=-1, debug=0):
         c = self.countLayers()
         pre = self.getLayerAt(0)
-        # this line can be deleted later
-        pre.propagate(pre._gpu_output, -1, -1, -1, debug)
-        #
-        # input layer is pre-prosessed
-        #
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            #layer.propagate(pre._gpu_output, ni, ii, wi, debug)
+            if layer.get_learning()>0:
+                pass
+            else:
+                pre = layer
+                continue
+            #
             if i==li: # alt
                 layer.propagate(pre._gpu_output, ni, ii, wi, debug)
             else: # propagation
                 layer.propagate(pre._gpu_output, -1, -1, -1, debug)
             #
             pre = layer
-#
+        #
 #
 #
 def main():

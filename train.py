@@ -169,14 +169,14 @@ class Train:
         cnt = 0
         num_w = layer.get_num_input()#_num_input
         #
-        w_p = num_w
-        if num_w>divider:
-            w_p = num_w/divider
-        else:
-            w_p = num_w/4
-            if w_p<1:
-                w_p = 3
-            #
+        w_p = layer.get_num_update()#num_w
+#        if num_w>divider:
+#            w_p = num_w/divider
+#        else:
+#            w_p = num_w/4
+#            if w_p<1:
+#                w_p = 3
+#            #
         #
         #
         #

@@ -31,7 +31,7 @@ def main():
     #
     package_id = 0
     config_id = 1
-    mini_batch_size = 5000
+    mini_batch_size = 1000
     num_client = 4
     epoc = 12
     #

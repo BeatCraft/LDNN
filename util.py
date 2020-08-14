@@ -349,25 +349,53 @@ class Package:
                 #
                 layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 14*14*4, 32*8)
                 layer.set_num_update(64)
-                #layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 32*3, 32*3)
-                #layer.set_num_update(16) # 24
                 layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 32*8, self._num_class) # out
                 layer.set_num_update(32)
             #
         elif self._package_id==1: # cifa-10
-            input_layer = r.add_layer(0, self._image_size, self._image_size)
+            if config==0:
+                # input
+                input_layer = r.add_layer(0, self._image_size, self._image_size)
+                # CNN
+                c = r.countLayers()
+                layer = core.Conv2dLayer(c, 32, 32, 1, 8, my_gpu)
+                layer.set_num_update(3)
+                layer.set_learning(0) # on : 1, off : 0
+                r.layers.append(layer)
+                # max
+                c = r.countLayers()
+                layer = core.MaxLayer(c, 8, 32, 32, my_gpu)
+                r.layers.append(layer)
+                # hidden : 16 x 16 x 8 = 256 x 8 = 2048
+                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 2048, 128)
+                layer.set_num_update(64)
+                # output
+                # hidden : 16 x 16 x 8 = 256 x 8 = 2048
+                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 128, 128)
+                layer.set_num_update(32)
+                # output
+                layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 128, self._num_class)
+                layer.set_num_update(16)
+            elif config==1:
+                # input
+                input_layer = r.add_layer(0, self._image_size, self._image_size)
+                # CNN
+                c = r.countLayers()
+                layer = core.Conv2dLayer(c, 32, 32, 1, 8, my_gpu)
+                layer.set_num_update(3)
+                layer.set_learning(0) # on : 1, off : 0
+                r.layers.append(layer)
+                # max
+                c = r.countLayers()
+                layer = core.MaxLayer(c, 8, 32, 32, my_gpu)
+                r.layers.append(layer)
+                # hidden : 16 x 16 x 8 = 256 x 8 = 2048
+                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 2048, 256)
+                layer.set_num_update(128)
+                # output
+                layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 256, self._num_class)
+                layer.set_num_update(32)
             #
-            c = r.countLayers()
-            layer = core.Conv2dLayer(c, 32, 32, 1, 8, my_gpu)
-            r.layers.append(layer)
-            # 32 x 32 x 8 = 1024 x 8 = 8192
-            c = r.countLayers()
-            layer = core.MaxLayer(c, 8, 32, 32, my_gpu)
-            r.layers.append(layer)
-            # 16 x 16 x 8 = 256 x 8 = 2048
-            r.add_layer(core.LAYER_TYPE_HIDDEN, 16*16*8, 32*2)
-            r.add_layer(core.LAYER_TYPE_HIDDEN, 32*2, 32*2)
-            r.add_layer(core.LAYER_TYPE_OUTPUT, 32*2, self._num_class) # out
         else:
             print "package error"
             return None

@@ -162,7 +162,7 @@ class Train:
         it = 0
         r = self._r
         limit = self._limit
-        divider = self._divider
+        #divider = self._divider
         #divider = 1
         direction = self._weight_shift_mode
         epoc = self._epoc

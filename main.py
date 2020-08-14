@@ -168,13 +168,13 @@ def main():
     #
     if mode==0: # train
         epoc = 1
-        mini_batch_size = 400
+        mini_batch_size = 200
         it = package._train_batch_size/mini_batch_size
         #
         t = train.Train(package, r)
         t.set_limit(0.000001)
         t.set_mini_batch_size(mini_batch_size)
-        t.set_divider(64)
+        #t.set_divider(64)
         t.set_iteration(it)
         t.set_epoc(epoc)
         t.set_layer_direction(1) # output to input

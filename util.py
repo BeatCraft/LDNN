@@ -258,7 +258,7 @@ TRAIN_IMAGE_BATCH_PATH = ["../ldnn_config/MNIST/train_image_batch.pickle",
                           "../ldnn_config/cifar-10-batches-py/train_image_batch.pickle"]
 TRAIN_LABEL_BATCH_PATH = ["../ldnn_config/MNIST/train_label_batch.pickle",
                           "../ldnn_config/cifar-10-batches-py/train_label_batch.pickle"]
-TRAIN_BATCH_SIZE = [60000, 10000]
+TRAIN_BATCH_SIZE = [60000, 50000]
 TEST_BATCH_SIZE = [10000, 10000]
 TEST_IMAGE_PATH = ["../ldnn_package/MNIST/t10k-images-idx3-ubyte",
                    "./"]
@@ -272,7 +272,7 @@ TEST_LABEL_BATCH_PATH = ["../ldnn_config/MNIST/test_label_batch.pickle",
 PACKAGE_NAME = ["MNIST", "cifar-10-batches-py"]
 PACKAGE_IMAGE_WIDTH = [28, 32]
 PACKAGE_IMAGE_HEIGHT = [28, 32]
-PACKAGE_IMAGE_SIZE = [784, 1024]
+PACKAGE_IMAGE_SIZE = [784, 32*32*3]
 PACKAGE_NUM_CLASS = [10, 10]
 
 class Package:
@@ -359,7 +359,7 @@ class Package:
                 # CNN
                 c = r.countLayers()
                 layer = core.Conv2dLayer(c, 32, 32, 1, 8, my_gpu)
-                layer.set_num_update(3)
+                #layer.set_num_update(3)
                 layer.set_learning(0) # on : 1, off : 0
                 r.layers.append(layer)
                 # max
@@ -369,7 +369,6 @@ class Package:
                 # hidden : 16 x 16 x 8 = 256 x 8 = 2048
                 layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 2048, 128)
                 layer.set_num_update(64)
-                # output
                 # hidden : 16 x 16 x 8 = 256 x 8 = 2048
                 layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 128, 128)
                 layer.set_num_update(32)
@@ -377,24 +376,36 @@ class Package:
                 layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 128, self._num_class)
                 layer.set_num_update(16)
             elif config==1:
-                # input
+                # 0 : input
                 input_layer = r.add_layer(0, self._image_size, self._image_size)
-                # CNN
+                # 1 : CNN
                 c = r.countLayers()
-                layer = core.Conv2dLayer(c, 32, 32, 1, 8, my_gpu)
-                layer.set_num_update(3)
+                layer = core.Conv2dLayer(c, 32, 32, 3, 8, my_gpu)
                 layer.set_learning(0) # on : 1, off : 0
                 r.layers.append(layer)
-                # max
+                # 2 : max
                 c = r.countLayers()
                 layer = core.MaxLayer(c, 8, 32, 32, my_gpu)
                 r.layers.append(layer)
-                # hidden : 16 x 16 x 8 = 256 x 8 = 2048
-                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 2048, 256)
-                layer.set_num_update(128)
-                # output
-                layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 256, self._num_class)
+                # 3 : CNN
+                c = r.countLayers()
+                layer = core.Conv2dLayer(c, 16, 16, 8, 8, my_gpu)
+                layer.set_learning(0) # on : 1, off : 0
+                r.layers.append(layer)
+                # 4 : max
+                c = r.countLayers()
+                layer = core.MaxLayer(c, 8, 16, 16, my_gpu)
+                r.layers.append(layer)
+                # 5 : hidden : 8 x 8 x 8 = 512
+                # 16 * 16 * 8 = 2048
+                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 512, 64)
                 layer.set_num_update(32)
+                # 6 : hidden
+                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 64, 64)
+                layer.set_num_update(16)
+                # 7 : output
+                layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 64, self._num_class)
+                layer.set_num_update(8)
             #
         else:
             print "package error"

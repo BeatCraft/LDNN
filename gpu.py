@@ -168,7 +168,7 @@ __kernel void conv2d_batch(
         sum = 0.0;
         offset_w = filetr_size * f;
         for (int c=0;c<ch;c++){
-            int offset = ofset_input+image_stride*c;
+            int offset = ofset_input + image_stride * c;
             if (yi==0){ // on the top
                 if (xi==0){ // top left corner
                     a[0] = 0.0;

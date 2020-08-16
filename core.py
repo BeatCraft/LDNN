@@ -504,17 +504,18 @@ class Conv2dLayer(Layer):
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         if ni>=0: # alt
             pass
-            self._gpu.conv2d_batch_alt(array_in, self._gpu_weight, self._gpu_output,
-                                       self._w, self._h, self._ch, self._filter, self._batch_size,
-                                       ni, ii, WEIGHT_SET_CNN[wi])#wi)
+#            self._gpu.conv2d_batch_alt(array_in, self._gpu_weight, self._gpu_output,
+#                                       self._w, self._h, self._ch, self._filter, self._batch_size,
+#                                       ni, ii, WEIGHT_SET_CNN[wi])#wi)
         else:
             self._gpu.conv2d_batch(array_in, self._gpu_weight, self._gpu_output,
                                    self._w, self._h, self._ch, self._filter, self._batch_size)
+            self._gpu.scale_cnn(self._gpu_output, self._batch_size, self._filter,
+                                self._image_size*self._filter, self._image_size)
 
         #
-        
-        self._gpu.scale_cnn(self._gpu_output, self._batch_size, self._filter,
-                            self._image_size*self._filter, self._image_size)
+#        self._gpu.scale_cnn(self._gpu_output, self._batch_size, self._filter,
+#                            self._image_size*self._filter, self._image_size)
         # normalize
         #
         #self._gpu.normalize_batch_cnn(self._gpu_output, self._batch_size, self._image_size*self._filter, self._filter, self._image_size)
@@ -583,11 +584,20 @@ class Roster:
         # preprocess cnn and max
         #
         debug = 0
-        cnn_layer = self.getLayerAt(1) # cnn
-        cnn_layer.propagate(layer._gpu_output, -1, -1, -1, debug)
+        pre = layer
+        li = 1
+        layer = self.getLayerAt(li)
+        while layer.get_learning()==0:
+            layer.propagate(pre._gpu_output, -1, -1, -1, debug)
+            pre = layer
+            li = li +1
+            layer = self.getLayerAt(li)
         #
-        max_layer = self.getLayerAt(2) # cnn
-        max_layer.propagate(cnn_layer._gpu_output, -1, -1, -1, debug)
+#        cnn_layer = self.getLayerAt(1)
+#        cnn_layer.propagate(layer._gpu_output, -1, -1, -1, debug)
+        #
+#        max_layer = self.getLayerAt(2)
+#        max_layer.propagate(cnn_layer._gpu_output, -1, -1, -1, debug)
         
             
     def init_weight(self):
@@ -712,13 +722,20 @@ class Roster:
         #return ret
         s = np.sum(self._batch_cross_entropy)
         s = s/float(self._batch_size)
-#        if np.isnan(s):
-#            for i in range(self._batch_size):
-#                if np.isnan(self._batch_cross_entropy[i]):
-#                    print "NaN : %d" % (i)
-#                    output = self.getLayerAt(c-3)
-#                    self._gpu.copy(output._output_array, output._gpu_output)
-#                    print output._output_array[i]
+        
+        if np.isnan(s):
+            for i in range(self._batch_size):
+                li = c-1
+                if np.isnan(self._batch_cross_entropy[i]):
+                    print "NaN : %d" % (i)
+                    
+                    output = self.getLayerAt(li)
+                    self._gpu.copy(output._output_array, output._gpu_output)
+                    print output._output_array[i]
+                    
+                    output = self.getLayerAt(li-1)
+                    self._gpu.copy(output._output_array, output._gpu_output)
+                    print output._output_array[i]
                 #
             #
         #

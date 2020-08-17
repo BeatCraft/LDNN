@@ -388,23 +388,23 @@ class Package:
                 layer = core.MaxLayer(c, 8, 32, 32, my_gpu)
                 r.layers.append(layer)
                 # 3 : CNN
-                c = r.countLayers()
-                layer = core.Conv2dLayer(c, 16, 16, 8, 8, my_gpu)
-                layer.set_learning(0) # on : 1, off : 0
-                r.layers.append(layer)
+#                c = r.countLayers()
+#                layer = core.Conv2dLayer(c, 16, 16, 8, 8, my_gpu)
+#                layer.set_learning(0) # on : 1, off : 0
+#                r.layers.append(layer)
                 # 4 : max
-                c = r.countLayers()
-                layer = core.MaxLayer(c, 8, 16, 16, my_gpu)
-                r.layers.append(layer)
+#                c = r.countLayers()
+#                layer = core.MaxLayer(c, 8, 16, 16, my_gpu)
+#                r.layers.append(layer)
                 # 5 : hidden : 8 x 8 x 8 = 512
                 # 16 * 16 * 8 = 2048
-                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 512, 64)
-                layer.set_num_update(32)
+                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 2048, 128)
+                layer.set_num_update(64)
                 # 6 : hidden
-                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 64, 64)
+                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 128, 128)
                 layer.set_num_update(16)
                 # 7 : output
-                layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 64, self._num_class)
+                layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 128, self._num_class)
                 layer.set_num_update(8)
             #
         else:

@@ -101,7 +101,8 @@ class Layer(object):
     # type      : 0 = input, 1 = hidden, 2 = output
     # num_input : number of inputs / outputs from a previous layer
     # num_node  : numbers of neurons
-    def __init__(self, i, type, num_input, num_node, gpu=None):
+    def __init__(self, i, type, num_input, num_node, pre, gpu=None):
+        self._pre = pre
         self._index = i
         self._type = type
         if gpu is not None:
@@ -118,14 +119,31 @@ class Layer(object):
         self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
-    
+        #
+        self._node_marker = np.zeros( (self._num_node), dtype=np.int32)
+        #
         self._num_update = num_input/10
         if self._num_update<1:
             self._num_update = 1
         #
-        self._learning = 1 # on
+        self._learning = 1 # 0 : off, 1 : on
+        #
         # allocate mems for output, also intermediate working area when it is needed
-    
+        #
+        
+    def get_pre_layer(self):
+        return self._pre
+        
+    def set_marker_pre(self, ni, v):
+        if self._pre:
+            self._pre.set_marker(ni, v)
+            
+    def set_marker(self, ni, v):
+        self._node_marker[ni] = v
+
+    def get_marker(self, ni):
+        return self._node_marker[ni]
+
     def set_learning(self, v):
         self._learning = v
 

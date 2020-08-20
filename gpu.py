@@ -9,6 +9,127 @@ os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 #
 #
 KERNEL_CODE = """
+__kernel void conv3d_batch(
+    __global float* input,
+    __global float* weight,
+    __global float* output,
+    const int w,
+    const int h,
+    const int ch,
+    const int filter)
+{
+    int bi = get_global_id(0);
+    int xi = get_global_id(1);
+    int yi = get_global_id(2);
+    int image_stride = w * h;
+    int batch_stride = image_stride * ch;
+    int ofset_input = batch_stride * bi;
+    int output_stride = w * h * ch * filter;
+    int offset_out = output_stride * bi + yi * w + xi;
+    int filetr_size = 3*3*ch;
+    int offset_w = 0;
+    float sum = 0.0;
+    float a[9];
+    int x = xi - 1;
+    int y = yi - 1;
+    //
+    for (int f=0;f<filter;f++){
+        //sum = 0.0;
+        offset_w = filetr_size * f;
+        for (int c=0;c<ch;c++){
+            int offset = ofset_input + image_stride * c*3*3;
+            if (yi==0){ // on the top
+                if (xi==0){ // top left corner
+                    a[0] = 0.0;
+                    a[1] = 0.0;
+                    a[2] = 0.0;
+                    a[3] = 0.0;
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = 0;
+                    a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                    a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+                }else if (xi==w-1){ // top right corner
+                    a[0] = 0;
+                    a[1] = 0;
+                    a[2] = 0;
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = 0;
+                    a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+                    a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                    a[8] = 0;
+                }else{ // top line
+                    a[0] = 0;
+                    a[1] = 0;
+                    a[2] = 0;
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+                    a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                    a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+                }
+            }else if (yi==h-1){ //on the bottom
+                if (xi==0){ // bottom left corner
+                    a[0] = 0;
+                    a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                    a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+                    a[3] = 0;
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = 0;
+                    a[7] = 0;
+                    a[8] = 0;
+                }else if (xi==w-1){ // bottom right corner
+                    a[0] = input[offset+w*y+x] * weight[offset_w+0];
+                    a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                    a[2] = 0;
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = 0;
+                    a[6] = 0;
+                    a[7] = 0;
+                    a[8] = 0;
+                }else{ // bottom line
+                    a[0] = input[offset+w*y+x] * weight[offset_w+0];
+                    a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                    a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+                    a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                    a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                    a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                    a[6] = 0;
+                    a[7] = 0;
+                    a[8] = 0;
+                }
+            }else{ // in the middle
+                a[0] = input[offset+w*y+x] * weight[offset_w+0];
+                a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+                a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+                a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+                a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+                a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+                a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+                a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+                a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+            }
+            sum = 0.0;
+            for (int i=0;i<9;i++){
+                sum += a[i];
+            }
+            //
+            // relu
+            //
+            if (sum<0.0){
+                output[offset_out + image_stride * ch * f + image_stride * c] = 0.0;
+            }else{
+                output[offset_out + image_stride * ch * f + image_stride * c] = sum;
+            }
+            //printf(\"%f\\n\", sum);
+        } // ch loop
+    } // filter loop
+};
+
 __kernel void conv2d_batch_alt(
     __global float* input,
     __global float* weight,
@@ -856,6 +977,12 @@ class Gpu:
                                           input, weight, output, np.int32(w), np.int32(h),
                                           np.int32(ch), np.int32(filter),
                                           np.int32(ni), np.int32(ii), np.float32(alt))
+        event.wait()
+        
+    def conv3d_batch(self, input, weight, output, w, h, ch, filter, batch_size):
+        event = self.prg.conv3d_batch(self._queue, (batch_size, w, h), None,
+                                      input, weight, output, np.int32(w), np.int32(h),
+                                      np.int32(ch), np.int32(filter))
         event.wait()
 #
 #

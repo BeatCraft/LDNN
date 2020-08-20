@@ -225,9 +225,9 @@ class Layer(object):
 #
 #
 class InputLayer(Layer):
-    def __init__(self, i, num_input, num_node, gpu=None):
+    def __init__(self, i, num_input, num_node, pre, gpu=None):
         print "InputLayer::__init__()"
-        super(InputLayer, self).__init__(i, LAYER_TYPE_INPUT, num_input, num_node, gpu)
+        super(InputLayer, self).__init__(i, LAYER_TYPE_INPUT, num_input, num_node, pre, gpu)
         self._learning = 0 # off
     
     def prepare(self, batch_size):
@@ -245,9 +245,9 @@ class InputLayer(Layer):
 #
 #
 class HiddenLayer(Layer):
-    def __init__(self, i, num_input, num_node, gpu=None):
+    def __init__(self, i, num_input, num_node, pre, gpu=None):
         print "HiddenLayer::__init__()"
-        super(HiddenLayer, self).__init__(i, LAYER_TYPE_HIDDEN, num_input, num_node, gpu)
+        super(HiddenLayer, self).__init__(i, LAYER_TYPE_HIDDEN, num_input, num_node, pre, gpu)
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
     
@@ -298,9 +298,9 @@ class HiddenLayer(Layer):
 #
 #
 class OutputLayer(Layer):
-    def __init__(self, i, num_input, num_node, gpu=None):
+    def __init__(self, i, num_input, num_node, pre, gpu=None):
         print "OutputLayer::__init__()"
-        super(OutputLayer, self).__init__(i, LAYER_TYPE_OUTPUT, num_input, num_node, gpu)
+        super(OutputLayer, self).__init__(i, LAYER_TYPE_OUTPUT, num_input, num_node, pre, gpu)
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
 
@@ -344,7 +344,7 @@ class OutputLayer(Layer):
 #
 # w : image width, i : index, h : image height, stride : size of convolusion matrix
 class ConvLayer(Layer):
-    def __init__(self, i,  w, h, stride, gpu=None):
+    def __init__(self, i,  w, h, stride, pre, gpu=None):
         print "ConvLayer::__init__()"
         #
         self._index = i
@@ -358,7 +358,7 @@ class ConvLayer(Layer):
         self._kernel_num = self._kernel_x * self._kernel_y # 676
         self._kernel_size = stride * stride # 9
         #
-        super(ConvLayer, self).__init__(i, LAYER_TYPE_CONV, self._kernel_size, self._kernel_num, gpu)
+        super(ConvLayer, self).__init__(i, LAYER_TYPE_CONV, self._kernel_size, self._kernel_num, pre, gpu)
         #
         self._cnv_map = np.zeros( (self._kernel_num, self._kernel_size), dtype=np.int32)
         #
@@ -418,9 +418,10 @@ class ConvLayer(Layer):
 # 2 x 2 simple max filter for 2D image data
 # w : image width, i : index, h : image height
 class MaxLayer(Layer):
-    def __init__(self, i, ch, w, h, gpu=None):
+    def __init__(self, i, ch, w, h, pre, gpu=None):
         print "MaxLayer::__init__()"
         #
+        self._pre = pre
         self._index = i
         self._type = LAYER_TYPE_POOL
         self._gpu = gpu
@@ -466,9 +467,10 @@ class MaxLayer(Layer):
 # ch : number of channels, filter : number of filters
 # number of output channels is the same as number of filters
 class Conv2dLayer(Layer):
-    def __init__(self, i, w, h, ch, filter, gpu=None):
+    def __init__(self, i, w, h, ch, filter, pre, gpu=None):
         print "Conv2dLayer::__init__()"
         #
+        self._pre = pre
         self._index = i
         self._type = LAYER_TYPE_CONV_2D
         self._gpu = gpu
@@ -532,31 +534,76 @@ class Conv2dLayer(Layer):
                                 self._image_size*self._filter, self._image_size)
 
         #
-#        self._gpu.scale_cnn(self._gpu_output, self._batch_size, self._filter,
-#                            self._image_size*self._filter, self._image_size)
-        # normalize
+    #
+# kernel size x = 3, fixed
+# kernel size y = 3, fixed
+# kernel size z = n, RGB = ch
+# kernel stride = 1
+# ch : number of channels, filter : number of filters
+# number of output channels is the same as number of filters
+class Conv3dLayer(Layer):
+    def __init__(self, i, w, h, ch, filter, pre, gpu=None):
+        print "Conv3dLayer::__init__()"
         #
-        #self._gpu.normalize_batch_cnn(self._gpu_output, self._batch_size, self._image_size*self._filter, self._filter, self._image_size)
+        self._pre = pre
+        self._index = i
+        self._type = LAYER_TYPE_CONV_2D
+        self._gpu = gpu
+        self._id = -1 # reserved
         #
-        # relu
+        self._ch = ch
+        self._w = w
+        self._h = h
+        self._image_size = self._w * self._h
+        self._filter = filter
+        self._filter_size = 3 * 3 * self._ch
+#        self._ch_stride = self._w * self._h * self._ch
+#        self._batch_stride = self._ch_stride * self._filter
+        # mems for weights
+        self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+        self._weight_lock = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+        self._weight_property = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+        self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
         #
-        #self._gpu.relu(self._gpu_output, self._batch_size, self._filter, self._image_size) #  self._num_node : stride
+        self._num_input = self._filter_size
+        self._num_node = self._filter
+        #
+        if self._gpu:
+            self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+        #
+    #
+    def prepare(self, batch_size):
+        self._batch_size = batch_size
+        self._output_array = np.zeros((self._batch_size, self._ch*self._filter, self._image_size), dtype=np.float32)
+        #
+        if self._gpu:
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        #
+    def set_weight_index(self, ni, ii, wi):
+        self._weight_index_matrix[ni][ii] = wi
+        self._weight_matrix[ni][ii] = WEIGHT_SET_CNN[wi]
         
+    def init_weight_with_random_index(self):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                wi = random.randrange(len(WEIGHT_SET_CNN))
+                self.set_weight_index(ni, ii, wi)
+            #
+        #
         
-            #self._gpu.copy(self._output_array, self._gpu_output)
-            #print self._output_array[0][0]
-            #print self._weight_matrix[0]
-            #print self._output_array[1]
-            #print self._weight_matrix[1]
-    
-#    def init_weight_with_random_index(self):
-#        for ni in range(self._num_node):
-#            for ii in range(self._num_input):
-#                wi = random.randrange(WEIGHT_INDEX_ZERO, WEIGHT_INDEX_SIZE)
-#                self.set_weight_index(ni, ii, wi)
-#            #
-#        #
-        
+    def update_weight(self):
+        self._gpu.copy(self._gpu_weight, self._weight_matrix)
+
+    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+        if ni>=0: # alt
+            pass
+        else:
+            self._gpu.conv3d_batch(array_in, self._gpu_weight, self._gpu_output,
+                                   self._w, self._h, self._ch, self._filter, self._batch_size)
+            self._gpu.scale_cnn(self._gpu_output, self._batch_size, self._filter*self._ch,
+                                self._image_size*self._filter, self._image_size)
+        #
+    #
 #
 #
 #
@@ -606,9 +653,10 @@ class Roster:
         li = 1
         layer = self.getLayerAt(li)
         while layer.get_learning()==0:
+            #print "pre-calc(%d)" % (li)
             layer.propagate(pre._gpu_output, -1, -1, -1, debug)
             pre = layer
-            li = li +1
+            li = li + 1
             layer = self.getLayerAt(li)
         #
 #        cnn_layer = self.getLayerAt(1)
@@ -750,10 +798,32 @@ class Roster:
                     output = self.getLayerAt(li)
                     self._gpu.copy(output._output_array, output._gpu_output)
                     print output._output_array[i]
+                    print output._output_array[i].shape
                     
                     output = self.getLayerAt(li-1)
                     self._gpu.copy(output._output_array, output._gpu_output)
                     print output._output_array[i]
+                    print output._output_array[i].shape
+                    
+                    output = self.getLayerAt(li-2)
+                    self._gpu.copy(output._output_array, output._gpu_output)
+                    print output._output_array[i]
+                    print output._output_array[i].shape
+                    
+                    output = self.getLayerAt(li-3)
+                    self._gpu.copy(output._output_array, output._gpu_output)
+                    print output._output_array[i]
+                    print output._output_array[i].shape
+                    
+                    output = self.getLayerAt(li-4)
+                    self._gpu.copy(output._output_array, output._gpu_output)
+                    print output._output_array[i]
+                    print output._output_array[i].shape
+                    
+                    output = self.getLayerAt(li-5)
+                    self._gpu.copy(output._output_array, output._gpu_output)
+                    print output._output_array[i]
+                    print output._output_array[i].shape
                 #
             #
         #

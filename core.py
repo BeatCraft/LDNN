@@ -271,9 +271,15 @@ class HiddenLayer(Layer):
         stride_1 = self._num_node * self._num_input
         stride_2 = self._num_input
         if ni>=0: # alt
+            #start_time = time.time()
+            #
             self._gpu.multiple_x_by_w_batch_alt(array_in, self._gpu_weight, self._gpu_product,
                                                 self._batch_size, stride_1, stride_2,
                                                 self._num_input, self._num_node, ni, ii, WEIGHT_SET[wi])
+            #
+            #elapsed_time = time.time() - start_time
+            #t = format(elapsed_time, "0")
+            #print "time : multiple_x_by_w_batch_alt() : %s" % (t)
         else: # propagation
             self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
                                             self._batch_size, stride_1, stride_2,
@@ -293,7 +299,6 @@ class HiddenLayer(Layer):
         # relu
         #
         #self._gpu.relu(self._gpu_output, self._batch_size, self._num_node, 1) #  self._num_node : stride
-        
 #
 #
 #
@@ -694,6 +699,35 @@ class Roster:
             #
         #
 
+    def count_locked_weight(self):
+        cnt = 0
+        c = self.countLayers()
+        for i in range(1, c):
+            layer = self.getLayerAt(i)
+            nc = layer._num_node
+            ic = layer._num_input
+            for ni in range(nc):
+                for ii in range(ic):
+                    lock = layer.get_weight_lock(ni, ii)
+                    if lock>0:
+                        cnt = cnt + 1
+                    #
+                #
+            #
+        #
+        return cnt
+    
+    def count_weight(self):
+        cnt = 0
+        c = self.countLayers()
+        for i in range(1, c):
+            layer = self.getLayerAt(i)
+            nc = layer._num_node
+            ic = layer._num_input
+            cnt = cnt + nc*ic
+        #
+        return cnt
+
     def unlock_weight_all(self):
         c = self.countLayers()
         for i in range(1, c):
@@ -703,11 +737,14 @@ class Roster:
             for ni in range(nc):
                 for ii in range(ic):
                     layer.set_weight_lock(ni, ii, 0)
+                #
+            #
         #
 
     def update_weight(self):
         for layer in self.layers:
             layer.update_weight()
+        #
 
     def countLayers(self):
         return len(self.layers)
@@ -715,6 +752,7 @@ class Roster:
     def get_layers(self):
         if self.countLayers() == 0:
             return 0
+        #
         return self.layers
 
     def getLayerAt(self, i):

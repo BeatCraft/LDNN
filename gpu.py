@@ -9,6 +9,97 @@ os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 #
 #
 KERNEL_CODE = """
+__kernel void conv_core(
+    __global const float* input,
+    __global const float* weight,
+    __global float* output,
+    int offset,
+    int offset_w,
+    int w,
+    int x,
+    int y,
+    int h,
+    int xi,
+    int yi,
+    __global float* a)
+{
+    if (yi==0){ // on the top
+        if (xi==0){ // top left corner
+            a[0] = 0.0;
+            a[1] = 0.0;
+            a[2] = 0.0;
+            a[3] = 0.0;
+            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+            a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+            a[6] = 0;
+            a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+            a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+        }else if (xi==w-1){ // top right corner
+            a[0] = 0;
+            a[1] = 0;
+            a[2] = 0;
+            a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+            a[5] = 0;
+            a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+            a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+            a[8] = 0;
+        }else{ // top line
+            a[0] = 0;
+            a[1] = 0;
+            a[2] = 0;
+            a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+            a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+            a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+            a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+            a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+        }
+    }else if (yi==h-1){ //on the bottom
+        if (xi==0){ // bottom left corner
+            a[0] = 0;
+            a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+            a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+            a[3] = 0;
+            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+            a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+            a[6] = 0;
+            a[7] = 0;
+            a[8] = 0;
+        }else if (xi==w-1){ // bottom right corner
+            a[0] = input[offset+w*y+x] * weight[offset_w+0];
+            a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+            a[2] = 0;
+            a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+            a[5] = 0;
+            a[6] = 0;
+            a[7] = 0;
+            a[8] = 0;
+        }else{ // bottom line
+            a[0] = input[offset+w*y+x] * weight[offset_w+0];
+            a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+            a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+            a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+            a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+            a[6] = 0;
+            a[7] = 0;
+            a[8] = 0;
+        }
+    }else{ // in the middle
+        a[0] = input[offset+w*y+x] * weight[offset_w+0];
+        a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
+        a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
+        a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
+        a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
+        a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
+        a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
+        a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
+        a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+    }
+};
+
 __kernel void conv3d_batch(
     __global float* input,
     __global float* weight,
@@ -668,9 +759,9 @@ __kernel void scale_layer(__global float* data, int size)
     }
 }
 
-__kernel void k_cross_entropy(__global float* infs,
+__kernel void k_cross_entropy(__global const float* infs,
                               __global float* output,
-                              __global int* labels,
+                              __global const int* labels,
                               int num)
 {
     int bi = get_global_id(0);
@@ -723,7 +814,7 @@ __kernel void k_softmax(__global float* in, int num)
     }
 }
 
-__kernel void k_sum(__global float* in,
+__kernel void k_sum(__global const float* in,
                     __global float* out,
                     int num_input,
                     int num_node,
@@ -763,8 +854,8 @@ __kernel void relu(__global float* out, int num, int stride)
 }
 
 __kernel void multiple_x_by_w_batch(
-    __global float* x,
-    __global float* w,
+    __global const float* x,
+    __global const float* w,
     __global float* y,
     const int stride_1,
     const int stride_2)
@@ -780,8 +871,8 @@ __kernel void multiple_x_by_w_batch(
 // stride_2 : num_input
 
 __kernel void multiple_x_by_w_batch_alt(
-    __global float* x,
-    __global float* w,
+    __global const float* x,
+    __global const float* w,
     __global float* y,
     const int stride_1,
     const int stride_2,
@@ -792,12 +883,16 @@ __kernel void multiple_x_by_w_batch_alt(
     int i = get_global_id(0); // num_input
     int j = get_global_id(1); // num_node
     int bi = get_global_id(2); // batch id
-
+    
+//    float temp = w[stride_2*alt_ni + alt_ii];
+//    w[stride_2*alt_ni + alt_ii] = alt_w;
     if (j==alt_ni && i==alt_ii){
         y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * alt_w;
     }else{
         y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * w[stride_2*j + i];
     }
+//    y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * w[stride_2*j + i];
+//    w[stride_2*alt_ni + alt_ii] = temp;
 };
 
 __kernel void multiple_x_by_w(

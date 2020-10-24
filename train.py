@@ -128,30 +128,9 @@ class Train:
             return entropy_alt, 1
         else:
             if wp==0:
+                # reverse
                 wp_alt = wp_alt*(-1)
                 layer.set_weight_property(ni, ii, wp_alt)
-                # reverse
-                wi_alt = wi + wp_alt
-                if r._gpu:
-                    r.propagate(li, ni, ii, wi_alt, 0)
-                    entropy_alt = r.get_cross_entropy()
-                else:
-                    entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-                #
-                if entropy_alt<entropy:
-                    layer.set_weight_property(ni, ii, wp_alt)
-                    layer.set_weight_index(ni, ii, wi_alt)
-                    if r._gpu:
-                        layer.update_weight()
-                    else:
-                        entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                    #
-                    return entropy_alt, 1
-                else:
-                    layer.set_weight_property(ni, ii, 0)
-                    layer.set_weight_lock(ni, ii, 1)
-                    print "lock at(%d)" % wi
-                #
             else:
                 layer.set_weight_property(ni, ii, 0)
                 layer.set_weight_lock(ni, ii, 1)

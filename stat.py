@@ -13,7 +13,7 @@ import math
 import multiprocessing as mp
 import numpy as np
 import struct
-import cPickle
+import pickle
 import pyopencl as cl
 import glob
 import re
@@ -65,7 +65,7 @@ def main():
             #print filepath
             #r.import_weight_index(filepath)
             acc = test.stat(r, package, filepath, 0)
-            print "%d, %s, %f" % (i, tl[1], acc)
+            print("%d, %s, %f" % (i, tl[1], acc))
         #
     #
     return 0
@@ -73,9 +73,9 @@ def main():
 #
 #
 if __name__=='__main__':
-    print ">> start"
+    print(">> start")
     sts = main()
-    print ">> end"
+    print(">> end")
     print("\007")
     sys.exit(sts)
 #

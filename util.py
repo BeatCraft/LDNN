@@ -9,7 +9,7 @@ import struct
 
 import pickle
 import numpy as np
-import cPickle
+import pickle
 
 from PIL import Image
 from PIL import ImageFile
@@ -222,7 +222,7 @@ def list_to_csv(path, data_list):
 #
 #
 def csv_to_list(path):
-    print "csv_to_list()"
+    print("csv_to_list()")
     data_list = []
     try:
         with open(path, 'r') as f:
@@ -242,7 +242,7 @@ def csv_to_list(path):
 #
 def get_key_input(prompt):
     try:
-        c = input(prompt)
+        c = eval(input(prompt))
     except:
         c = -1
         
@@ -301,26 +301,26 @@ class Package:
             #print "restore train image batch"
             self._train_image_batch = pickle_load(self._train_image_batch_path)
         else:
-            print "fatal error : no train image batch"
+            print("fatal error : no train image batch")
         #
         if os.path.isfile(self._train_label_batch_path):
             #print "restore train label batch"
             self._train_label_batch = pickle_load(self._train_label_batch_path)
         else:
-            print "fatal error : no train label batch"
+            print("fatal error : no train label batch")
         #
         if os.path.isfile(self._test_image_batch_path):
             #print "restore test image batch"
             self._test_image_batch = pickle_load(self._test_image_batch_path)
         else:
-            print "fatal error : no test image batch"
+            print("fatal error : no test image batch")
         #
         if os.path.isfile(self._test_label_batch_path) :
             #print "restore test label batch"
             self._test_label_batch = pickle_load(self._test_label_batch_path)
         else:
-            print "fatal error : no test label batch"
-            print self._test_label_batch_path
+            print("fatal error : no test label batch")
+            print(self._test_label_batch_path)
             
     def setup_dnn(self, my_gpu, config=0):
         r = core.Roster()
@@ -328,13 +328,13 @@ class Package:
         #
         if self._package_id==0: # MNIST
             if config==0:
-                print "FC"
+                print("FC")
                 r.add_layer(core.LAYER_TYPE_INPUT, self._image_size, self._image_size)  # input
                 r.add_layer(core.LAYER_TYPE_HIDDEN, self._image_size, 64) # hidden 0
                 r.add_layer(core.LAYER_TYPE_HIDDEN, 64, 64) # hidden 1
                 r.add_layer(core.LAYER_TYPE_OUTPUT, 64, self._num_class) # out
             elif config==1:
-                print "CNN"
+                print("CNN")
                 r.add_layer(core.LAYER_TYPE_INPUT, self._image_size, self._image_size)  # input
                 #
                 c = r.countLayers()
@@ -404,7 +404,7 @@ class Package:
                 output.set_num_update(6)
             #
         else:
-            print "package error"
+            print("package error")
             return None
         #
         if os.path.isfile(self._wi_csv_path):
@@ -421,4 +421,4 @@ class Package:
         return r
 
 def echo(data):
-    print data
+    print(data)

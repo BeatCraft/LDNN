@@ -17,7 +17,7 @@ import math
 import multiprocessing as mp
 import numpy as np
 import struct
-import cPickle
+import pickle
 import csv
 from PIL import Image
 from PIL import ImageFile
@@ -57,7 +57,7 @@ def make_minibatch(package, mini_batch_size, num):
         #data = (data_array, class_array)
         save_path = "../ldnn_config/%s/mini/%d/%03d.pickle" % (package._name, mini_batch_size, j)
         util.pickle_save(save_path, random_index)
-        print save_path
+        print(save_path)
     #
 #
 #
@@ -90,9 +90,9 @@ def main():
 #
 #
 if __name__=='__main__':
-    print ">> start"
+    print(">> start")
     sts = main()
-    print ">> end"
+    print(">> end")
     print("\007")
     sys.exit(sts)
 #

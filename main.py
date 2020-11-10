@@ -17,7 +17,7 @@ import math
 import multiprocessing as mp
 import numpy as np
 import struct
-import cPickle
+import pickle
 import pyopencl as cl
 #
 # LDNN Modules
@@ -41,9 +41,9 @@ WEIGHT_INDEX_CSV_PATH = "./wi.csv"
 def check_weight_distribution():
     w_list = util.csv_to_list(WEIGHT_INDEX_CSV_PATH)
     w_total = len(w_list)
-    print w_total
+    print(w_total)
     if w_total<=0:
-        print "error"
+        print("error")
         return 0
 
     v_list = []
@@ -54,19 +54,19 @@ def check_weight_distribution():
         num =  w_list.count(key)
         num_list.append(num)
         v = float(num)/w_total*100.0
-        print "[%02d] %d : %f" % (i, num, v)
+        print("[%02d] %d : %f" % (i, num, v))
         v_list.append(v)
         total = total + v
 
     ave = total / float(len(v_list))
-    print "average : %f" % (ave)
+    print("average : %f" % (ave))
 
     for i in range(core.WEIGHT_INDEX_SIZE):
         dif = v_list[i] - ave
-        print "[%02d] %f" % (i, dif)
+        print("[%02d] %f" % (i, dif))
 
     for i in range(core.WEIGHT_INDEX_SIZE):
-        print num_list[i]
+        print(num_list[i])
     
     return 0
 #
@@ -74,7 +74,7 @@ def check_weight_distribution():
 #
 def get_key_input(prompt):
     try:
-        c = input(prompt)
+        c = eval(input(prompt))
     except:
         c = -1
     return c
@@ -93,14 +93,28 @@ def main():
     config = 0
     mode = 0
     
-    
-    print "- Select an GPU -"
+    print("- Select an OpenCL platform -")
+    d = 0
     for platform in cl.get_platforms():
-        d = 0
-        for device in platform.get_devices():
-            print("%d : %s" % (d, device.name))
-            d = d + 1
-        #
+        print("%d : %s" % (d, platform.name))
+        d = d + 1
+    #
+    menu = get_key_input("input command >")
+    if menu==0:
+        platform_id = 0
+    elif menu==1:
+        platform_id = 1
+    elif menu==2:
+        platform_id = 2
+    else:
+        platform_id = 1 # my MBP
+    #
+
+    print("- Select a device -")
+    d = 0
+    for device in platform.get_devices():
+        print("%d : %s" % (d, device.name))
+        d = d + 1
     #
     menu = get_key_input("input command >")
     if menu==0:
@@ -110,7 +124,7 @@ def main():
     elif menu==2:
         device_id = 2
     else:
-        device_id = 1 # my MBP
+        device_id = 0
     #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
@@ -118,9 +132,9 @@ def main():
     #
     #
     package_id = 0
-    print "- Select a package -"
-    print "0 : MNIST"
-    print "1 : CIFAR-10"
+    print("- Select a package -")
+    print("0 : MNIST")
+    print("1 : CIFAR-10")
     menu = get_key_input("input command >")
     if menu==0:
         package_id = 0
@@ -131,9 +145,9 @@ def main():
     #
     #
     #
-    print "- Select a config-"
-    print "0 : FC for MNIST"
-    print "1 : CNN for MNIST"
+    print("- Select a config-")
+    print("0 : FC for MNIST")
+    print("1 : CNN for MNIST")
     menu = get_key_input("input command >")
     if menu==0:
         config = 0
@@ -146,10 +160,10 @@ def main():
     #
     #
     #
-    print "- Select a command-"
-    print "0 : train (mini-batch)"
-    print "1 : test (500)"
-    print "2 : ?"
+    print("- Select a command-")
+    print("0 : train (mini-batch)")
+    print("1 : test (500)")
+    print("2 : ?")
     menu = get_key_input("input command >")
     if menu==0:
         mode = 0
@@ -163,15 +177,15 @@ def main():
     package = util.Package(package_id)
     r = package.setup_dnn(my_gpu, config)
     if r is None:
-        print "fatal DNN error"
+        print("fatal DNN error")
         return 0
     #
     if mode==0: # train
-        epoc = 1
+        epoc = 8
         mini_batch_size = 100
-        print "package._train_batch_size=%d" % (package._train_batch_size)
-        it = package._train_batch_size/mini_batch_size
-        print "it = %d" % (it)
+        print("package._train_batch_size=%d" % (package._train_batch_size))
+        it = int(package._train_batch_size/mini_batch_size)
+        print("it = %d" % (it))
         #
         t = train.Train(package, r)
         t.set_limit(0.000001)
@@ -185,7 +199,7 @@ def main():
     elif mode==2: #
         pass
     else:
-        print "input error"
+        print("input error")
         pass
     #
     return 0
@@ -193,9 +207,9 @@ def main():
 #
 #
 if __name__=='__main__':
-    print ">> start"
+    print(">> start")
     sts = main()
-    print ">> end"
+    print(">> end")
     print("\007")
     sys.exit(sts)
 #

@@ -83,7 +83,7 @@ def unpack_iif(data):
 #
 class Looper(object):
     def __init__(self, local_addr, local_port, remote_addr, remote_port):
-        print "Looper::__init__()"
+        print("Looper::__init__()")
         self._stop = multiprocessing.Value('i', 0)
         self._mode = multiprocessing.Value('i', 0)
         self._process = None
@@ -98,7 +98,7 @@ class Looper(object):
         self.init()
 
     def init(self):
-        print "Looper::init()"
+        print("Looper::init()")
         #self._send_sock = None#socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         #self._send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self._recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -117,20 +117,20 @@ class Looper(object):
             return None, None
         
     def loop(self): # MUST override this
-        print "Looper::loop()"
+        print("Looper::loop()")
         while not self._stop.value:
-            print "  loop"
-            print self._stop.value
+            print("  loop")
+            print(self._stop.value)
         #
-        print "  stopped."
+        print("  stopped.")
 
     def run(self):
-        print "Looper::run()"
+        print("Looper::run()")
         self._process = multiprocessing.Process(target=self.loop, args=())
         self._process.start()
 
     def quit(self):
-        print "Looper::quit()"
+        print("Looper::quit()")
         self._stop.value = 1
     
     def is_quite_requested(self):
@@ -145,7 +145,7 @@ class Looper(object):
 #
 #
 def main():
-    print "main() : start"
+    print("main() : start")
     #
     BC_ADDR = "127.0.0.1"
     BC_PORT = 5000
@@ -158,8 +158,8 @@ def main():
     
     loop = 1
     while loop:
-        key = raw_input("cmd >")
-        print key
+        key = input("cmd >")
+        print(key)
         if key=='q' or key=='Q':
             loop = 0
             s.quit()
@@ -207,7 +207,7 @@ def main():
     #cmd_ack = ()
     
 
-    print "main() : end"
+    print("main() : end")
 #
 #
 #

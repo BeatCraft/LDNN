@@ -17,7 +17,7 @@ import math
 import multiprocessing as mp
 import numpy as np
 import struct
-import cPickle
+import pickle
 import csv
 from PIL import Image
 from PIL import ImageFile
@@ -69,8 +69,8 @@ def make_mnist_train_batch(package):
         a_float = da.astype(np.float32) # convert from uint8 to float32
         images[i] = a_float
     #
-    print len(labels)
-    print images.shape[0]
+    print(len(labels))
+    print(images.shape[0])
     
     util.pickle_save(package._train_image_batch_path, images)
     util.pickle_save(package._train_label_batch_path, labels)
@@ -103,8 +103,8 @@ def make_mnist_test_batch(package):
         a_float = da.astype(np.float32) # convert from uint8 to float32
         images[i] = a_float
     #
-    print len(labels)
-    print images.shape[0]
+    print(len(labels))
+    print(images.shape[0])
     util.pickle_save(package._test_image_batch_path, images)
     util.pickle_save(package._test_label_batch_path, labels)
 #
@@ -137,12 +137,12 @@ def make_cifa10_train_batch(package):
     for i in range(CIFAR10_TRAIN_BATCH_NUM):
         path = CIFAR10_TRAIN_DATA_PATH[i]
         with open(path, 'rb') as fo:
-            dict = cPickle.load(fo)
+            dict = pickle.load(fo)
             label_list.extend(dict["labels"])
             images_rgb = dict["data"]
             offset = CIFAR10_TRAIN_BATCH_SIZE*i
             for j in range(CIFAR10_TRAIN_BATCH_SIZE):
-                print "(%d, %d)" % (i, j)
+                print("(%d, %d)" % (i, j))
                 image = images_rgb[j]
                 image = image.reshape([3,1024])
                 red = image[0]
@@ -188,11 +188,11 @@ def make_cifa10_test_batch(package):
     path = CIFAR10_TEST_DATA_PATH
     #
     with open(path, 'rb') as fo:
-        dict = cPickle.load(fo)
+        dict = pickle.load(fo)
         label_list.extend(dict["labels"])
         images_rgb = dict["data"]
         for j in range(CIFAR10_TRAIN_BATCH_SIZE):
-            print "(%d)" % (j)
+            print("(%d)" % (j))
             image = images_rgb[j]
             image = image.reshape([3,1024])
             red = image[0]
@@ -273,9 +273,9 @@ def main():
 #
 #
 if __name__=='__main__':
-    print ">> start"
+    print(">> start")
     sts = main()
-    print ">> end"
+    print(">> end")
     print("\007")
     sys.exit(sts)
 #

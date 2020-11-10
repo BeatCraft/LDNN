@@ -17,7 +17,7 @@ import math
 import multiprocessing as mp
 import numpy as np
 import struct
-import cPickle
+import pickle
 import csv
 from PIL import Image
 from PIL import ImageFile
@@ -63,14 +63,14 @@ def make_cifa10_train_batch(package):
     for i in range(CIFAR10_TRAIN_BATCH_NUM):
         path = CIFAR10_TRAIN_DATA_PATH[i]
         with open(path, 'rb') as fo:
-            dict = cPickle.load(fo)
+            dict = pickle.load(fo, encoding='latin1')
             labels = dict["labels"]
             images = dict["data"]
             offset = CIFAR10_TRAIN_BATCH_SIZE*i
             for j in range(CIFAR10_TRAIN_BATCH_SIZE):
                 data_array[offset+j] = np.array(images[j])
                 label_array[offset+j] = labels[j]
-                print "(%d, %d)=%d" % (i, j, labels[j])
+                print("(%d, %d)=%d" % (i, j, labels[j]))
             #
         #
     #
@@ -88,13 +88,13 @@ def make_cifa10_test_batch(package):
     path = CIFAR10_TEST_DATA_PATH
     #
     with open(path, 'rb') as fo:
-        dict = cPickle.load(fo)
+        dict = pickle.load(fo, encoding='latin1')# latin1 bytes
         labels = dict["labels"]
         images = dict["data"]
         for j in range(CIFAR10_TRAIN_BATCH_SIZE):
             data_array[j] = np.array(images[j])
             label_array[j] = labels[j]
-            print "(%d)=%d" % (j, labels[j])
+            print("(%d)=%d" % (j, labels[j]))
         #
         #print images[0].shape
     #
@@ -123,9 +123,9 @@ def main():
 #
 #
 if __name__=='__main__':
-    print ">> start"
+    print(">> start")
     sts = main()
-    print ">> end"
+    print(">> end")
     print("\007")
     sys.exit(sts)
 #

@@ -937,8 +937,8 @@ class Gpu:
     def __init__(self, platform_id, device_id):
         platform = cl.get_platforms()[platform_id]
         device = platform.get_devices()[device_id]
-        print platform
-        print device
+        print(platform)
+        print(device)
         #
         self._ctx = cl.Context([device])
         for dev in self._ctx.devices:
@@ -1092,9 +1092,9 @@ def main():
     data_a = np.array([8, 16, 32, 64]).astype(np.int32)
     data_b = np.array([0.0, 0.0, 0.0, 0.0]).astype(np.float32)
 
-    print data_x
-    print data_w
-    print data_y
+    print(data_x)
+    print(data_w)
+    print(data_y)
     
     platform_id = 0
     device_id = 1
@@ -1115,7 +1115,7 @@ def main():
     stride = num_input / 2
     left = num_input % 2
     
-    print "num=%d, stride=%d, left=%d" % (num_input, stride, left)
+    print("num=%d, stride=%d, left=%d" % (num_input, stride, left))
     #g.k_sum(bufs[1], bufs[4], stride, left, 0, num_input, num_node)
     g.k_sum(bufs[1], bufs[4], num_input, num_node, 0, 1)
 
@@ -1140,9 +1140,9 @@ def main():
 #
 #
 if __name__=='__main__':
-    print ">> start"
+    print(">> start")
     sts = main()
-    print ">> end"
+    print(">> end")
     print("\007")
     sys.exit(sts)
 

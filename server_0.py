@@ -22,7 +22,7 @@ import server
 #
 #
 def main():
-    print "main() : start"
+    print("main() : start")
     #
     BC_ADDR = "192.168.200.255"
     BC_PORT = 5000
@@ -37,7 +37,7 @@ def main():
     #
     server.server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client, epoc)
     #
-    print "main() : end"
+    print("main() : end")
 #
 #
 #

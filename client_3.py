@@ -33,7 +33,7 @@ def main():
     platform_id = 0
     device_id = 0
     client_id = 3
-    print "main() : start : %d" % (client_id)
+    print("main() : start : %d" % (client_id))
     #
     client.client(BC_ADDR, BC_PORT, SERVER_ADDR, SERVER_PORT, platform_id, device_id, client_id)
     #

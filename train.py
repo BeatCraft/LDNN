@@ -17,7 +17,7 @@ import math
 import multiprocessing as mp
 import numpy as np
 import struct
-import cPickle
+import pickle
 #
 #
 # LDNN Modules
@@ -106,7 +106,7 @@ class Train:
             if wi==maximum or wi==minimum:
                 layer.set_weight_property(ni, ii, 0)
                 layer.set_weight_lock(ni, ii, 1)
-                print "lock at(%d)" % wi
+                print("lock at(%d)" % wi)
                 return entropy, 0
             #
         #
@@ -134,7 +134,7 @@ class Train:
             else:
                 layer.set_weight_property(ni, ii, 0)
                 layer.set_weight_lock(ni, ii, 1)
-                print "lock at(%d)" % wi
+                print("lock at(%d)" % wi)
             #
         #
         return entropy, 0
@@ -641,7 +641,7 @@ class Train:
         #
         random.shuffle(wi_list)
         random.shuffle(wi_list)
-        print "w : %d" % (len(wi_list))
+        print("w : %d" % (len(wi_list)))
         if w_p>len(wi_list):
             w_p = len(wi_list)
         #
@@ -654,13 +654,13 @@ class Train:
             if ret>0:
                 cnt = cnt + ret
                 if direction>0:
-                    print "+[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy)
+                    print("+[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy))
                 else:
-                    print "-[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy)
+                    print("-[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy))
                 #
             #
             if entropy<limit:
-                print "reach to the limit(%f), exit w loop" %(limit)
+                print("reach to the limit(%f), exit w loop" %(limit))
                 break
             #
         # for p
@@ -679,7 +679,7 @@ class Train:
             entropy, ret = self.weight_loop(entropy, layer, li, ni, zero)
             cnt = cnt + ret
             if entropy<limit:
-                print "reach to the limit(%f), exit n loop" %(limit)
+                print("reach to the limit(%f), exit n loop" %(limit))
                 break
             #
         # for ni
@@ -696,7 +696,7 @@ class Train:
         if r._gpu:
             r.propagate()
             entropy = r.get_cross_entropy()
-            print entropy
+            print(entropy)
         else:
             entropy = r._remote.evaluate()
         #
@@ -727,7 +727,7 @@ class Train:
             entropy, ret = self.node_loop(entropy, layer, li, zero)
             cnt = cnt + ret
             if entropy<limit:
-                print "reach to the limit(%f), exit l loop" %(limit)
+                print("reach to the limit(%f), exit l loop" %(limit))
                 break
             #
         # for li
@@ -738,7 +738,7 @@ class Train:
         package = self._package
         mini_batch_size = self._mini_batch_size
         #num = self._it
-        print "it : %d" % (self._it)
+        print("it : %d" % (self._it))
         epoc = self._epoc
         limit = self._limit # 0.000001
         package.load_batch()
@@ -747,7 +747,7 @@ class Train:
         num_class = package._num_class
         #
         r.prepare(mini_batch_size, data_size, num_class)
-        print ">>mini_batch_size(%d)" % (mini_batch_size)
+        print(">>mini_batch_size(%d)" % (mini_batch_size))
         #
         start_time = time.time()
         for e in range(epoc): # epoc
@@ -772,17 +772,17 @@ class Train:
                     r.export_weight_index(package._wi_csv_path)
                     #
                     if entropy<limit:
-                        print "reach to the limit(%f), exit iterations" %(limit)
+                        print("reach to the limit(%f), exit iterations" %(limit))
                         return
                     #
                     all = r.count_weight()
                     locked = r.count_locked_weight()
                     rate = float(locked) / float(all)
-                    print "locked weight : %d / %d = %f" %(locked, all, rate)
+                    print("locked weight : %d / %d = %f" %(locked, all, rate))
                     if rate>0.9:
                         r.reset_weight_property()
                         r.unlock_weight_all()
-                        print ">>> unlock all weights"
+                        print(">>> unlock all weights")
                     #
                     # this won't work. better use sum of updated weights
                     #
@@ -791,7 +791,7 @@ class Train:
         #
         elapsed_time = time.time() - start_time
         t = format(elapsed_time, "0")
-        print "time = %s" % (t)
+        print("time = %s" % (t))
     #
 #
 #

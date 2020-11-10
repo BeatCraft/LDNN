@@ -226,7 +226,7 @@ class Layer(object):
 #
 class InputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
-        print "InputLayer::__init__()"
+        print("InputLayer::__init__()")
         super(InputLayer, self).__init__(i, LAYER_TYPE_INPUT, num_input, num_node, pre, gpu)
         self._learning = 0 # off
     
@@ -246,7 +246,7 @@ class InputLayer(Layer):
 #
 class HiddenLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
-        print "HiddenLayer::__init__()"
+        print("HiddenLayer::__init__()")
         super(HiddenLayer, self).__init__(i, LAYER_TYPE_HIDDEN, num_input, num_node, pre, gpu)
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
@@ -304,7 +304,7 @@ class HiddenLayer(Layer):
 #
 class OutputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
-        print "OutputLayer::__init__()"
+        print("OutputLayer::__init__()")
         super(OutputLayer, self).__init__(i, LAYER_TYPE_OUTPUT, num_input, num_node, pre, gpu)
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
@@ -350,7 +350,7 @@ class OutputLayer(Layer):
 # w : image width, i : index, h : image height, stride : size of convolusion matrix
 class ConvLayer(Layer):
     def __init__(self, i,  w, h, stride, pre, gpu=None):
-        print "ConvLayer::__init__()"
+        print("ConvLayer::__init__()")
         #
         self._index = i
         self._type = LAYER_TYPE_CONV
@@ -424,7 +424,7 @@ class ConvLayer(Layer):
 # w : image width, i : index, h : image height
 class MaxLayer(Layer):
     def __init__(self, i, ch, w, h, pre, gpu=None):
-        print "MaxLayer::__init__()"
+        print("MaxLayer::__init__()")
         #
         self._pre = pre
         self._index = i
@@ -473,7 +473,7 @@ class MaxLayer(Layer):
 # number of output channels is the same as number of filters
 class Conv2dLayer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
-        print "Conv2dLayer::__init__()"
+        print("Conv2dLayer::__init__()")
         #
         self._pre = pre
         self._index = i
@@ -548,7 +548,7 @@ class Conv2dLayer(Layer):
 # number of output channels is the same as number of filters
 class Conv3dLayer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
-        print "Conv3dLayer::__init__()"
+        print("Conv3dLayer::__init__()")
         #
         self._pre = pre
         self._index = i
@@ -758,7 +758,7 @@ class Roster:
     def getLayerAt(self, i):
         c = self.countLayers()
         if i>=c:
-            print "error : Roster : getLayerAt"
+            print("error : Roster : getLayerAt")
             return None
         #
         return self.layers[i]
@@ -778,10 +778,10 @@ class Roster:
             self.layers.append(layer)
             return layer
         elif type==LAYER_TYPE_CONV:
-            print "not yet"
+            print("not yet")
             return
         elif type==LAYER_TYPE_POOL:
-            print "not yet"
+            print("not yet")
             return
  
     def get_inference(self):
@@ -831,37 +831,37 @@ class Roster:
             for i in range(self._batch_size):
                 li = c-1
                 if np.isnan(self._batch_cross_entropy[i]):
-                    print "NaN : %d" % (i)
+                    print("NaN : %d" % (i))
                     
                     output = self.getLayerAt(li)
                     self._gpu.copy(output._output_array, output._gpu_output)
-                    print output._output_array[i]
-                    print output._output_array[i].shape
+                    print(output._output_array[i])
+                    print(output._output_array[i].shape)
                     
                     output = self.getLayerAt(li-1)
                     self._gpu.copy(output._output_array, output._gpu_output)
-                    print output._output_array[i]
-                    print output._output_array[i].shape
+                    print(output._output_array[i])
+                    print(output._output_array[i].shape)
                     
                     output = self.getLayerAt(li-2)
                     self._gpu.copy(output._output_array, output._gpu_output)
-                    print output._output_array[i]
-                    print output._output_array[i].shape
+                    print(output._output_array[i])
+                    print(output._output_array[i].shape)
                     
                     output = self.getLayerAt(li-3)
                     self._gpu.copy(output._output_array, output._gpu_output)
-                    print output._output_array[i]
-                    print output._output_array[i].shape
+                    print(output._output_array[i])
+                    print(output._output_array[i].shape)
                     
                     output = self.getLayerAt(li-4)
                     self._gpu.copy(output._output_array, output._gpu_output)
-                    print output._output_array[i]
-                    print output._output_array[i].shape
+                    print(output._output_array[i])
+                    print(output._output_array[i].shape)
                     
                     output = self.getLayerAt(li-5)
                     self._gpu.copy(output._output_array, output._gpu_output)
-                    print output._output_array[i]
-                    print output._output_array[i].shape
+                    print(output._output_array[i])
+                    print(output._output_array[i].shape)
                 #
             #
         #
@@ -869,7 +869,7 @@ class Roster:
         #return np.sum(self._batch_cross_entropy)/float(self._batch_size)
     
     def export_weight_index(self, path):
-        print "Roster : export_weight_index(%s)" % path
+        print("Roster : export_weight_index(%s)" % path)
         with open(path, "w") as f:
             writer = csv.writer(f, lineterminator='\n')
             c = self.countLayers()
@@ -884,7 +884,7 @@ class Roster:
         #
 
     def import_weight_index(self, path):
-        print "Roster : import_weight_index(%s)" % path
+        print("Roster : import_weight_index(%s)" % path)
         with open(path, "r") as f:
             reader = csv.reader(f)
             lc = self.countLayers()
@@ -945,9 +945,9 @@ def main():
 #
 #
 if __name__=='__main__':
-    print ">> start"
+    print(">> start")
     sts = main()
-    print ">> end"
+    print(">> end")
     print("\007")
     sys.exit(sts)
 #

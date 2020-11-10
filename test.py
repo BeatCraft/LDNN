@@ -17,7 +17,7 @@ import math
 import multiprocessing as mp
 import numpy as np
 import struct
-import cPickle
+import pickle
 #
 #
 # LDNN Modules
@@ -47,7 +47,7 @@ def test(r, package):
     r.prepare(batch_size, data_size, num_class)
     r.set_data(data_array, data_size, class_array, batch_size)
     #
-    print ">>batch test mode (%d)" % (batch_size)
+    print(">>batch test mode (%d)" % (batch_size))
     dist = [0,0,0,0,0,0,0,0,0,0] # data_class
     rets = [0,0,0,0,0,0,0,0,0,0] # result of infs
     oks  = [0,0,0,0,0,0,0,0,0,0] # num of correct
@@ -57,7 +57,7 @@ def test(r, package):
     infs = r.get_inference()
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
-    print "time = %s" % (t)
+    print("time = %s" % (t))
     #
     ca = 0
     for i in range(batch_size):
@@ -80,17 +80,17 @@ def test(r, package):
             ca = ca + 1
         #
     #
-    print "---------------------------------"
-    print "result : %d / %d" % (ca, batch_size)
+    print("---------------------------------")
+    print("result : %d / %d" % (ca, batch_size))
     accuracy = float(ca) / float(batch_size)
-    print "accuracy : %f" % (accuracy)
-    print "---------------------------------"
-    print "class\t|dist\t|infs\t|ok"
-    print "---------------------------------"
+    print("accuracy : %f" % (accuracy))
+    print("---------------------------------")
+    print("class\t|dist\t|infs\t|ok")
+    print("---------------------------------")
     for i in range(10):
-        print "%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i])
+        print("%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i]))
     #
-    print "---------------------------------"
+    print("---------------------------------")
 #
 #
 #
@@ -102,11 +102,11 @@ def test_n(r, package, n):
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
-    print ">>test(%d) = %d" % (n, eval_size)
+    print(">>test(%d) = %d" % (n, eval_size))
     #
     it, left = divmod(eval_size, n)
     if left>0:
-        print "error : n(=%d) is not appropriate" % (n)
+        print("error : n(=%d) is not appropriate" % (n))
     #
     start_time = time.time()
     #
@@ -116,7 +116,8 @@ def test_n(r, package, n):
     #
     for i in range(it):
         for j in range(n):
-            data_array[j] = package._train_image_batch[i*n+j]
+            tmp = package._train_image_batch[i*n+j]
+            data_array[j] = tmp
             class_array[j] = package._train_label_batch[i*n+j]
         #
         r.set_data(data_array, data_size, class_array, n)
@@ -133,21 +134,21 @@ def test_n(r, package, n):
         #
     #
     ca = sum(oks)
-    print "---------------------------------"
-    print "result : %d / %d" % (ca, eval_size)
+    print("---------------------------------")
+    print("result : %d / %d" % (ca, eval_size))
     accuracy = float(ca) / float(eval_size)
-    print "accuracy : %f" % (accuracy)
-    print "---------------------------------"
-    print "class\t|dist\t|infs\t|ok"
-    print "---------------------------------"
+    print("accuracy : %f" % (accuracy))
+    print("---------------------------------")
+    print("class\t|dist\t|infs\t|ok")
+    print("---------------------------------")
     for i in range(10):
-        print "%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i])
+        print("%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i]))
     #
-    print "---------------------------------"
+    print("---------------------------------")
     #
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
-    print "time = %s" % (t)
+    print("time = %s" % (t))
 
         
 #
@@ -161,7 +162,7 @@ def test_single(r, package):
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
-    print ">>batch test mode (%d)" % (eval_size)
+    print(">>batch test mode (%d)" % (eval_size))
     #
     data_array = np.zeros((1, data_size), dtype=np.float32)
     class_array = np.zeros(1, dtype=np.int32)
@@ -172,7 +173,7 @@ def test_single(r, package):
     ca = 0
     for i in range(eval_size):
         if i%100==0:
-            print i
+            print(i)
         #i = 60
         data_array[0] = package._test_image_batch[i]
         answer = package._test_label_batch[i]
@@ -202,21 +203,21 @@ def test_single(r, package):
             ca = ca + 1
         #
     #
-    print "---------------------------------"
-    print "result : %d / %d" % (ca, eval_size)
+    print("---------------------------------")
+    print("result : %d / %d" % (ca, eval_size))
     accuracy = float(ca) / float(eval_size)
-    print "accuracy : %f" % (accuracy)
-    print "---------------------------------"
-    print "class\t|dist\t|infs\t|ok"
-    print "---------------------------------"
+    print("accuracy : %f" % (accuracy))
+    print("---------------------------------")
+    print("class\t|dist\t|infs\t|ok")
+    print("---------------------------------")
     for i in range(10):
-        print "%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i])
+        print("%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i]))
     #
-    print "---------------------------------"
+    print("---------------------------------")
     #
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
-    print "time = %s" % (t)
+    print("time = %s" % (t))
 #
 #
 #
@@ -229,7 +230,7 @@ def stat(r, package, path, debug):
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
     if debug:
-        print ">>batch test mode (%d)" % (eval_size)
+        print(">>batch test mode (%d)" % (eval_size))
     #
     data_array = np.zeros((1, data_size), dtype=np.float32)
     class_array = np.zeros(1, dtype=np.int32)
@@ -271,20 +272,20 @@ def stat(r, package, path, debug):
     accuracy = float(ca) / float(eval_size)
     #
     if debug:
-        print "---------------------------------"
-        print "result : %d / %d" % (ca, eval_size)
-        print "accuracy : %f" % (accuracy)
-        print "---------------------------------"
-        print "class\t|dist\t|infs\t|ok"
-        print "---------------------------------"
+        print("---------------------------------")
+        print("result : %d / %d" % (ca, eval_size))
+        print("accuracy : %f" % (accuracy))
+        print("---------------------------------")
+        print("class\t|dist\t|infs\t|ok")
+        print("---------------------------------")
         for i in range(10):
-            print "%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i])
+            print("%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i]))
         #
-        print "---------------------------------"
+        print("---------------------------------")
         #
         elapsed_time = time.time() - start_time
         t = format(elapsed_time, "0")
-        print "time = %s" % (t)
+        print("time = %s" % (t))
     #
     return accuracy
 #

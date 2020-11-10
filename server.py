@@ -27,7 +27,7 @@ import train
 class ServerLooper(netutil.Looper):
     def __init__(self, local_addr, local_port, remote_addr, remote_port,
                  package_id, config_id, mini_batch_size, num_client, epoc):
-        print "ServerLooper::__init__()"
+        print("ServerLooper::__init__()")
         #
         super(ServerLooper, self).__init__(local_addr, local_port, remote_addr, remote_port)
         #
@@ -45,7 +45,7 @@ class ServerLooper(netutil.Looper):
         self._package = util.Package(package_id)
         self._roster = self._package.setup_dnn(my_gpu, self._config_id)
         if self._roster is None:
-            print "fatal DNN error"
+            print("fatal DNN error")
         #
         self._roster.set_remote(self)
         self._seq = 0
@@ -70,8 +70,8 @@ class ServerLooper(netutil.Looper):
                 pass
             else: # timeout
                 for k in range(self._client_num):
-                    print "    timeout:"
-                    print "        %s, %d" % (self._client_list[k], self._client_timeout[k])
+                    print("    timeout:")
+                    print("        %s, %d" % (self._client_list[k], self._client_timeout[k]))
                 #
                 timeout = timeout + 1
                 continue
@@ -80,7 +80,7 @@ class ServerLooper(netutil.Looper):
                 k = self._client_list.index(addr[0])
                 self._client_timeout[k] = 1
             else: # address is not registered
-                print "    bad address : %s, %d" % (addr[0], addr[1])
+                print("    bad address : %s, %d" % (addr[0], addr[1]))
                 error = error + 1
                 continue
             #
@@ -88,7 +88,7 @@ class ServerLooper(netutil.Looper):
             if seq==self._seq:
                 ret =  ret + ce
             else: # bad seq
-                print "   seq error : %s, %d, %d (%d)" % (addr[0], addr[1], seq, self._seq)
+                print("   seq error : %s, %d, %d (%d)" % (addr[0], addr[1], seq, self._seq))
                 error = error + 1
                 continue
             #
@@ -139,7 +139,7 @@ class ServerLooper(netutil.Looper):
         return self.execute_cmd(mode, i, 0, 0, 0)
     
     def loop(self):
-        print "ServerLooper::loop() - start"
+        print("ServerLooper::loop() - start")
         while not self.is_quite_requested():
             mode = self.mode()
             if mode==0:
@@ -154,27 +154,27 @@ class ServerLooper(netutil.Looper):
                 #
                 res, addr = self.recv()
                 while res:
-                    print "%s : %d" % (addr[0], addr[1])
+                    print("%s : %d" % (addr[0], addr[1]))
                     self._client_list.append(addr[0])
                     res, addr = self.recv()
                 #
                 self._client_num = len(self._client_list)
                 self._client_timeout = [0] * self._client_num
-                print self._client_num
+                print(self._client_num)
                 if self._num_client!=self._client_num:
-                    print "error : %d expected, %d answered." % (self._num_client, self._client_num)
+                    print("error : %d expected, %d answered." % (self._num_client, self._client_num))
                     #self.quit()
                 #
             elif mode==20: # evaluate
                 ce = self.evaluate()
-                print "evaluate :%f" % (ce)
+                print("evaluate :%f" % (ce))
             elif mode==30: # alt
                 cmd = netutil.pack_i6(self._seq, mode, 0, 1, 0, 0)
                 self.send(cmd)
                 self.set_mode(mode+5)
                 #
                 ret = self.recv_multi()
-                print ret
+                print(ret)
                 self.set_mode(0)
             elif mode==40: # update
                 cmd = netutil.pack_i6(self._seq, mode, 0, 1, 0, 0)
@@ -182,7 +182,7 @@ class ServerLooper(netutil.Looper):
                 self.set_mode(mode+5)
                 #
                 ret = self.recv_multi()
-                print ret
+                print(ret)
                 self.set_mode(0)
             elif mode==50: # train
                 t = train.Train(self._package, self._roster)
@@ -205,28 +205,28 @@ class ServerLooper(netutil.Looper):
                 self.send(cmd)
                 self.set_mode(mode+5)
                 ret = self.recv_multi()
-                print ret
+                print(ret)
                 self.set_mode(0)
             elif mode==70: # set_batch()
-                print "set_batch()"
+                print("set_batch()")
                 cmd = netutil.pack_i6(self._seq, mode, 0, 0, 0, 0)
                 self.send(cmd)
                 #
                 time.sleep(10)
                 #
                 ret = self.recv_multi()
-                print ret
+                print(ret)
                 self.set_mode(0)
             else:
                 self.set_mode(0)
             #
         #
-        print "ServerLooper::loop() - end"
+        print("ServerLooper::loop() - end")
 #
 #
 #
 def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client, epoc):
-    print "main() : start"
+    print("main() : start")
     #
     s = ServerLooper(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client, epoc)
     s.init()
@@ -234,8 +234,8 @@ def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mi
     #
     loop = 1
     while loop:
-        key = raw_input("cmd >")
-        print key
+        key = input("cmd >")
+        print(key)
         if key=='q' or key=='Q':
             loop = 0
             s.quit()
@@ -255,12 +255,12 @@ def server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mi
             s.set_mode(70)
         #
     #
-    print "main() : end"
+    print("main() : end")
 #
 #
 #
 def main():
-    print "main() : start"
+    print("main() : start")
     #
     BC_ADDR = "127.0.0.1"
     BC_PORT = 5000
@@ -275,7 +275,7 @@ def main():
     #
     s = server(SERVER_ADDR, SERVER_PORT, BC_ADDR, BC_PORT, package_id, config_id, mini_batch_size, num_client, epoc)
     #
-    print "main() : end"
+    print("main() : end")
 #
 #
 #

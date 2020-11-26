@@ -95,6 +95,7 @@ LAYER_TYPE_OUTPUT = 2
 LAYER_TYPE_CONV   = 3
 LAYER_TYPE_POOL   = 4
 LAYER_TYPE_CONV_2D = 5
+LAYER_TYPE_CONV_3D = 6
 
 class Layer(object):
     # i         : index of layers
@@ -552,7 +553,7 @@ class Conv3dLayer(Layer):
         #
         self._pre = pre
         self._index = i
-        self._type = LAYER_TYPE_CONV_2D
+        self._type = LAYER_TYPE_CONV_3D
         self._gpu = gpu
         self._id = -1 # reserved
         #
@@ -584,6 +585,7 @@ class Conv3dLayer(Layer):
         if self._gpu:
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
         #
+        
     def set_weight_index(self, ni, ii, wi):
         self._weight_index_matrix[ni][ii] = wi
         self._weight_matrix[ni][ii] = WEIGHT_SET_CNN[wi]

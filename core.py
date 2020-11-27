@@ -89,13 +89,14 @@ class Node:
 #
 #
 #
-LAYER_TYPE_INPUT  = 0
-LAYER_TYPE_HIDDEN = 1
-LAYER_TYPE_OUTPUT = 2
-LAYER_TYPE_CONV   = 3
-LAYER_TYPE_POOL   = 4
+LAYER_TYPE_INPUT   = 0
+LAYER_TYPE_HIDDEN  = 1
+LAYER_TYPE_OUTPUT  = 2
+LAYER_TYPE_CONV    = 3
+LAYER_TYPE_POOL    = 4
 LAYER_TYPE_CONV_2D = 5
 LAYER_TYPE_CONV_3D = 6
+LAYER_TYPE_CONV_4  = 7
 
 class Layer(object):
     # i         : index of layers
@@ -609,6 +610,82 @@ class Conv3dLayer(Layer):
                                    self._w, self._h, self._ch, self._filter, self._batch_size)
             self._gpu.scale_cnn(self._gpu_output, self._batch_size, self._filter*self._ch,
                                 self._image_size*self._filter, self._image_size)
+        #
+    #
+    
+class Conv_4_Layer(Layer):
+    def __init__(self, i, w, h, ch, filter, pre, gpu=None):
+        print("Convolution Layer ver.4 ::__init__()")
+        #
+        self._pre = pre
+        self._index = i # index of layers
+        self._type = LAYER_TYPE_CONV_4
+        self._gpu = gpu
+        self._id = -1 # reserved
+        self._padding = 1 # ON mode only
+        #
+        self._ch = ch
+        self._w = w
+        self._h = h
+        
+        # filter
+        self._filter = filter
+        self._filter_size = 3 * 3 * ch # width and height of filter are fixed to 3
+
+        # mems for weights
+        self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+        self._weight_lock = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+        self._weight_property = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+        self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
+        # need alt??
+        
+        # note : node and input are diffrently used from other layers
+        self._num_input = self._filter_size
+        self._num_node = self._filter
+        #
+        if self._gpu:
+            self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+        #
+
+    def prepare(self, batch_size):
+        self._batch_size = batch_size
+        # intermidiate
+        self._padded_array = np.zeros((self._batch_size, (self._w+2)*(self._h+2)*self._ch), dtype=np.float32)
+        self._conv_array = np.zeros((self._batch_size, self._w*self._h, self._filter_size, dtype=np.float32)
+                
+        # output
+        self._output_array = np.zeros((self._batch_size, self._filter, self._w*self._h), dtype=np.float32)
+        #
+        if self._gpu:
+            self._gpu_padded = self._gpu.dev_malloc(self._padded_array)
+            self._gpu_conv = self._gpu.dev_malloc(self._conv_array)
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        #
+        
+    def set_weight_index(self, ni, ii, wi):
+        self._weight_index_matrix[ni][ii] = wi
+        self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
+        
+    def init_weight_with_random_index(self):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                wi = random.randrange(len(WEIGHT_SET))
+                self.set_weight_index(ni, ii, wi)
+            #
+        #
+        
+    def update_weight(self):
+        self._gpu.copy(self._gpu_weight, self._weight_matrix)
+        
+    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+        if ni>=0: # alt
+            pass
+        else:
+            self._gpu.conv_4_pad_batch(array_in, self._w, self._h, self._ch, self._batch_size, self._gpu_padded)
+            self._gpu.conv_4_roll_batch(self._gpu_padded, self._w, self._h, self._ch, self._filter, self._batch_size, self._gpu_conv)
+            self._gpu.conv_4_calc_batch(self._gpu_conv, self._w, self._h, self._ch, self._filter, self._batch_size, self._gpu_output)
+            # relu ?
+            # scale ?
         #
     #
 #

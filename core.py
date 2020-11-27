@@ -681,9 +681,9 @@ class Conv_4_Layer(Layer):
         if ni>=0: # alt
             pass
         else:
-            self._gpu.conv_4_pad_batch(array_in, self._w, self._h, self._ch, self._batch_size, self._gpu_padded)
-            self._gpu.conv_4_roll_batch(self._gpu_padded, self._w, self._h, self._ch, self._filter, self._batch_size, self._gpu_conv)
-            self._gpu.conv_4_calc_batch(self._gpu_conv, self._w, self._h, self._ch, self._filter, self._batch_size, self._gpu_output)
+            self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
+            self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_conv, self._w+2, self._h+2, self._ch, self._filter, self._batch_size)
+            self._gpu.conv_4_calc_batch(self._gpu_conv, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
             # relu ?
             # scale ?
         #

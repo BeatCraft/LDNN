@@ -9,96 +9,63 @@ os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 #
 #
 KERNEL_CODE = """
-__kernel void conv_core(
-    __global const float* input,
-    __global const float* weight,
+__kernel void conv_4_pad_batch(
+    __global float* input,
     __global float* output,
-    int offset,
-    int offset_w,
-    int w,
-    int x,
-    int y,
-    int h,
-    int xi,
-    int yi,
-    __global float* a)
+    const int w,
+    const int h,
+    const int ch)
 {
-    if (yi==0){ // on the top
-        if (xi==0){ // top left corner
-            a[0] = 0.0;
-            a[1] = 0.0;
-            a[2] = 0.0;
-            a[3] = 0.0;
-            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
-            a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
-            a[6] = 0;
-            a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
-            a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
-        }else if (xi==w-1){ // top right corner
-            a[0] = 0;
-            a[1] = 0;
-            a[2] = 0;
-            a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
-            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
-            a[5] = 0;
-            a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
-            a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
-            a[8] = 0;
-        }else{ // top line
-            a[0] = 0;
-            a[1] = 0;
-            a[2] = 0;
-            a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
-            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
-            a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
-            a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
-            a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
-            a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
-        }
-    }else if (yi==h-1){ //on the bottom
-        if (xi==0){ // bottom left corner
-            a[0] = 0;
-            a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
-            a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
-            a[3] = 0;
-            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
-            a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
-            a[6] = 0;
-            a[7] = 0;
-            a[8] = 0;
-        }else if (xi==w-1){ // bottom right corner
-            a[0] = input[offset+w*y+x] * weight[offset_w+0];
-            a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
-            a[2] = 0;
-            a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
-            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
-            a[5] = 0;
-            a[6] = 0;
-            a[7] = 0;
-            a[8] = 0;
-        }else{ // bottom line
-            a[0] = input[offset+w*y+x] * weight[offset_w+0];
-            a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
-            a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
-            a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
-            a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
-            a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
-            a[6] = 0;
-            a[7] = 0;
-            a[8] = 0;
-        }
-    }else{ // in the middle
-        a[0] = input[offset+w*y+x] * weight[offset_w+0];
-        a[1] = input[offset+w*y+x+1] * weight[offset_w+1];
-        a[2] = input[offset+w*y+x+2] * weight[offset_w+2];
-        a[3] = input[offset+w*(y+1)+x] * weight[offset_w+3];
-        a[4] = input[offset+w*(y+1)+x+1] * weight[offset_w+4];
-        a[5] = input[offset+w*(y+1)+x+2] * weight[offset_w+5];
-        a[6] = input[offset+w*(y+2)+x] * weight[offset_w+6];
-        a[7] = input[offset+w*(y+2)+x+1] * weight[offset_w+7];
-        a[8] = input[offset+w*(y+2)+x+2] * weight[offset_w+8];
+    int bi = get_global_id(0);
+    int xi = get_global_id(1);
+    int yi = get_global_id(2);
+    
+    int ch_index = 0;
+    int index = 0;
+    int out_index = 0;
+    
+    int b_stride = w*h*ch;
+    int ch_stride = w*h;
+    int y_stride = yi*h;
+    
+    int out_b_stride = (w+2)*(h+2)*ch;
+    int out_ch_stride = (w+2)*(h+2);
+    int out_y_stride = yi*h;
+    
+    for (int i=0; i<ch;i++){
+        index = b_stride*bi + ch_stride*i + y_stride + xi;
+        out_index = out_b_stride*bi + + out_ch_stride*i + out_y_stride + xi;
+        output[out_index] = intput[index];
     }
 };
+
+__kernel void conv_4_roll_batch(
+    __global float* input,
+    __global float* output,
+    const int w,
+    const int h,
+    const int ch,
+    const int filter)
+{
+    int bi = get_global_id(0);
+    int xi = get_global_id(1);
+    int yi = get_global_id(2);
+};
+
+__kernel void conv_4_calc_batch(
+    __global float* input,
+    __global float* weight,
+    __global float* output,
+    const int w,
+    const int h,
+    const int ch,
+    const int filter)
+{
+    int bi = get_global_id(0);
+    int xi = get_global_id(1);
+    int yi = get_global_id(2);
+};
+
 
 __kernel void conv3d_batch(
     __global float* input,
@@ -1083,19 +1050,19 @@ class Gpu:
     #
     # new CNN implementations
     #
-    def conv_4_pad_batch(self, input, w, h, ch, batch_size, output)
+    def conv_4_pad_batch(self, input, output, w, h, ch, batch_size)
         event = self.prg.conv_4_pad_batch(self._queue, (batch_size, w, h), None,
-                                          input, np.int32(w), np.int32(h), np.int32(ch), output)
+                                          input, output, np.int32(w), np.int32(h), np.int32(ch))
         event.wait()
             
-    def conv_4_roll_batch(self, input, w, h, ch, filter, batch_size, output)
+    def conv_4_roll_batch(self, input, output, w, h, ch, filter, batch_size)
         event = self.prg.conv_4_roll_batch(self._queue, (batch_size, w, h), None,
-                                           input, np.int32(w), np.int32(h), np.int32(ch), output)
+                                           input, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter))
         event.wait()
             
-    def conv_4_calc_batch(self, input, w, h, ch, filter, batch_size, output)
+    def conv_4_calc_batch(self, input, weight, output, w, h, ch, filter, batch_size)
         event = self.prg.conv_4_calc_batch(self._queue, (batch_size, w, h), None,
-                                           input, np.int32(w), np.int32(h), np.int32(ch), output)
+                                           input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter))
         event.wait()
 #
 #

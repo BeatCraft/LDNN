@@ -651,14 +651,14 @@ class Conv_4_Layer(Layer):
         self._batch_size = batch_size
         # intermidiate
         self._padded_array = np.zeros((self._batch_size, (self._w+2)*(self._h+2)*self._ch), dtype=np.float32)
-        self._conv_array = np.zeros((self._batch_size, self._w*self._h, self._filter_size, dtype=np.float32)
+        #self._conv_array = np.zeros((self._batch_size, self._w*self._h, self._filter_size, dtype=np.float32)
                 
         # output
         self._output_array = np.zeros((self._batch_size, self._filter, self._w*self._h), dtype=np.float32)
         #
         if self._gpu:
             self._gpu_padded = self._gpu.dev_malloc(self._padded_array)
-            self._gpu_conv = self._gpu.dev_malloc(self._conv_array)
+            #self._gpu_conv = self._gpu.dev_malloc(self._conv_array)
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
         #
         
@@ -682,8 +682,8 @@ class Conv_4_Layer(Layer):
             pass
         else:
             self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-            self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_conv, self._w+2, self._h+2, self._ch, self._filter, self._batch_size)
-            self._gpu.conv_4_calc_batch(self._gpu_conv, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
+            self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
+            #self._gpu.conv_4_calc_batch(self._gpu_conv, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
             # relu ?
             # scale ?
         #

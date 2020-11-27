@@ -20,17 +20,16 @@ __kernel void conv_4_pad_batch(
     int xi = get_global_id(1);
     int yi = get_global_id(2);
     
-    int ch_index = 0;
     int index = 0;
     int out_index = 0;
     
     int b_stride = w*h*ch;
     int ch_stride = w*h;
-    int y_stride = yi*h;
+    int y_stride = yi*w;
     
     int out_b_stride = (w+2)*(h+2)*ch;
     int out_ch_stride = (w+2)*(h+2);
-    int out_y_stride = yi*h;
+    int out_y_stride = yi*(w+2);
     
     for (int i=0; i<ch;i++){
         index = b_stride*bi + ch_stride*i + y_stride + xi;
@@ -41,6 +40,7 @@ __kernel void conv_4_pad_batch(
 
 __kernel void conv_4_roll_batch(
     __global float* input,
+    __global float* weight,
     __global float* output,
     const int w,
     const int h,
@@ -50,6 +50,31 @@ __kernel void conv_4_roll_batch(
     int bi = get_global_id(0);
     int xi = get_global_id(1);
     int yi = get_global_id(2);
+
+    int index = 0;
+    int b_stride = w*h*ch;
+    int ch_stride = w*h;
+    int y_stride = yi*w;
+    
+    for (int fi=0; fi<filter; fi++){
+        float sum = 0.0;
+        for (int i=0; i<ch; i++){
+            int start = b_stride*bi + ch_stride*i;
+            sum += input[start + y_stride - w + xi - 1] * weight[fi*ch*3*3 + i*3*3    ];
+            sum += input[start + y_stride - w + xi    ] * weight[fi*ch*3*3 + i*3*3 + 1];
+            sum += input[start + y_stride - w + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 2];
+        
+            sum += input[start + y_stride + xi - 1] * weight[fi*ch*3*3 + i*3*3 + 3];
+            sum += input[start + y_stride + xi    ] * weight[fi*ch*3*3 + i*3*3 + 4];
+            sum += input[start + y_stride + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 5];
+        
+            sum += input[start + y_stride + w + xi - 1] * weight[fi*ch*3*3 + i*3*3 + 6];
+            sum += input[start + y_stride + w + xi    ] * weight[fi*ch*3*3 + i*3*3 + 7];
+            sum += input[start + y_stride + W + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 8];
+        }
+        // relu?
+        output[yi*w+xi] = sum;
+    }
 };
 
 __kernel void conv_4_calc_batch(
@@ -64,6 +89,10 @@ __kernel void conv_4_calc_batch(
     int bi = get_global_id(0);
     int xi = get_global_id(1);
     int yi = get_global_id(2);
+    
+    
+    
+    
 };
 
 
@@ -1055,9 +1084,9 @@ class Gpu:
                                           input, output, np.int32(w), np.int32(h), np.int32(ch))
         event.wait()
             
-    def conv_4_roll_batch(self, input, output, w, h, ch, filter, batch_size)
+    def conv_4_roll_batch(self, input, weight, output, w, h, ch, filter, batch_size)
         event = self.prg.conv_4_roll_batch(self._queue, (batch_size, w, h), None,
-                                           input, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter))
+                                           input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter))
         event.wait()
             
     def conv_4_calc_batch(self, input, weight, output, w, h, ch, filter, batch_size)

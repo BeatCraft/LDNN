@@ -1079,17 +1079,17 @@ class Gpu:
     #
     # new CNN implementations
     #
-    def conv_4_pad_batch(self, input, output, w, h, ch, batch_size)
+    def conv_4_pad_batch(self, input, output, w, h, ch, batch_size):
         event = self.prg.conv_4_pad_batch(self._queue, (batch_size, w, h), None,
                                           input, output, np.int32(w), np.int32(h), np.int32(ch))
         event.wait()
             
-    def conv_4_roll_batch(self, input, weight, output, w, h, ch, filter, batch_size)
+    def conv_4_roll_batch(self, input, weight, output, w, h, ch, filter, batch_size):
         event = self.prg.conv_4_roll_batch(self._queue, (batch_size, w, h), None,
                                            input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter))
         event.wait()
             
-    def conv_4_calc_batch(self, input, weight, output, w, h, ch, filter, batch_size)
+    def conv_4_calc_batch(self, input, weight, output, w, h, ch, filter, batch_size):
         event = self.prg.conv_4_calc_batch(self._queue, (batch_size, w, h), None,
                                            input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter))
         event.wait()

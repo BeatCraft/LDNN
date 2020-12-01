@@ -75,6 +75,7 @@ def check_weight_distribution():
 def get_key_input(prompt):
     try:
         c = eval(input(prompt))
+        #c = input(prompt)
     except:
         c = -1
     return c

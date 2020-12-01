@@ -34,7 +34,7 @@ __kernel void conv_4_pad_batch(
     for (int i=0; i<ch;i++){
         index = b_stride*bi + ch_stride*i + y_stride + xi;
         out_index = out_b_stride*bi + + out_ch_stride*i + out_y_stride + xi;
-        output[out_index] = intput[index];
+        output[out_index] = input[index];
     }
 };
 
@@ -70,7 +70,7 @@ __kernel void conv_4_roll_batch(
         
             sum += input[start + y_stride + w + xi - 1] * weight[fi*ch*3*3 + i*3*3 + 6];
             sum += input[start + y_stride + w + xi    ] * weight[fi*ch*3*3 + i*3*3 + 7];
-            sum += input[start + y_stride + W + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 8];
+            sum += input[start + y_stride + w + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 8];
         }
         // relu?
         output[yi*w+xi] = sum;

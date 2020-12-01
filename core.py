@@ -436,8 +436,8 @@ class MaxLayer(Layer):
         #
         self._ch = ch
         self._num_input = w * h
-        self._x = w/2
-        self._y = h/2
+        self._x = int(w/2)
+        self._y = int(h/2)
         self._num_node = self._x * self._y
         self._batch_stride = w * h * ch
         #
@@ -455,6 +455,9 @@ class MaxLayer(Layer):
         pass
     
     def prepare(self, batch_size):
+        #print(batch_size)
+        #print(self._ch)
+        #print(self._num_node)
         self._batch_size = batch_size
         self._output_array = np.zeros((self._batch_size, self._ch, self._num_node), dtype=np.float32)
         #

@@ -74,8 +74,8 @@ def check_weight_distribution():
 #
 def get_key_input(prompt):
     try:
-        c = eval(input(prompt))
-        #c = input(prompt)
+        #c = eval(input(prompt)) # Python3.x
+        c = input(prompt) # Python2.7
     except:
         c = -1
     return c
@@ -118,6 +118,7 @@ def main():
         d = d + 1
     #
     menu = get_key_input("input command >")
+    print(menu)
     if menu==0:
         device_id = 0
     elif menu==1:
@@ -127,6 +128,8 @@ def main():
     else:
         device_id = 0
     #
+    print("%d : %d" %(platform_id, device_id))
+    
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
     #
@@ -164,7 +167,7 @@ def main():
     print("- Select a command-")
     print("0 : train (mini-batch)")
     print("1 : test (500)")
-    print("2 : ?")
+    print("2 : ? (unit test)")
     menu = get_key_input("input command >")
     if menu==0:
         mode = 0
@@ -182,8 +185,8 @@ def main():
         return 0
     #
     if mode==0: # train
-        epoc = 8
-        mini_batch_size = 100
+        epoc = 1
+        mini_batch_size = 1000
         print("package._train_batch_size=%d" % (package._train_batch_size))
         it = int(package._train_batch_size/mini_batch_size)
         print("it = %d" % (it))
@@ -198,7 +201,7 @@ def main():
     elif mode==1: # test (batch)
         test.test_n(r, package, 500)
     elif mode==2: #
-        pass
+        test.unit_test(r, package)
     else:
         print("input error")
         pass

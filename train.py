@@ -40,7 +40,7 @@ class Train:
         self._cnt_i = 0
         self._cnt_k = 0
         self._weight_shift_mode = 1 # 0:cool, 1:heat
-        self._loop = 1
+        self._loop = 4 # 1 2 4 8
     
     def reset_cnt(self):
         self._cnt_e = 0
@@ -721,9 +721,14 @@ class Train:
             zero = 0
             layer = r.getLayerAt(li)
             layer_type = layer.get_type()
-            if layer_type==core.LAYER_TYPE_CONV_2D:
-                zero = 1
+            if layer_type==core.LAYER_TYPE_INPUT:
+                continue
+            elif layer_type==core.LAYER_TYPE_POOL:
+                continue
             #
+#            if layer_type==core.LAYER_TYPE_CONV_2D:
+#                zero = 1
+#            #
             entropy, ret = self.node_loop(entropy, layer, li, zero)
             cnt = cnt + ret
             if entropy<limit:

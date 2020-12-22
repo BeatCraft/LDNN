@@ -94,6 +94,37 @@ def test(r, package):
 #
 #
 #
+def unit_test(r, package):
+    print(">>unit_test()")
+    #
+    package.load_batch()
+    data_size = package._image_size
+    num_class = package._num_class
+#    eval_size = package._test_batch_size
+    dist = np.zeros(num_class, dtype=np.int32)
+    rets = np.zeros(num_class, dtype=np.int32)
+    oks = np.zeros(num_class, dtype=np.int32)
+    #
+    n = 10
+    r.prepare(n, data_size, num_class)
+    data_array = np.zeros((n, data_size), dtype=np.float32)
+    class_array = np.zeros(n, dtype=np.int32)
+    
+    for j in range(n):
+        data_array[j] = package._train_image_batch[j]
+        class_array[j] = package._train_label_batch[+j]
+    #
+    #print(data_array)
+    #print(class_array)
+    #
+    r.set_data(data_array, data_size, class_array, n)
+    r.propagate(-1, -1, -1, -1, 0)
+    answes = r.get_answer()
+    print(answes)
+    
+#
+#
+#
 def test_n(r, package, n):
     package.load_batch()
     data_size = package._image_size

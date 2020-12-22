@@ -92,12 +92,9 @@ class Node:
 LAYER_TYPE_INPUT   = 0
 LAYER_TYPE_HIDDEN  = 1
 LAYER_TYPE_OUTPUT  = 2
-LAYER_TYPE_CONV    = 3
-LAYER_TYPE_POOL    = 4
-LAYER_TYPE_CONV_2D = 5
-LAYER_TYPE_CONV_3D = 6
-LAYER_TYPE_CONV_4  = 7
-
+LAYER_TYPE_CONV_4  = 3
+LAYER_TYPE_POOL    = 4 # MAX
+#
 class Layer(object):
     # i         : index of layers
     # type      : 0 = input, 1 = hidden, 2 = output
@@ -345,82 +342,9 @@ class OutputLayer(Layer):
         self._gpu.softmax(self._gpu_output, self._num_node, self._batch_size)
         #
         # debug
-        #self._gpu.copy(self._output_array, self._gpu_output)
-        #print self._output_array
-#
-#
-# w : image width, i : index, h : image height, stride : size of convolusion matrix
-class ConvLayer(Layer):
-    def __init__(self, i,  w, h, stride, pre, gpu=None):
-        print("ConvLayer::__init__()")
-        #
-        self._index = i
-        self._type = LAYER_TYPE_CONV
-        self._gpu = gpu
-        self._id = -1
-        #
-        self._batch_stride = w * h
-        self._kernel_x = w - (stride-1) # 26
-        self._kernel_y = h - (stride-1) # 26
-        self._kernel_num = self._kernel_x * self._kernel_y # 676
-        self._kernel_size = stride * stride # 9
-        #
-        super(ConvLayer, self).__init__(i, LAYER_TYPE_CONV, self._kernel_size, self._kernel_num, pre, gpu)
-        #
-        self._cnv_map = np.zeros( (self._kernel_num, self._kernel_size), dtype=np.int32)
-        #
-        cmap_index = 0
-        for y in range(self._kernel_y):
-            for x in range(self._kernel_x):
-                cmap = self._cnv_map[cmap_index]
-                cmap[0] = x + 0 + y*w
-                cmap[1] = x + 1 + y*w
-                cmap[2] = x + 2 + y*w
-                cmap[3] = x + 0 + (y+1)*w
-                cmap[4] = x + 1 + (y+1)*w
-                cmap[5] = x + 2 + (y+1)*w
-                cmap[6] = x + 0 + (y+2)*w
-                cmap[7] = x + 1 + (y+2)*w
-                cmap[8] = x + 2 + (y+2)*w
-                cmap_index = cmap_index + 1
-                #print cmap
-            #
-        #
+#        self._gpu.copy(self._output_array, self._gpu_output)
+#        print self._output_array
 
-    def prepare(self, batch_size):
-        self._batch_size = batch_size
-        self._output_array = np.zeros((self._batch_size, self._kernel_num), dtype=np.float32)
-        #
-        if self._gpu:
-            self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
-            self._gpu_cnv_map = self._gpu.dev_malloc(self._cnv_map)
-            self._gpu_output = self._gpu.dev_malloc(self._output_array)
-            #
-            #print self._cnv_map[0]
-            self._gpu.copy(self._gpu_cnv_map, self._cnv_map)
-        #
-        
-    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
-        if ni>=0: # alt
-            alt_y, alt_x = divmod(ni, self._kernel_x)
-            self._gpu.conv_batch_alt(array_in, self._gpu_cnv_map, self._gpu_weight, self._gpu_output,
-                                     self._kernel_size, self._kernel_x, self._kernel_y,
-                                     self._batch_size, self._batch_stride,
-                                     alt_x, alt_y, ii, WEIGHT_SET[wi])
-                                     
-        else: # propagation                                                
-            self._gpu.conv_batch(array_in, self._gpu_cnv_map, self._gpu_weight, self._gpu_output,
-                                 self._kernel_size, self._kernel_x, self._kernel_y,
-                                 self._batch_size, self._batch_stride)
-                                 
-            #self._gpu.copy(self._output_array, self._gpu_output)
-            #print self._output_array[0]#.sum()
-            #ddd = self._output_array[0]
-            #for i in range(self._batch_size):
-            #    print "%d : %f" % (i, self._output_array[i].sum())
-            #
-        #
-        
 #
 # 2 x 2 simple max filter for 2D image data
 # w : image width, i : index, h : image height
@@ -443,13 +367,16 @@ class MaxLayer(Layer):
         #
         #super(MaxLayer, self).__init__(i, LAYER_TYPE_POOL, num_input, num_node, gpu)
         #
-        self._learning = 0
+        self._learning = 1
     
     def set_weight_index(self, ni, ii, wi):
         pass
     
     def export_weight_index(self):
         return None
+    
+    def get_weight_lock(self, ni, ii):
+        return 0
     
     def import_weight_index(self, wi_list):
         pass
@@ -466,156 +393,15 @@ class MaxLayer(Layer):
         #
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+#        print("MaxLayer::propagate()")
         self._gpu.max_batch(array_in, self._gpu_output,
                             self._ch, self._x, self._y,
                             self._batch_size, self._num_input)
         #
-        #self._gpu.copy(self._output_array, self._gpu_output)
-        #print self._output_array[0]
+#        self._gpu.copy(self._output_array, self._gpu_output)
+#        print self._output_array
 
-# fixed : kernel size = 3 x 3, kernel stride = 1
-# ch : number of channels, filter : number of filters
-# number of output channels is the same as number of filters
-class Conv2dLayer(Layer):
-    def __init__(self, i, w, h, ch, filter, pre, gpu=None):
-        print("Conv2dLayer::__init__()")
-        #
-        self._pre = pre
-        self._index = i
-        self._type = LAYER_TYPE_CONV_2D
-        self._gpu = gpu
-        self._id = -1 # reserved
-        #
-        self._ch = ch
-        self._w = w
-        self._h = h
-        self._image_size = self._w * self._h
-        self._filter = filter
-        self._filter_size = 3*3
-        self._ch_stride = self._w * self._h
-        self._batch_stride = self._ch_stride * self._filter
-        # mems for weights
-        self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_lock = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_property = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
-        #
-        self._num_input = self._filter_size
-        self._num_node = self._filter
-        #
-        if self._gpu:
-            self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
 
-    # allocate mems for output, also intermediate working area when it is needed
-    def prepare(self, batch_size):
-        self._batch_size = batch_size
-        self._output_array = np.zeros((self._batch_size, self._filter, self._image_size), dtype=np.float32)
-        #
-        if self._gpu:
-            #self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
-            self._gpu_output = self._gpu.dev_malloc(self._output_array)
-        #
-    
-    def set_weight_index(self, ni, ii, wi):
-        self._weight_index_matrix[ni][ii] = wi
-        self._weight_matrix[ni][ii] = WEIGHT_SET_CNN[wi]
-    
-    def init_weight_with_random_index(self):
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                wi = random.randrange(len(WEIGHT_SET_CNN))
-                self.set_weight_index(ni, ii, wi)
-            #
-        #
-    
-    def update_weight(self):
-        self._gpu.copy(self._gpu_weight, self._weight_matrix)
-        
-    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
-        if ni>=0: # alt
-            pass
-#            self._gpu.conv2d_batch_alt(array_in, self._gpu_weight, self._gpu_output,
-#                                       self._w, self._h, self._ch, self._filter, self._batch_size,
-#                                       ni, ii, WEIGHT_SET_CNN[wi])#wi)
-        else:
-            self._gpu.conv2d_batch(array_in, self._gpu_weight, self._gpu_output,
-                                   self._w, self._h, self._ch, self._filter, self._batch_size)
-            self._gpu.scale_cnn(self._gpu_output, self._batch_size, self._filter,
-                                self._image_size*self._filter, self._image_size)
-
-        #
-    #
-# kernel size x = 3, fixed
-# kernel size y = 3, fixed
-# kernel size z = n, RGB = ch
-# kernel stride = 1
-# ch : number of channels, filter : number of filters
-# number of output channels is the same as number of filters
-class Conv3dLayer(Layer):
-    def __init__(self, i, w, h, ch, filter, pre, gpu=None):
-        print("Conv3dLayer::__init__()")
-        #
-        self._pre = pre
-        self._index = i
-        self._type = LAYER_TYPE_CONV_3D
-        self._gpu = gpu
-        self._id = -1 # reserved
-        #
-        self._ch = ch
-        self._w = w
-        self._h = h
-        self._image_size = self._w * self._h
-        self._filter = filter
-        self._filter_size = 3 * 3 * self._ch
-#        self._ch_stride = self._w * self._h * self._ch
-#        self._batch_stride = self._ch_stride * self._filter
-        # mems for weights
-        self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_lock = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_property = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
-        #
-        self._num_input = self._filter_size
-        self._num_node = self._filter
-        #
-        if self._gpu:
-            self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
-        #
-    #
-    def prepare(self, batch_size):
-        self._batch_size = batch_size
-        self._output_array = np.zeros((self._batch_size, self._ch*self._filter, self._image_size), dtype=np.float32)
-        #
-        if self._gpu:
-            self._gpu_output = self._gpu.dev_malloc(self._output_array)
-        #
-        
-    def set_weight_index(self, ni, ii, wi):
-        self._weight_index_matrix[ni][ii] = wi
-        self._weight_matrix[ni][ii] = WEIGHT_SET_CNN[wi]
-        
-    def init_weight_with_random_index(self):
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                wi = random.randrange(len(WEIGHT_SET_CNN))
-                self.set_weight_index(ni, ii, wi)
-            #
-        #
-        
-    def update_weight(self):
-        self._gpu.copy(self._gpu_weight, self._weight_matrix)
-
-    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
-        if ni>=0: # alt
-            pass
-        else:
-            self._gpu.conv3d_batch(array_in, self._gpu_weight, self._gpu_output,
-                                   self._w, self._h, self._ch, self._filter, self._batch_size)
-            self._gpu.scale_cnn(self._gpu_output, self._batch_size, self._filter*self._ch,
-                                self._image_size*self._filter, self._image_size)
-        #
-    #
-    
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
         print("Convolution Layer ver.4 ::__init__()")
@@ -626,6 +412,8 @@ class Conv_4_Layer(Layer):
         self._gpu = gpu
         self._id = -1 # reserved
         self._padding = 1 # ON mode only
+        self._padding_cache = 0
+        self._learning = 1
         #
         self._ch = ch
         self._w = w
@@ -634,6 +422,7 @@ class Conv_4_Layer(Layer):
         # filter
         self._filter = filter
         self._filter_size = 3 * 3 * ch # width and height of filter are fixed to 3
+        self._num_update = self._filter_size*filter # num of weights
 
         # mems for weights
         self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
@@ -641,6 +430,9 @@ class Conv_4_Layer(Layer):
         self._weight_property = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
         # need alt??
+        #self._weight_index_matrix_alt = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+        #self._weight_matrix_alt = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
+        #self._wi_undo = 0
         
         # note : node and input are diffrently used from other layers
         self._num_input = self._filter_size
@@ -648,32 +440,40 @@ class Conv_4_Layer(Layer):
         #
         if self._gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+            #self._gpu_weight_alt = self._gpu.dev_malloc(self._weight_matrix_alt)
         #
 
     def prepare(self, batch_size):
         self._batch_size = batch_size
         # intermidiate
         self._padded_array = np.zeros((self._batch_size, (self._w+2)*(self._h+2)*self._ch), dtype=np.float32)
-        #self._conv_array = np.zeros((self._batch_size, self._w*self._h, self._filter_size, dtype=np.float32)
-                
+
         # output
         self._output_array = np.zeros((self._batch_size, self._filter, self._w*self._h), dtype=np.float32)
         #
         if self._gpu:
             self._gpu_padded = self._gpu.dev_malloc(self._padded_array)
-            #self._gpu_conv = self._gpu.dev_malloc(self._conv_array)
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
+            #
+#            if self._padding_cache:
+#                self._gpu.conv_4_pad_batch(self._pre._gpu_output, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
+            #
         #
         
     def set_weight_index(self, ni, ii, wi):
         self._weight_index_matrix[ni][ii] = wi
         self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
-        
+
+#    def set_weight_index_alt(self, ni, ii, wi):
+#        self._weight_index_matrix_alt[ni][ii] = wi
+#        self._weight_matrix_alt[ni][ii] = WEIGHT_SET[wi]
+
     def init_weight_with_random_index(self):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                wi = random.randrange(len(WEIGHT_SET))
+                wi = 5#random.randrange(len(WEIGHT_SET)) # 8
                 self.set_weight_index(ni, ii, wi)
+                #self.set_weight_index_alt(ni, ii, wi)
             #
         #
         
@@ -681,15 +481,34 @@ class Conv_4_Layer(Layer):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
-        if ni>=0: # alt
+        #print("Conv_4_Layer::propagate()")
+        if self._padding_cache:
+            #print("f0")
             pass
         else:
+            #print("f1")
             self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-            self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
-            #self._gpu.conv_4_calc_batch(self._gpu_conv, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
-            # relu ?
-            # scale ?
         #
+        # ni : filetr index, 0 to num of filter -1
+        # ii : index of matrix, 0 to 3*3*ch-1
+        if ni>=0:
+            #print("f2")
+            wi_undo = self._weight_index_matrix[ni][ii]
+            self.set_weight_index(ni, ii, wi)
+            self.update_weight()
+            self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
+            self.set_weight_index(ni, ii, wi_undo)
+            self.update_weight()
+        else:
+            #print("f3")
+            self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
+            #
+            # scale ?
+            #
+        #
+        # debug
+#        self._gpu.copy(self._output_array, self._gpu_output)
+#        print self._output_array
     #
 #
 #
@@ -733,6 +552,10 @@ class Roster:
         layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0),
                          layer._num_node, batch_size, 0)
         #
+#        self._gpu.copy(layer._output_array, layer._gpu_output)
+#        print layer._output_array[0]
+        return
+        #
         # preprocess cnn and max
         #
         debug = 0
@@ -740,18 +563,12 @@ class Roster:
         li = 1
         layer = self.getLayerAt(li)
         while layer.get_learning()==0:
-            #print "pre-calc(%d)" % (li)
+            print "pre-calc(%d)" % (li)
             layer.propagate(pre._gpu_output, -1, -1, -1, debug)
             pre = layer
             li = li + 1
             layer = self.getLayerAt(li)
         #
-#        cnn_layer = self.getLayerAt(1)
-#        cnn_layer.propagate(layer._gpu_output, -1, -1, -1, debug)
-        #
-#        max_layer = self.getLayerAt(2)
-#        max_layer.propagate(cnn_layer._gpu_output, -1, -1, -1, debug)
-        
             
     def init_weight(self):
         c = self.countLayers()
@@ -914,36 +731,13 @@ class Roster:
                 li = c-1
                 if np.isnan(self._batch_cross_entropy[i]):
                     print("NaN : %d" % (i))
-                    
-                    output = self.getLayerAt(li)
-                    self._gpu.copy(output._output_array, output._gpu_output)
-                    print(output._output_array[i])
-                    print(output._output_array[i].shape)
-                    
-                    output = self.getLayerAt(li-1)
-                    self._gpu.copy(output._output_array, output._gpu_output)
-                    print(output._output_array[i])
-                    print(output._output_array[i].shape)
-                    
-                    output = self.getLayerAt(li-2)
-                    self._gpu.copy(output._output_array, output._gpu_output)
-                    print(output._output_array[i])
-                    print(output._output_array[i].shape)
-                    
-                    output = self.getLayerAt(li-3)
-                    self._gpu.copy(output._output_array, output._gpu_output)
-                    print(output._output_array[i])
-                    print(output._output_array[i].shape)
-                    
-                    output = self.getLayerAt(li-4)
-                    self._gpu.copy(output._output_array, output._gpu_output)
-                    print(output._output_array[i])
-                    print(output._output_array[i].shape)
-                    
-                    output = self.getLayerAt(li-5)
-                    self._gpu.copy(output._output_array, output._gpu_output)
-                    print(output._output_array[i])
-                    print(output._output_array[i].shape)
+                    for li in range(c):
+                        output = self.getLayerAt(li)
+                        self._gpu.copy(output._output_array, output._gpu_output)
+                        print("layer : %d" % (li))
+                        print(output._output_array[i].shape)
+                        print(output._output_array[i])
+                    #
                 #
             #
         #
@@ -998,6 +792,7 @@ class Roster:
         pre = self.getLayerAt(0)
         for i in range(1, c):
             layer = self.getLayerAt(i)
+#            print("layer : %d : %d : %d" % (i, layer.get_learning(), layer.get_type()))
             if layer.get_learning()>0:
                 pass
             else:

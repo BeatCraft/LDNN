@@ -72,29 +72,14 @@ __kernel void conv_4_roll_batch(
             sum += input[start + y_stride + w + xi    ] * weight[fi*ch*3*3 + i*3*3 + 7];
             sum += input[start + y_stride + w + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 8];
         }
-        // relu?
-        output[yi*w+xi] = sum;
+        // relu
+        if (sum<0.0){
+            output[bi*w*h*filter + w*h*fi + yi*w+xi] = 0.0;
+        }else{
+            output[bi*w*h*filter + w*h*fi + yi*w+xi] = sum;
+        }
     }
 };
-
-__kernel void conv_4_calc_batch(
-    __global float* input,
-    __global float* weight,
-    __global float* output,
-    const int w,
-    const int h,
-    const int ch,
-    const int filter)
-{
-    int bi = get_global_id(0);
-    int xi = get_global_id(1);
-    int yi = get_global_id(2);
-    
-    
-    
-    
-};
-
 
 __kernel void conv3d_batch(
     __global float* input,
@@ -1086,11 +1071,6 @@ class Gpu:
             
     def conv_4_roll_batch(self, input, weight, output, w, h, ch, filter, batch_size):
         event = self.prg.conv_4_roll_batch(self._queue, (batch_size, w, h), None,
-                                           input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter))
-        event.wait()
-            
-    def conv_4_calc_batch(self, input, weight, output, w, h, ch, filter, batch_size):
-        event = self.prg.conv_4_calc_batch(self._queue, (batch_size, w, h), None,
                                            input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter))
         event.wait()
 #

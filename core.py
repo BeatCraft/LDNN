@@ -270,15 +270,9 @@ class HiddenLayer(Layer):
         stride_1 = self._num_node * self._num_input
         stride_2 = self._num_input
         if ni>=0: # alt
-            #start_time = time.time()
-            #
             self._gpu.multiple_x_by_w_batch_alt(array_in, self._gpu_weight, self._gpu_product,
                                                 self._batch_size, stride_1, stride_2,
                                                 self._num_input, self._num_node, ni, ii, WEIGHT_SET[wi])
-            #
-            #elapsed_time = time.time() - start_time
-            #t = format(elapsed_time, "0")
-            #print "time : multiple_x_by_w_batch_alt() : %s" % (t)
         else: # propagation
             self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
                                             self._batch_size, stride_1, stride_2,
@@ -290,14 +284,6 @@ class HiddenLayer(Layer):
         self._gpu.sum(self._gpu_product, self._gpu_output,
                         self._num_input, self._num_node, activation, self._batch_size)
         self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
-        #
-        # normalize
-        #
-        #self._gpu.normalize_layer(self._gpu_output, self._num_node, self._batch_size)
-        #
-        # relu
-        #
-        #self._gpu.relu(self._gpu_output, self._batch_size, self._num_node, 1) #  self._num_node : stride
 #
 #
 #
@@ -402,7 +388,6 @@ class MaxLayer(Layer):
 #        self._gpu.copy(self._output_array, self._gpu_output)
 #        print self._output_array
 
-
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
         print("Convolution Layer ver.4 ::__init__()")
@@ -484,17 +469,18 @@ class Conv_4_Layer(Layer):
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         print("Conv_4_Layer::propagate()")
-        if self._padding_cache:
-            print("f0")
-            pass
-        else:
-            print("f1")
-            self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
+#        if self._padding_cache:
+#            print("f0")
+#            pass
+#        else:
+#            print("f1")
+#            self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
         #
+        self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
         # ni : filetr index, 0 to num of filter -1
         # ii : index of matrix, 0 to 3*3*ch-1
         if ni>=0:
-            print("f2")
+            #print("f2")
             wi_undo = self._weight_index_matrix[ni][ii]
             self.set_weight_index(ni, ii, wi)
             self.update_weight()
@@ -502,15 +488,15 @@ class Conv_4_Layer(Layer):
             self.set_weight_index(ni, ii, wi_undo)
             self.update_weight()
         else:
-            print("f3")
+            #print("f3")
             self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
             #
             # scale ?
             #
         #
         # debug
-        self._gpu.copy(self._output_array, self._gpu_output)
-        print(self._output_array)
+#        self._gpu.copy(self._output_array, self._gpu_output)
+#        print(self._output_array)
     #
 #
 #

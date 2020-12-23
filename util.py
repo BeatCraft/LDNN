@@ -329,28 +329,28 @@ class Package:
         if self._package_id==0: # MNIST
             if config==0:
                 print("FC")
-                r.add_layer(core.LAYER_TYPE_INPUT, self._image_size, self._image_size)  # input
-                r.add_layer(core.LAYER_TYPE_HIDDEN, self._image_size, 64) # hidden 0
-                r.add_layer(core.LAYER_TYPE_HIDDEN, 64, 64) # hidden 1
-                r.add_layer(core.LAYER_TYPE_OUTPUT, 64, self._num_class) # out
+                # 0 : input
+                c = r.countLayers()
+                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
+                r.layers.append(input)
+                # 1 : hidden : 28 x 28 x 1 = 784
+                c = r.countLayers()
+                hidden_1 = core.HiddenLayer(c, 784, 64, input, my_gpu)
+                hidden_1.set_num_update(32)
+                r.layers.append(hidden_1)
+		# 2 : hidden : 64
+                c = r.countLayers()
+                hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, my_gpu)
+                hidden_2.set_num_update(8)
+                r.layers.append(hidden_2)
+                # 5 : output
+                c = r.countLayers()
+                output = core.OutputLayer(c, 64, 10, hidden_2, my_gpu)
+                output.set_num_update(8)
+                r.layers.append(output)
             elif config==1:
                 print("CNN")
-                r.add_layer(core.LAYER_TYPE_INPUT, self._image_size, self._image_size)  # input
-                #
-                c = r.countLayers()
-                layer = core.Conv2dLayer(c, 28, 28, 1, 4, my_gpu)
-                layer.set_num_update(3)
-                layer.set_learning(0) # on : 1, off : 0
-                r.layers.append(layer)
-                #
-                c = r.countLayers()
-                layer = core.MaxLayer(c, 4, 28, 28, my_gpu)
-                r.layers.append(layer)
-                #
-                layer = r.add_layer(core.LAYER_TYPE_HIDDEN, 14*14*4, 32*8)
-                layer.set_num_update(64)
-                layer = r.add_layer(core.LAYER_TYPE_OUTPUT, 32*8, self._num_class) # out
-                layer.set_num_update(32)
+                pass
             #
         elif self._package_id==1: # cifa-10
             if config==0:

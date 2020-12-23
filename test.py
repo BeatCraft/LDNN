@@ -147,8 +147,8 @@ def test_n(r, package, n):
     #
     for i in range(it):
         for j in range(n):
-            tmp = package._train_image_batch[i*n+j]
-            data_array[j] = tmp
+            #tmp = package._train_image_batch[i*n+j]
+            data_array[j] = package._train_image_batch[i*n+j]
             class_array[j] = package._train_label_batch[i*n+j]
         #
         r.set_data(data_array, data_size, class_array, n)

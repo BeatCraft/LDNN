@@ -382,7 +382,8 @@ class MaxLayer(Layer):
         pass
     
     def prepare(self, batch_size):
-        #print(batch_size)
+        print("MaxLayer::prepare()")
+	#print(batch_size)
         #print(self._ch)
         #print(self._num_node)
         self._batch_size = batch_size
@@ -393,7 +394,7 @@ class MaxLayer(Layer):
         #
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
-#        print("MaxLayer::propagate()")
+        print("MaxLayer::propagate()")
         self._gpu.max_batch(array_in, self._gpu_output,
                             self._ch, self._x, self._y,
                             self._batch_size, self._num_input)
@@ -444,6 +445,7 @@ class Conv_4_Layer(Layer):
         #
 
     def prepare(self, batch_size):
+        print("Conv_4_Layer::prepare(%d)" %(batch_size))
         self._batch_size = batch_size
         # intermidiate
         self._padded_array = np.zeros((self._batch_size, (self._w+2)*(self._h+2)*self._ch), dtype=np.float32)
@@ -481,18 +483,18 @@ class Conv_4_Layer(Layer):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
-        #print("Conv_4_Layer::propagate()")
+        print("Conv_4_Layer::propagate()")
         if self._padding_cache:
-            #print("f0")
+            print("f0")
             pass
         else:
-            #print("f1")
+            print("f1")
             self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
         #
         # ni : filetr index, 0 to num of filter -1
         # ii : index of matrix, 0 to 3*3*ch-1
         if ni>=0:
-            #print("f2")
+            print("f2")
             wi_undo = self._weight_index_matrix[ni][ii]
             self.set_weight_index(ni, ii, wi)
             self.update_weight()
@@ -500,15 +502,15 @@ class Conv_4_Layer(Layer):
             self.set_weight_index(ni, ii, wi_undo)
             self.update_weight()
         else:
-            #print("f3")
+            print("f3")
             self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
             #
             # scale ?
             #
         #
         # debug
-#        self._gpu.copy(self._output_array, self._gpu_output)
-#        print self._output_array
+        self._gpu.copy(self._output_array, self._gpu_output)
+        print(self._output_array)
     #
 #
 #
@@ -563,7 +565,7 @@ class Roster:
         li = 1
         layer = self.getLayerAt(li)
         while layer.get_learning()==0:
-            print "pre-calc(%d)" % (li)
+            print("pre-calc(%d)" % (li))
             layer.propagate(pre._gpu_output, -1, -1, -1, debug)
             pre = layer
             li = li + 1

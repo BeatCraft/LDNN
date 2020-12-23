@@ -51,13 +51,16 @@ __kernel void conv_4_roll_batch(
     int xi = get_global_id(1);
     int yi = get_global_id(2);
 
-    int index = 0;
+//    int index = 0;
     int b_stride = w*h*ch;
     int ch_stride = w*h;
     int y_stride = yi*w;
+
+    printf(\"CL : bi=%d\\n\", bi);
     
     for (int fi=0; fi<filter; fi++){
         float sum = 0.0;
+        printf(\"CL : fi=%d\\n\", fi);
         for (int i=0; i<ch; i++){
             int start = b_stride*bi + ch_stride*i;
             sum += input[start + y_stride - w + xi - 1] * weight[fi*ch*3*3 + i*3*3    ];

@@ -73,11 +73,16 @@ def check_weight_distribution():
 #
 #
 def get_key_input(prompt):
+    c = -1
     try:
-        #c = eval(input(prompt)) # Python3.x
-        c = input(prompt) # Python2.7
+        if sys.version_info[0]==2:
+            c = input(prompt) # Python2.7
+        else:
+            c = eval(input(prompt)) # Python3.x
+        #
     except:
         c = -1
+    #
     return c
 #
 #
@@ -186,7 +191,8 @@ def main():
     #
     if mode==0: # train
         epoc = 1
-        mini_batch_size = 1000
+        mini_batch_size = 500
+        loop = 8 # 1 2 4 8
         print("package._train_batch_size=%d" % (package._train_batch_size))
         it = int(package._train_batch_size/mini_batch_size)
         print("it = %d" % (it))
@@ -196,7 +202,10 @@ def main():
         t.set_mini_batch_size(mini_batch_size)
         t.set_iteration(it)
         t.set_epoc(epoc)
+        t.set_loop(loop)
         t.set_layer_direction(1) # 0 : in to out, 1 : out to in
+        t.disable_mini_batch()
+        #
         t.loop()
     elif mode==1: # test (batch)
         test.test_n(r, package, 500)

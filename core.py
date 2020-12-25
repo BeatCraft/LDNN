@@ -453,7 +453,7 @@ class Conv_4_Layer(Layer):
     def init_weight_with_random_index(self):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                wi = 5#random.randrange(len(WEIGHT_SET)) # 8
+                wi = random.randrange(len(WEIGHT_SET)) # 5
                 self.set_weight_index(ni, ii, wi)
             #
         #

@@ -40,7 +40,14 @@ class Train:
         self._cnt_i = 0
         self._cnt_k = 0
         self._weight_shift_mode = 1 # 0:cool, 1:heat
-        self._loop = 4 # 1 2 4 8
+        self._loop = 1 # 1 2 4 8
+        self._disable_mini_batch = 0
+    
+    def set_loop(self, n):
+        self._loop = n
+    
+    def disable_mini_batch(self):
+        self._disable_mini_batch = 1
     
     def reset_cnt(self):
         self._cnt_e = 0
@@ -64,6 +71,7 @@ class Train:
 
     def set_weight_shift_mode(self, mode):
         self._weight_shift_mode = mode
+        # obsolute
         
     def set_layer_direction(self, d):
         self._layer_direction = d
@@ -80,7 +88,7 @@ class Train:
         self._it = n
 
     # one way
-    def weight_shift_5(self, li, ni, ii, entropy, zero=0):
+    def weight_shift(self, li, ni, ii, entropy, zero=0):
         r = self._r
         layer = r.getLayerAt(li)
         #
@@ -139,487 +147,6 @@ class Train:
         #
         return entropy, 0
         
-
-    def weight_shift_4(self, li, ni, ii, entropy, zero=0):
-        r = self._r
-        layer = r.getLayerAt(li)
-        wp = layer.get_weight_property(ni, ii) # default : 0
-        lock = layer.get_weight_lock(ni, ii)   # default : 0
-        wi = layer.get_weight_index(ni, ii)
-        wi_alt = wi
-        entropy_alt = entropy
-        maximum = core.WEIGHT_INDEX_MAX
-        minimum = core.WEIGHT_INDEX_MIN
-        #
-        if lock>0:
-            return entropy, 0
-        #
-        if wp==0:
-            if wi==maximum:
-                wi_alt = wi - 1
-                if r._gpu:
-                    r.propagate(li, ni, ii, wi_alt, 0)
-                    entropy_alt = r.get_cross_entropy()
-                else:
-                    entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-                #
-                if entropy_alt<entropy:
-                    layer.set_weight_property(ni, ii, -1)
-                    layer.set_weight_index(ni, ii, wi_alt)
-                    if r._gpu:
-                        layer.update_weight()
-                    else:
-                        entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                    #
-                    return entropy_alt, 1
-                #
-                #layer.set_weight_lock(ni, ii, 1)
-                #layer.set_weight_property(ni, ii, 0)
-                return entropy_alt, 0
-            elif wi==minimum:
-                wi_alt = wi + 1
-                if r._gpu:
-                    r.propagate(li, ni, ii, wi_alt, 0)
-                    entropy_alt = r.get_cross_entropy()
-                else:
-                    entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-                #
-                if entropy_alt<entropy:
-                    layer.set_weight_property(ni, ii, 1)
-                    layer.set_weight_index(ni, ii, wi_alt)
-                    if r._gpu:
-                        layer.update_weight()
-                    else:
-                        entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                    #
-                    return entropy_alt, 1
-                #
-                #layer.set_weight_lock(ni, ii, 1)
-                return entropy_alt, 0
-            else: # minimum < wi < maximum
-                wi_alt = wi + 1
-                if r._gpu:
-                    r.propagate(li, ni, ii, wi_alt, 0)
-                    entropy_alt = r.get_cross_entropy()
-                else:
-                    entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-                #
-                if entropy_alt<entropy:
-                    layer.set_weight_property(ni, ii, 1)
-                    layer.set_weight_index(ni, ii, wi_alt)
-                    if r._gpu:
-                        layer.update_weight()
-                    else:
-                        entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                    #
-                    #if wi_alt==maximum:
-                    #    layer.set_weight_lock(ni, ii, 1)
-                    #
-                    return entropy_alt, 1
-                #
-                wi_alt = wi - 1 ##
-                if r._gpu:
-                    r.propagate(li, ni, ii, wi_alt, 0)
-                    entropy_alt = r.get_cross_entropy()
-                else:
-                    entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-                #
-                if entropy_alt<entropy:
-                    layer.set_weight_property(ni, ii, -1)
-                    layer.set_weight_index(ni, ii, wi_alt)
-                    if r._gpu:
-                        layer.update_weight()
-                    else:
-                        entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                    #
-                    #if wi_alt==minimum:
-                    #    layer.set_weight_lock(ni, ii, 1)
-                    #
-                    return entropy_alt, 1
-                #
-                layer.set_weight_lock(ni, ii, 1)
-                return entropy_alt, 0
-            #
-        elif wp>0:
-            if wi==maximum:
-                layer.set_weight_property(ni, ii, 0)
-                return entropy_alt, 0
-            #
-            wi_alt = wi + 1
-            if r._gpu:
-                r.propagate(li, ni, ii, wi_alt, 0)
-                entropy_alt = r.get_cross_entropy()
-            else:
-                entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-            #
-            if entropy_alt<entropy:
-                layer.set_weight_property(ni, ii, 1)
-                layer.set_weight_index(ni, ii, wi_alt)
-                if r._gpu:
-                    layer.update_weight()
-                else:
-                    entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                #
-                #if wi_alt==maximum:
-                #    layer.set_weight_lock(ni, ii, 1)
-                #
-                return entropy_alt, 1
-            #
-            layer.set_weight_lock(ni, ii, 1)
-            layer.set_weight_property(ni, ii, 0)
-            return entropy_alt, 0
-        else: #  wp<0
-            if wi==minimum:
-                layer.set_weight_property(ni, ii, 0)
-                return entropy_alt, 0
-            #
-            wi_alt = wi - 1
-            if r._gpu:
-                r.propagate(li, ni, ii, wi_alt, 0)
-                entropy_alt = r.get_cross_entropy()
-            else:
-                entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-            #
-            if entropy_alt<entropy:
-                layer.set_weight_property(ni, ii, -1)
-                layer.set_weight_index(ni, ii, wi_alt)
-                if r._gpu:
-                    layer.update_weight()
-                else:
-                    entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                #
-                #if wi_alt==minimum:
-                #    layer.set_weight_lock(ni, ii, 1)
-                #
-                return entropy_alt, 1
-            #
-            layer.set_weight_lock(ni, ii, 1)
-            layer.set_weight_property(ni, ii, 0)
-            return entropy_alt, 0
-        #
-        return entropy, 0
-    
-    def weight_shift_3(self, li, ni, ii, entropy, zero=0):
-        r = self._r
-        layer = r.getLayerAt(li)
-        wp = layer.get_weight_property(ni, ii) # default : 0
-        lock = layer.get_weight_lock(ni, ii)   # default : 0
-        wi = layer.get_weight_index(ni, ii)
-        wi_alt = wi
-        entropy_alt = entropy
-        maximum = core.WEIGHT_INDEX_MAX
-        minimum = core.WEIGHT_INDEX_MIN
-        #
-        if lock>0:
-            return entropy, 0
-        #
-        if wp==0:
-            if wi==maximum:
-                wi_alt = wi - 1
-                if r._gpu:
-                    r.propagate(li, ni, ii, wi_alt, 0)
-                    entropy_alt = r.get_cross_entropy()
-                else:
-                    entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-                #
-                if entropy_alt<entropy:
-                    layer.set_weight_property(ni, ii, -1)
-                    layer.set_weight_index(ni, ii, wi_alt)
-                    if r._gpu:
-                        layer.update_weight()
-                    else:
-                        entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                    #
-                    return entropy_alt, 1
-                #
-                layer.set_weight_lock(ni, ii, 1)
-                return entropy_alt, 0
-            elif wi==minimum:
-                wi_alt = wi + 1
-                if r._gpu:
-                    r.propagate(li, ni, ii, wi_alt, 0)
-                    entropy_alt = r.get_cross_entropy()
-                else:
-                    entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-                #
-                if entropy_alt<entropy:
-                    layer.set_weight_property(ni, ii, 1)
-                    layer.set_weight_index(ni, ii, wi_alt)
-                    if r._gpu:
-                        layer.update_weight()
-                    else:
-                        entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                    #
-                    return entropy_alt, 1
-                #
-                layer.set_weight_lock(ni, ii, 1)
-                return entropy_alt, 0
-            else:
-                wi_alt = wi + 1
-                if r._gpu:
-                    r.propagate(li, ni, ii, wi_alt, 0)
-                    entropy_alt = r.get_cross_entropy()
-                else:
-                    entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-                #
-                if entropy_alt<entropy:
-                    layer.set_weight_property(ni, ii, 1)
-                    layer.set_weight_index(ni, ii, wi_alt)
-                    if r._gpu:
-                        layer.update_weight()
-                    else:
-                        entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                    #
-                    if wi_alt==maximum:
-                        layer.set_weight_lock(ni, ii, 1)
-                    #
-                    return entropy_alt, 1
-                #
-                wi_alt = wi - 1 ##
-                if r._gpu:
-                    r.propagate(li, ni, ii, wi_alt, 0)
-                    entropy_alt = r.get_cross_entropy()
-                else:
-                    entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-                #
-                if entropy_alt<entropy:
-                    layer.set_weight_property(ni, ii, -1)
-                    layer.set_weight_index(ni, ii, wi_alt)
-                    if r._gpu:
-                        layer.update_weight()
-                    else:
-                        entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                    #
-                    if wi_alt==minimum:
-                        layer.set_weight_lock(ni, ii, 1)
-                    #
-                    return entropy_alt, 1
-                #
-                layer.set_weight_lock(ni, ii, 1)
-                return entropy_alt, 0
-            #
-        elif wp>0:
-            wi_alt = wi + 1
-            if r._gpu:
-                r.propagate(li, ni, ii, wi_alt, 0)
-                entropy_alt = r.get_cross_entropy()
-            else:
-                entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-            #
-            if entropy_alt<entropy:
-                layer.set_weight_property(ni, ii, 1)
-                layer.set_weight_index(ni, ii, wi_alt)
-                if r._gpu:
-                    layer.update_weight()
-                else:
-                    entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                #
-                if wi_alt==maximum:
-                    layer.set_weight_lock(ni, ii, 1)
-                #
-                return entropy_alt, 1
-            #
-            layer.set_weight_lock(ni, ii, 1)
-            return entropy_alt, 0
-        else:
-            wi_alt = wi - 1
-            if r._gpu:
-                r.propagate(li, ni, ii, wi_alt, 0)
-                entropy_alt = r.get_cross_entropy()
-            else:
-                entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-            #
-            if entropy_alt<entropy:
-                layer.set_weight_property(ni, ii, -1)
-                layer.set_weight_index(ni, ii, wi_alt)
-                if r._gpu:
-                    layer.update_weight()
-                else:
-                    entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                #
-                if wi_alt==minimum:
-                    layer.set_weight_lock(ni, ii, 1)
-                #
-                return entropy_alt, 1
-            #
-            layer.set_weight_lock(ni, ii, 1)
-            return entropy_alt, 0
-        #
-        return entropy, 0
-
-    def weight_shift_2(self, li, ni, ii, entropy, zero=0):
-        r = self._r
-        mode = self._weight_shift_mode
-        #
-        layer = r.getLayerAt(li)
-        wp = layer.get_weight_property(ni, ii) # default : 0
-        lock = layer.get_weight_lock(ni, ii)   # default : 0
-        wi = layer.get_weight_index(ni, ii)
-        wi_alt = wi
-        entropy_alt = entropy
-        maximum = core.WEIGHT_INDEX_MAX
-        minimum = core.WEIGHT_INDEX_MIN
-        #
-        if lock>0:
-            return entropy, 0
-        #
-        if wp<0:
-            pass
-        elif wi==maximum:
-            layer.set_weight_property(ni, ii, 0)
-            return entropy_alt, 0
-#            wi_alt = wi - 1
-#            if r._gpu:
-#                layer.set_weight_property(ni, ii, 0)
-#                layer.set_weight_index(ni, ii, wi_alt)
-#                layer.update_weight()
-#                r.propagate()
-#                entropy_alt = r.get_cross_entropy()
-#            else:
-#                entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-#            #
-#            return entropy_alt, 1 # !!
-        else:
-            wi_alt = wi + 1
-            if r._gpu:
-                r.propagate(li, ni, ii, wi_alt, 0)
-                entropy_alt = r.get_cross_entropy()
-            else:
-                entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-            #
-            if entropy>entropy_alt: # better
-                layer.set_weight_property(ni, ii, 1)
-                layer.set_weight_index(ni, ii, wi_alt)
-                if r._gpu:
-                    layer.update_weight()
-                else:
-                    entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                #
-                return entropy_alt, 1
-            else:
-                layer.set_weight_property(ni, ii, 0)
-            #
-        #
-        if wp>0:
-            pass
-        elif wi==minimum:
-            layer.set_weight_property(ni, ii, 0)
-            return entropy_alt, 0
-#            wi_alt = wi - 1
-#            if r._gpu:
-#                layer.set_weight_property(ni, ii, 0)
-#                layer.set_weight_index(ni, ii, wi_alt)
-#                layer.update_weight()
-#                r.propagate()
-#                entropy_alt = r.get_cross_entropy()
-#            else:
-#                entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-            #
-#            return entropy_alt, 1 # !!
-        else:
-            wi_alt = wi - 1
-            if r._gpu:
-                r.propagate(li, ni, ii, wi_alt, 0)
-                entropy_alt = r.get_cross_entropy()
-            else:
-                entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-            #
-            if entropy>entropy_alt: # better
-                layer.set_weight_property(ni, ii, -1)
-                layer.set_weight_index(ni, ii, wi_alt)
-                if r._gpu:
-                    layer.update_weight()
-                else:
-                    entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-                #
-                return entropy_alt, 1
-            else:
-                layer.set_weight_property(ni, ii, 0)
-            #
-        #
-        return entropy_alt, 0
-        
-    def weight_shift(self, li, ni, ii, entropy, zero=0):
-        r = self._r
-        mode = self._weight_shift_mode
-        #
-        layer = r.getLayerAt(li)
-        wp = layer.get_weight_property(ni, ii) # default : 0
-        lock = layer.get_weight_lock(ni, ii)   # default : 0
-        wi = layer.get_weight_index(ni, ii)
-        wi_alt = wi
-        #
-        if lock>0:
-            return entropy, 0
-        #
-        if wp!=mode and wp!=0:
-            return entropy, 0
-        #
-        if mode>0: # heat
-            maximum = core.WEIGHT_INDEX_MAX
-            if zero==1:
-                maximum = len(core.WEIGHT_SET_CNN)-1
-                if wi==maximum:
-                    layer.set_weight_property(ni, ii, 0)
-                    return entropy, 0
-                #
-            #
-            if wi==maximum:
-                layer.set_weight_property(ni, ii, 0)
-                layer.set_weight_index(ni, ii, wi-1)
-                if r._gpu:
-                    layer.update_weight()
-                    r.propagate()
-                    entropy = r.get_cross_entropy()
-                else:
-                    entropy = r._remote.update(li, ni, ii, wi-1)
-                #
-                return entropy, 1
-            #
-        else: # cool
-            minimum = core.WEIGHT_INDEX_MIN
-            if zero==1:
-                minimum = 0
-                if wi==minimum:
-                    layer.set_weight_property(ni, ii, 0)
-                    return entropy, 0
-                #
-            #
-            if wi==minimum:
-                layer.set_weight_property(ni, ii, 0)
-                layer.set_weight_index(ni, ii, wi+1)
-                if r._gpu:
-                    layer.update_weight()
-                    r.propagate()
-                    entropy = r.get_cross_entropy()
-                else:
-                    entropy = r._remote.update(li, ni, ii, wi+1)
-                #
-                return entropy, 1
-            #
-        #
-        wi_alt = wi + mode
-        entropy_alt = entropy
-        if r._gpu:
-            r.propagate(li, ni, ii, wi_alt, 0)
-            entropy_alt = r.get_cross_entropy()
-        else:
-            entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-        #
-        if  entropy_alt<entropy:
-            layer.set_weight_property(ni, ii, mode)
-            layer.set_weight_index(ni, ii, wi_alt)
-            if r._gpu:
-                layer.update_weight()
-            else:
-                entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-            #
-            return entropy_alt, 1
-        #
-        layer.set_weight_property(ni, ii, 0)
-        #
-        return entropy, 0
-
     def weight_loop(self, entropy, layer, li, ni, zero=0):
         it = 0
         r = self._r
@@ -650,7 +177,7 @@ class Train:
         for p in range(w_p):
             #ii = random.randrange(num_w)
             ii = wi_list[p]
-            entropy, ret = self.weight_shift_5(li, ni, ii, entropy, zero)
+            entropy, ret = self.weight_shift(li, ni, ii, entropy, zero)
             if ret>0:
                 cnt = cnt + ret
                 if direction>0:
@@ -705,11 +232,11 @@ class Train:
         #
         for i in range(c):
             layer = r.getLayerAt(i)
-            if layer.get_learning()>0:
-                pass
-            else:
-                continue
-            #
+#            if layer.get_learning()>0:
+#                pass
+#            else:
+#                continue
+#            #
             list_of_layer_index.append(i)
         #
         if reverse==0: # input to output
@@ -765,15 +292,9 @@ class Train:
                 else:
                     r._remote.set_batch(j)
                 #
-                for m in range(self._loop): #1, 2, 4, 8, 16
+                for m in range(self._loop): # 1, 2, 4, 8, 16
                     self._cnt_k = m
-                    #self.set_weight_shift_mode(1)
                     entropy, c_cnt = self.layer_loop()
-                    #
-#                    self.set_weight_shift_mode(1)
-#                    entropy, h_cnt = self.layer_loop()
-#                    self.set_weight_shift_mode(-1)
-#                    entropy, c_cnt = self.layer_loop()
                     r.export_weight_index(package._wi_csv_path)
                     #
                     if entropy<limit:
@@ -789,11 +310,11 @@ class Train:
                         r.unlock_weight_all()
                         print(">>> unlock all weights")
                     #
-                    # this won't work. better use sum of updated weights
-                    #
-                #
-            #
-        #
+                # for m
+                if self._disable_mini_batch:
+                    break
+            # for j
+        # for e
         elapsed_time = time.time() - start_time
         t = format(elapsed_time, "0")
         print("time = %s" % (t))

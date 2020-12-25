@@ -113,23 +113,13 @@ class Layer(object):
         self._id = -1
         self._num_input = num_input
         self._num_node = num_node
-        # mems for weights
-        self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
         #
         self._node_marker = np.zeros( (self._num_node), dtype=np.int32)
         #
-        self._num_update = num_input/10
-        if self._num_update<1:
-            self._num_update = 1
-        #
-        #self._learning = 1 # 0 : off, 1 : on
-        #self._cache = 0 # 0 : off, 1 : on
-        #
-        # allocate mems for output, also intermediate working area when it is needed
-        #
+        self._num_update = 0
+     
+    def count_weight(self):
+        return self._num_node*self._num_input
         
     def get_pre_layer(self):
         return self._pre
@@ -137,6 +127,7 @@ class Layer(object):
     def set_marker_pre(self, ni, v):
         if self._pre:
             self._pre.set_marker(ni, v)
+        #
             
     def set_marker(self, ni, v):
         self._node_marker[ni] = v
@@ -228,8 +219,7 @@ class InputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
         print("InputLayer::__init__()")
         super(InputLayer, self).__init__(i, LAYER_TYPE_INPUT, num_input, num_node, pre, gpu)
-        #self._learning = 0 # off
-        #self._cache = 1 # on
+        #
     
     def prepare(self, batch_size):
         self._batch_size = batch_size
@@ -241,7 +231,7 @@ class InputLayer(Layer):
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         pass
-
+    
 #
 #
 #
@@ -249,8 +239,15 @@ class HiddenLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
         print("HiddenLayer::__init__()")
         super(HiddenLayer, self).__init__(i, LAYER_TYPE_HIDDEN, num_input, num_node, pre, gpu)
+        #
+        self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        #
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+        #
     
     def prepare(self, batch_size):
         self._batch_size = batch_size
@@ -292,6 +289,12 @@ class OutputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
         print("OutputLayer::__init__()")
         super(OutputLayer, self).__init__(i, LAYER_TYPE_OUTPUT, num_input, num_node, pre, gpu)
+        #
+        self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        #
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
 
@@ -338,27 +341,23 @@ class OutputLayer(Layer):
 class MaxLayer(Layer):
     def __init__(self, i, ch, w, h, pre, gpu=None):
         print("MaxLayer::__init__()")
-        #
-        self._pre = pre
-        self._index = i
-        self._type = LAYER_TYPE_POOL
-        self._gpu = gpu
-        self._id = -1 # reserved
-        #
         self._ch = ch
-        self._num_input = w * h
+        self._batch_stride = w * h * ch
+        num_input = w*h
         self._x = int(w/2)
         self._y = int(h/2)
-        self._num_node = self._x * self._y
-        self._batch_stride = w * h * ch
+        num_node = self._x*self._y
+        super(MaxLayer, self).__init__(i, LAYER_TYPE_POOL, num_input, num_node, pre, gpu)
         #
-        #super(MaxLayer, self).__init__(i, LAYER_TYPE_POOL, num_input, num_node, gpu)
-        #
-        #self._learning = 0 # off
-        #self._cache = 0 # off
-    
+
+    def get_num_update(self):
+        return 0
+
     def set_weight_index(self, ni, ii, wi):
         pass
+        
+    def get_weight_index(self, ni, ii):
+        return 0
     
     def export_weight_index(self):
         return None
@@ -371,9 +370,6 @@ class MaxLayer(Layer):
     
     def prepare(self, batch_size):
         print("MaxLayer::prepare()")
-        #print(batch_size)
-        #print(self._ch)
-        #print(self._num_node)
         self._batch_size = batch_size
         self._output_array = np.zeros((self._batch_size, self._ch, self._num_node), dtype=np.float32)
         #
@@ -393,43 +389,24 @@ class MaxLayer(Layer):
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
         print("Convolution Layer ver.4 ::__init__()")
-        #
-        self._pre = pre
-        self._index = i # index of layers
-        self._type = LAYER_TYPE_CONV_4
-        self._gpu = gpu
-        self._id = -1 # reserved
-        #self._padding = 1 # on mode only
-        #self._learning = 1 # on
         self._cache = 0 # on
-        #self._padding_cache = 1
-        #
         self._ch = ch
         self._w = w
         self._h = h
-        
-        # filter
         self._filter = filter
         self._filter_size = 3 * 3 * ch # width and height of filter are fixed to 3
-        self._num_update = self._filter_size*filter # num of weights
+        num_input = self._filter_size
+        num_node = self._filter
+        super(Conv_4_Layer, self).__init__(i, LAYER_TYPE_CONV_4, num_input, num_node, pre, gpu)
 
         # mems for weights
         self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
         self._weight_lock = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
         self._weight_property = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
-        # need alt??
-        #self._weight_index_matrix_alt = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        #self._weight_matrix_alt = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
-        #self._wi_undo = 0
-        
-        # note : node and input are diffrently used from other layers
-        self._num_input = self._filter_size
-        self._num_node = self._filter
         #
         if self._gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
-            #self._gpu_weight_alt = self._gpu.dev_malloc(self._weight_matrix_alt)
         #
 
     def prepare(self, batch_size):
@@ -587,9 +564,10 @@ class Roster:
         c = self.countLayers()
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            nc = layer._num_node
-            ic = layer._num_input
-            cnt = cnt + nc*ic
+            #nc = layer._num_node
+            #ic = layer._num_input
+            #cnt = cnt + nc*ic
+            cnt = cnt + layer.count_weight()
         #
         return cnt
 

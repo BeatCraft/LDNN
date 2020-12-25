@@ -154,6 +154,7 @@ class Train:
         direction = self._weight_shift_mode
         epoc = self._epoc
         cnt = 0
+        #
         num_w = layer.get_num_input()
         w_p = layer.get_num_update()
         #
@@ -166,7 +167,7 @@ class Train:
                 wi_list.append(ii)
             #
         #
-        random.shuffle(wi_list)
+        #random.shuffle(wi_list)
         random.shuffle(wi_list)
         print("w : %d" % (len(wi_list)))
         if w_p>len(wi_list):

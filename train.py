@@ -69,9 +69,9 @@ class Train:
     def set_epoc(self, n):
         self._epoc = n
 
+    # obsolute
     def set_weight_shift_mode(self, mode):
         self._weight_shift_mode = mode
-        # obsolute
         
     def set_layer_direction(self, d):
         self._layer_direction = d
@@ -167,14 +167,12 @@ class Train:
                 wi_list.append(ii)
             #
         #
-        #random.shuffle(wi_list)
         random.shuffle(wi_list)
-        print("w : %d" % (len(wi_list)))
+        print("L(%d)-W(%d) : %d/%d" % (li, ni, len(wi_list), num_w))
         if w_p>len(wi_list):
             w_p = len(wi_list)
         #
-        #
-        #
+        
         for p in range(w_p):
             #ii = random.randrange(num_w)
             ii = wi_list[p]

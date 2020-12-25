@@ -204,7 +204,7 @@ def main():
         t.set_epoc(epoc)
         t.set_loop(loop)
         t.set_layer_direction(1) # 0 : in to out, 1 : out to in
-        t.disable_mini_batch()
+        #t.disable_mini_batch()
         #
         t.loop()
     elif mode==1: # test (batch)

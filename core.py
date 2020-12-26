@@ -93,7 +93,7 @@ LAYER_TYPE_INPUT   = 0
 LAYER_TYPE_HIDDEN  = 1
 LAYER_TYPE_OUTPUT  = 2
 LAYER_TYPE_CONV_4  = 3
-LAYER_TYPE_POOL    = 4 # MAX
+LAYER_TYPE_MAX    = 4 # MAX
 #
 class Layer(object):
     # i         : index of layers
@@ -135,12 +135,6 @@ class Layer(object):
     def get_marker(self, ni):
         return self._node_marker[ni]
 
-#    def set_learning(self, v):
-#        self._learning = v
-#
-#    def get_learning(self):
-#        return self._learning
-#
     def set_num_update(self, n):
         self._num_update = n
     
@@ -172,19 +166,31 @@ class Layer(object):
     def set_weight_property(self, ni, ii, p):
         self._weight_property[ni][ii] = p
 
+    def reset_weight_property_all(self):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                set_weight_property(self, ni, ii, 0)
+            #
+        #
+
     def get_weight_lock(self, ni, ii):
         return self._weight_lock[ni][ii]
     
     def set_weight_lock(self, ni, ii, l):
         self._weight_lock[ni][ii] = l
     
-    def set_weight_index(self, ni, ii, wi): # weight index
-        #print "set_weight_index(%d, %d)" % (ni, ii)
+    def unlock_weight_all(self):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                set_weight_lock(self, ni, ii, 0)
+            #
+        #
+    
+    def set_weight_index(self, ni, ii, wi): # wi : weight index
         self._weight_index_matrix[ni][ii] = wi
         self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
     
     def init_weight_with_random_index(self):
-        #print "init_weight_with_random_index"
         for ni in range(self._num_node):
             for ii in range(self._num_input):
                 #wi = WEIGHT_INDEX_SIZE-1
@@ -198,7 +204,6 @@ class Layer(object):
         self._weight_index_matrix = np.array(wi_list, dtype=np.int32).copy()
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                #print "(%d, %d) = %d" % (ni, ii, self._weight_index_matrix[ni][ii])
                 self.set_weight_index(ni, ii, self._weight_index_matrix[ni][ii])
             #
         #
@@ -232,6 +237,36 @@ class InputLayer(Layer):
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         pass
     
+    def get_num_update(self):
+        return 0
+
+    def get_weight_property(self, ni, ii):
+        return 0
+        
+    def set_weight_property(self, ni, ii, wi):
+        pass
+    
+    def reset_weight_property_all(self):
+        pass
+            
+    def get_weight_lock(self, ni, ii):
+        return 0
+
+    def set_weight_lock(self, ni, ii, lock):
+        pass
+        
+    def unlock_weight_all(self):
+        pass
+    
+    def set_weight_index(self, ni, ii, wi):
+        pass
+        
+    def get_weight_index(self, ni, ii):
+        return 0
+    
+    def export_weight_index(self):
+        return None
+
 #
 #
 #
@@ -347,12 +382,30 @@ class MaxLayer(Layer):
         self._x = int(w/2)
         self._y = int(h/2)
         num_node = self._x*self._y
-        super(MaxLayer, self).__init__(i, LAYER_TYPE_POOL, num_input, num_node, pre, gpu)
+        super(MaxLayer, self).__init__(i, LAYER_TYPE_MAX, num_input, num_node, pre, gpu)
         #
 
     def get_num_update(self):
         return 0
 
+    def get_weight_property(self, ni, ii):
+        return 0
+        
+    def set_weight_property(self, ni, ii, wi):
+        pass
+    
+    def reset_weight_property_all(self):
+        pass
+    
+    def get_weight_lock(self, ni, ii):
+        return 0
+        
+    def set_weight_lock(self, ni, ii, lock):
+        pass
+    
+    def unlock_weight_all(self):
+        pass
+    
     def set_weight_index(self, ni, ii, wi):
         pass
         
@@ -361,10 +414,7 @@ class MaxLayer(Layer):
     
     def export_weight_index(self):
         return None
-    
-    def get_weight_lock(self, ni, ii):
-        return 0
-    
+
     def import_weight_index(self, wi_list):
         pass
     
@@ -517,7 +567,7 @@ class Roster:
         c = self.countLayers()
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            if layer.get_type()==LAYER_TYPE_POOL:
+            if layer.get_type()==LAYER_TYPE_MAX:
                 pass
             else:
                 layer.init_weight_with_random_index()
@@ -528,17 +578,18 @@ class Roster:
         c = self.countLayers()
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            nc = layer._num_node
-            ic = layer._num_input
-            for ni in range(nc):
-                for ii in range(ic):
-                    if layer.get_type()==LAYER_TYPE_POOL:
-                        pass
-                    else:
-                        layer.set_weight_property(ni, ii, p)
-                    #
-                #
-            #
+            layer.reset_weight_property_all()
+#            nc = layer._num_node
+#            ic = layer._num_input
+#            for ni in range(nc):
+#                for ii in range(ic):
+#                    if layer.get_type()==LAYER_TYPE_MAX:
+#                        pass
+#                    else:
+#                        layer.set_weight_property(ni, ii, p)
+#                    #
+#                #
+#            #
         #
 
     def count_locked_weight(self):
@@ -575,13 +626,14 @@ class Roster:
         c = self.countLayers()
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            nc = layer._num_node
-            ic = layer._num_input
-            for ni in range(nc):
-                for ii in range(ic):
-                    layer.set_weight_lock(ni, ii, 0)
-                #
-            #
+            layer.unlock_weight_all()
+#            nc = layer._num_node
+#            ic = layer._num_input
+#            for ni in range(nc):
+#                for ii in range(ic):
+#                    layer.set_weight_lock(ni, ii, 0)
+#                #
+#            #
         #
 
     def update_weight(self):
@@ -620,10 +672,10 @@ class Roster:
             layer = OutputLayer(c, num_input, num_node, self._gpu)
             self.layers.append(layer)
             return layer
-        elif type==LAYER_TYPE_CONV:
+        elif type==LAYER_TYPE_CONV_4:
             print("not yet")
             return
-        elif type==LAYER_TYPE_POOL:
+        elif type==LAYER_TYPE_MAX:
             print("not yet")
             return
  
@@ -711,7 +763,10 @@ class Roster:
             for i in range(1, lc):
                 layer = self.getLayerAt(i)
                 #print "%d : %d" % (i, layer.get_type())
-                if layer.get_type()==LAYER_TYPE_POOL:
+                
+                #count_weight
+                
+                if layer.get_type()==LAYER_TYPE_MAX:
                     #print "fuck"
                     continue
                 #

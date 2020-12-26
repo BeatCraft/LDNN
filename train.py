@@ -174,7 +174,6 @@ class Train:
         #
         
         for p in range(w_p):
-            #ii = random.randrange(num_w)
             ii = wi_list[p]
             entropy, ret = self.weight_shift(li, ni, ii, entropy, zero)
             if ret>0:
@@ -249,12 +248,9 @@ class Train:
             layer_type = layer.get_type()
             if layer_type==core.LAYER_TYPE_INPUT:
                 continue
-            elif layer_type==core.LAYER_TYPE_POOL:
+            elif layer_type==core.LAYER_TYPE_MAX:
                 continue
             #
-#            if layer_type==core.LAYER_TYPE_CONV_2D:
-#                zero = 1
-#            #
             entropy, ret = self.node_loop(entropy, layer, li, zero)
             cnt = cnt + ret
             if entropy<limit:
@@ -303,7 +299,7 @@ class Train:
                     all = r.count_weight()
                     locked = r.count_locked_weight()
                     rate = float(locked) / float(all)
-                    print("locked weight : %d / %d = %f" %(locked, all, rate))
+                    print("[%d|%d|%d] locked weight : %d / %d = %f" %(e, j, m, locked, all, rate))
                     if rate>0.9:
                         r.reset_weight_property()
                         r.unlock_weight_all()

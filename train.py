@@ -19,6 +19,8 @@ import numpy as np
 import struct
 import pickle
 #
+#import logging
+#logger = logging.getLogger(__name__)
 #
 # LDNN Modules
 import core
@@ -180,8 +182,13 @@ class Train:
                 cnt = cnt + ret
                 if direction>0:
                     print("+[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy))
+#                    dmsg = "+[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy)
+ #                   logger.debug(dmsg)
+                    
                 else:
                     print("-[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy))
+#                    dmsg = "-[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy)
+ #                   logger.debug(dmsg)
                 #
             #
             if entropy<limit:
@@ -300,6 +307,9 @@ class Train:
                     locked = r.count_locked_weight()
                     rate = float(locked) / float(all)
                     print("[%d|%d|%d] locked weight : %d / %d = %f" %(e, j, m, locked, all, rate))
+                    #dmsg = "[%d|%d|%d] locked weight : %d / %d = %f" % (e, j, m, locked, all, rate)
+                    #logger.debug(dmsg)
+                    
                     if rate>0.9:
                         r.reset_weight_property()
                         r.unlock_weight_all()

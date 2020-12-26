@@ -98,8 +98,10 @@ LAYER_TYPE_MAX    = 4 # MAX
 class Layer(object):
     # i         : index of layers
     # type      : 0 = input, 1 = hidden, 2 = output
+    # input : stimulus from a previous layer
     # num_input : number of inputs / outputs from a previous layer
-    # num_node  : numbers of neurons
+    # node : neurons
+    # num_node  : numbers of neurons in a layer
     def __init__(self, i, type, num_input, num_node, pre, gpu=None):
         self._pre = pre
         self._index = i
@@ -117,7 +119,18 @@ class Layer(object):
         self._node_marker = np.zeros( (self._num_node), dtype=np.int32)
         #
         self._num_update = 0
-     
+    
+    def count_locked_weight(self):
+        cnt = 0
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                if self._weight_lock[ni][ii]==1:
+                    cnt = cnt + 1
+                #
+            #
+        #
+        return cnt
+        
     def count_weight(self):
         return self._num_node*self._num_input
         
@@ -225,7 +238,10 @@ class InputLayer(Layer):
         print("InputLayer::__init__()")
         super(InputLayer, self).__init__(i, LAYER_TYPE_INPUT, num_input, num_node, pre, gpu)
         #
-    
+        
+    def count_locked_weight(self):
+        return 0
+        
     def prepare(self, batch_size):
         self._batch_size = batch_size
         #
@@ -267,6 +283,8 @@ class InputLayer(Layer):
     def export_weight_index(self):
         return None
 
+    def count_weight(self):
+        return 0
 #
 #
 #
@@ -418,6 +436,12 @@ class MaxLayer(Layer):
     def import_weight_index(self, wi_list):
         pass
     
+    def count_weight(self):
+        return 0
+    
+    def count_locked_weight(self):
+        return 0
+        
     def prepare(self, batch_size):
         print("MaxLayer::prepare()")
         self._batch_size = batch_size
@@ -458,7 +482,7 @@ class Conv_4_Layer(Layer):
         if self._gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
         #
-
+        
     def prepare(self, batch_size):
         print("Conv_4_Layer::prepare(%d)" %(batch_size))
         self._batch_size = batch_size
@@ -597,16 +621,17 @@ class Roster:
         c = self.countLayers()
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            nc = layer._num_node
-            ic = layer._num_input
-            for ni in range(nc):
-                for ii in range(ic):
-                    lock = layer.get_weight_lock(ni, ii)
-                    if lock>0:
-                        cnt = cnt + 1
-                    #
-                #
-            #
+            cnt = cnt + layer.count_locked_weight()
+#            nc = layer._num_node
+#            ic = layer._num_input
+#            for ni in range(nc):
+#                for ii in range(ic):
+#                    lock = layer.get_weight_lock(ni, ii)
+#                    if lock>0:
+#                        cnt = cnt + 1
+#                    #
+#                #
+#            #
         #
         return cnt
     
@@ -615,9 +640,6 @@ class Roster:
         c = self.countLayers()
         for i in range(1, c):
             layer = self.getLayerAt(i)
-            #nc = layer._num_node
-            #ic = layer._num_input
-            #cnt = cnt + nc*ic
             cnt = cnt + layer.count_weight()
         #
         return cnt

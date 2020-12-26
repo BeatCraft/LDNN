@@ -28,6 +28,12 @@ import gpu
 import train
 import test
 #
+#import logging
+#logger = logging.getLogger(__name__)
+#logger.setLevel(logging.DEBUG)
+#get_handler = logging.FileHandler("log/log.txt")
+#logger.addHandler(get_handler)
+#
 #
 #
 sys.setrecursionlimit(10000)
@@ -221,6 +227,7 @@ def main():
 #
 if __name__=='__main__':
     print(">> start")
+#    logger.debug('hello')
     sts = main()
     print(">> end")
     print("\007")

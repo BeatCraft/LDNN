@@ -195,7 +195,7 @@ class Layer(object):
     def unlock_weight_all(self):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                set_weight_lock(self, ni, ii, 0)
+                self.set_weight_lock(ni, ii, 0)
             #
         #
     

@@ -182,7 +182,7 @@ class Layer(object):
     def reset_weight_property_all(self):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                set_weight_property(self, ni, ii, 0)
+                self.set_weight_property(ni, ii, 0)
             #
         #
 

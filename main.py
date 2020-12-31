@@ -179,6 +179,7 @@ def main():
     print("0 : train (mini-batch)")
     print("1 : test (500)")
     print("2 : ? (unit test)")
+    print("3 : CNN Test")
     menu = get_key_input("input command >")
     if menu==0:
         mode = 0
@@ -186,6 +187,8 @@ def main():
         mode = 1
     elif menu==2:
         mode = 2
+    elif menu==3:
+        mode = 3
     else:
         mode = 1
     #
@@ -196,9 +199,9 @@ def main():
         return 0
     #
     if mode==0: # train
-        epoc = 1
+        epoc = 4
         mini_batch_size = 500
-        loop = 8 # 1 2 4 8
+        loop = 1#16 # 1 2 4 8
         print("package._train_batch_size=%d" % (package._train_batch_size))
         it = int(package._train_batch_size/mini_batch_size)
         print("it = %d" % (it))
@@ -217,6 +220,8 @@ def main():
         test.test_n(r, package, 500)
     elif mode==2: #
         test.unit_test(r, package)
+    elif mode==3: #
+        test.cnn_test(r, package)
     else:
         print("input error")
         pass

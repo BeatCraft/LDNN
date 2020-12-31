@@ -10,6 +10,8 @@ import pickle
 import numpy as np
 import csv
 
+from PIL import Image
+
 # LDNN Modules
 import gpu
 import util
@@ -540,6 +542,38 @@ class Conv_4_Layer(Layer):
 #        self._gpu.copy(self._output_array, self._gpu_output)
 #        print(self._output_array)
     #
+    def save_output(self):
+        #pass
+        self._gpu.copy(self._output_array, self._gpu_output)
+        #
+        for bi in range(self._batch_size):
+            for fi in range(self._filter):
+                data_array = self._output_array[bi][fi]
+                size = self._w * self._h
+                max = np.max(data_array)
+                min = np.min(data_array)
+                print("max=%f, min=%f" % (max, min))
+                #img_array = np.zeros( (self._h, self._w), dtype=np.int32)
+                img = Image.new("L", (self._w, self._h), 0)
+                pix = img.load()
+                for y in range(self._h):
+                    for x in range(self._w):
+                        v = data_array[self._w*y + x]
+                        #print v
+                        v1 = int(v*255/max)
+                        pix[x,y] = v1
+                        
+                        #img_array[y, x] = int(v*255/max)
+                        #print img_array[y, x]
+#                        v1 / 255 = v / max
+                    #
+                #
+                #print img_array
+                #img_gray = Image.fromarray(img_array)
+                #print(img_gray.mode)
+                img.save("./debug/cnn/%d_%d.png" %(bi, fi))
+            #
+        #
 #
 #
 #
@@ -673,6 +707,9 @@ class Roster:
         return self.layers
 
     def getLayerAt(self, i):
+        return self.get_layer_at(i)
+    
+    def get_layer_at(self, i):
         c = self.countLayers()
         if i>=c:
             print("error : Roster : getLayerAt")

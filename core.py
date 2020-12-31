@@ -506,7 +506,8 @@ class Conv_4_Layer(Layer):
     def init_weight_with_random_index(self):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                wi = random.randrange(len(WEIGHT_SET)) # 5
+                wi = random.randrange(len(WEIGHT_SET))
+                #wi = 7 # 5:0.0, 7:0.5
                 self.set_weight_index(ni, ii, wi)
             #
         #
@@ -534,9 +535,11 @@ class Conv_4_Layer(Layer):
             self.update_weight()
         else:
             self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
-            #
-            # scale ?
-            #
+        #
+        # scale
+        #
+        size = self._filter * self._w * self._h
+        self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
         #
         # debug
 #        self._gpu.copy(self._output_array, self._gpu_output)

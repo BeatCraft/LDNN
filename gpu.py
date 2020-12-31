@@ -75,18 +75,6 @@ __kernel void conv_4_roll_batch(
             sum += input[start + y_stride + (w+2)*2 + xi    ] * weight[fi*ch*3*3 + i*3*3 + 6];
             sum += input[start + y_stride + (w+2)*2 + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 7];
             sum += input[start + y_stride + (w+2)*2 + xi + 2] * weight[fi*ch*3*3 + i*3*3 + 8];
-            
-//            sum += input[start + y_stride - w + xi - 1] * weight[fi*ch*3*3 + i*3*3    ];
-//            sum += input[start + y_stride - w + xi    ] * weight[fi*ch*3*3 + i*3*3 + 1];
-//            sum += input[start + y_stride - w + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 2];
-//
-//            sum += input[start + y_stride + xi - 1] * weight[fi*ch*3*3 + i*3*3 + 3];
-//            sum += input[start + y_stride + xi    ] * weight[fi*ch*3*3 + i*3*3 + 4];
-//            sum += input[start + y_stride + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 5];
-//
-//            sum += input[start + y_stride + w + xi - 1] * weight[fi*ch*3*3 + i*3*3 + 6];
-//            sum += input[start + y_stride + w + xi    ] * weight[fi*ch*3*3 + i*3*3 + 7];
-//            sum += input[start + y_stride + w + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 8];
         }
         // relu
         if (sum<0.0){

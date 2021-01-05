@@ -517,12 +517,13 @@ class Conv_4_Layer(Layer):
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
 #        print("Conv_4_Layer::propagate()")
-        if self._cache:
-            pass
-        else:
-            self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-            self._cache = 1
+#        if self._cache:
+#            pass
+#        else:
+#            self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
+#            self._cache = 1
         #
+        self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
         
         # ni : filetr index, 0 to num of filter -1
         # ii : index of matrix, 0 to 3*3*ch-1
@@ -619,8 +620,8 @@ class Roster:
         layer = self.getLayerAt(0) # input layer
         layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0), layer._num_node, batch_size, 0)
         #
-        layer = self.getLayerAt(1) # CNN
-        layer._cache = 0
+        #layer = self.getLayerAt(1) # CNN
+        #layer._cache = 0
 #        self._gpu.copy(layer._output_array, layer._gpu_output)
 #        print layer._output_array[0]
             

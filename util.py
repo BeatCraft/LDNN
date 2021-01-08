@@ -6,10 +6,8 @@ from stat import *
 import random
 import copy
 import struct
-
 import pickle
 import numpy as np
-import pickle
 
 from PIL import Image
 from PIL import ImageFile

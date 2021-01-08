@@ -193,7 +193,27 @@ class Layer(object):
     
     def set_weight_lock(self, ni, ii, l):
         self._weight_lock[ni][ii] = l
+  
+    def get_weight_mbid(self, ni, ii):
+        return self._weight_mbid[ni][ii]
     
+    def set_weight_mbid(self, ni, ii, mbid):
+        self._weight_mbid[ni][ii] = mbid
+    
+    def reset_weight_mbid(self):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                self.set_weight_mbid(ni, ii, 0)
+            #
+        #
+    
+    def assign_weight_mbid_random(self, max):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                mbid = random.randrange(max)
+                self.set_weight_mbid(ni, ii, mbid)
+            #
+        #
     def unlock_weight_all(self):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
@@ -285,6 +305,12 @@ class InputLayer(Layer):
     def export_weight_index(self):
         return None
 
+    def set_weight_mbid(self, ni, ii, mbid):
+        pass
+        
+    def get_weight_mbid(self, ni, ii):
+        pass
+        
     def count_weight(self):
         return 0
 #
@@ -297,6 +323,7 @@ class HiddenLayer(Layer):
         #
         self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_mbid = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
         #
@@ -347,6 +374,7 @@ class OutputLayer(Layer):
         #
         self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_mbid = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
         #
@@ -461,6 +489,11 @@ class MaxLayer(Layer):
         #
 #        self._gpu.copy(self._output_array, self._gpu_output)
 #        print self._output_array
+    def set_weight_mbid(self, ni, ii, mbid):
+        pass
+        
+    def get_weight_mbid(self, ni, ii):
+        pass
 
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
@@ -478,6 +511,7 @@ class Conv_4_Layer(Layer):
         # mems for weights
         self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
         self._weight_lock = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+        self._weight_mbid = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
         self._weight_property = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
         #
@@ -681,6 +715,22 @@ class Roster:
             cnt = cnt + layer.count_weight()
         #
         return cnt
+
+
+    def reset_weight_mbid(self):
+        c = self.countLayers()
+        for i in range(1, c):
+            layer = self.getLayerAt(i)
+            layer.reset_weight_mbid()
+        #
+    #
+    def assign_weight_mbid(self, mbsize):
+        c = self.countLayers()
+        for i in range(1, c):
+            layer = self.getLayerAt(i)
+            layer.assign_weight_mbid_random(mbsize)
+        #
+    #
 
     def unlock_weight_all(self):
         c = self.countLayers()

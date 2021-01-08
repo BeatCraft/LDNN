@@ -111,36 +111,24 @@ def main():
         print("%d : %s" % (d, platform.name))
         d = d + 1
     #
-    menu = get_key_input("input command >")
-    if menu==0:
-        platform_id = 0
-    elif menu==1:
-        platform_id = 1
-    elif menu==2:
-        platform_id = 2
-    else:
-        platform_id = 1 # my MBP
+    platform_id = get_key_input("input command >")
+    if platform_id<0 or platform_id>=d:
+        print("error : platform_id=%d" % (platform_id))
+        return 0
     #
-
+    
     print("- Select a device -")
     d = 0
     for device in platform.get_devices():
         print("%d : %s" % (d, device.name))
         d = d + 1
     #
-    menu = get_key_input("input command >")
-    print(menu)
-    if menu==0:
-        device_id = 0
-    elif menu==1:
-        device_id = 1
-    elif menu==2:
-        device_id = 2
-    else:
-        device_id = 0
+    device_id = get_key_input("input command >")
+    if device_id<0 or device_id>=d:
+        print("error : device_id=%d" % (device_id))
+        return 0
     #
     print("%d : %d" %(platform_id, device_id))
-    
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
     #
@@ -150,48 +138,33 @@ def main():
     print("- Select a package -")
     print("0 : MNIST")
     print("1 : CIFAR-10")
-    menu = get_key_input("input command >")
-    if menu==0:
-        package_id = 0
-    elif menu==1:
-        package_id = 1
-    else:
-        package_id = 0
+    package_id = get_key_input("input command >")
+    if package_id<0 or package_id>1:
+        print("error : package_id=%d" % package_id)
+        return 0
     #
-    #
-    #
+
     print("- Select a config-")
     print("0 : FC for MNIST")
     print("1 : CNN for MNIST")
-    menu = get_key_input("input command >")
-    if menu==0:
-        config = 0
-    elif menu==1:
-        config = 1
-    else:
-        config = 1
+    config = get_key_input("input command >")
+    if config<0 or config>1:
+        print("error : config=%d" % config)
+        return 0
     #
     
-    #
-    #
-    #
     print("- Select a command-")
     print("0 : train (mini-batch)")
     print("1 : test (500)")
     print("2 : ? (unit test)")
     print("3 : CNN Test")
-    menu = get_key_input("input command >")
-    if menu==0:
-        mode = 0
-    elif menu==1:
-        mode = 1
-    elif menu==2:
-        mode = 2
-    elif menu==3:
-        mode = 3
-    else:
-        mode = 1
+    print("4 : new train")
+    mode = get_key_input("input command >")
+    if mode<0 or mode>4:
+        print("error : mode=%d" % mode)
+        return 0
     #
+
     package = util.Package(package_id)
     r = package.setup_dnn(my_gpu, config)
     if r is None:
@@ -222,6 +195,25 @@ def main():
         test.unit_test(r, package)
     elif mode==3: #
         test.cnn_test(r, package)
+    elif mode==4: #
+        print("new train")
+        epoc = 1
+        mini_batch_size = 500
+        loop = 1
+        print("package._train_batch_size=%d" % (package._train_batch_size))
+        it = int(package._train_batch_size/mini_batch_size)
+        print("it = %d" % (it))
+        #
+        t = train.Train(package, r)
+        t.set_limit(0.000001)
+        t.set_mini_batch_size(mini_batch_size)
+        t.set_iteration(it)
+        t.set_epoc(epoc)
+        t.set_loop(loop)
+        t.set_layer_direction(1) # 0 : in to out, 1 : out to in
+        #t.disable_mini_batch()
+        #
+        t.loop_alt()
     else:
         print("input error")
         pass

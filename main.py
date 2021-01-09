@@ -197,8 +197,8 @@ def main():
         test.cnn_test(r, package)
     elif mode==4: #
         print("new train")
-        epoc = 1
-        mini_batch_size = 500
+        epoc = 8
+        mini_batch_size = 1000
         loop = 1
         print("package._train_batch_size=%d" % (package._train_batch_size))
         it = int(package._train_batch_size/mini_batch_size)

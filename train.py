@@ -382,11 +382,8 @@ class Train:
                 w_list = self.get_weight_list_by_mbid(j)
                 print("%d : %d" % (j, len(w_list)))
                 attack_num = len(w_list) #int(len(w_list)/10)
-                #random.shuffle(w_list)
-                #continue
-                #
+                random.shuffle(w_list)
                 for m in range(self._loop): # 1, 2, 4, 8, 16
-                    
                     for p in range(attack_num):
                         tp = w_list[p]
                         li = tp[0]

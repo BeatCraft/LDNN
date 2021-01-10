@@ -20,11 +20,11 @@ import struct
 import pickle
 import csv
 from PIL import Image
-from PIL import ImageFile
-from PIL import JpegImagePlugin
-from PIL import ImageFile
-from PIL import PngImagePlugin
-import zlib
+#from PIL import ImageFile
+#from PIL import JpegImagePlugin
+#from PIL import ImageFile
+#from PIL import PngImagePlugin
+#import zlib
 #
 #
 # LDNN Modules
@@ -48,7 +48,6 @@ def make_mnist_train_batch(package):
     batch_size = package._train_batch_size
     #
     file_in = open(labels_path)
-    
     header = file_in.read(MNIST_LABEL_HEADER_SIZE)
     data = file_in.read()
     #
@@ -57,7 +56,10 @@ def make_mnist_train_batch(package):
     for i in range(batch_size):
         label = struct.unpack('>B', data[i])
         labels[i] = label[0]
+        #print label
     #
+    #return 0
+    
     file_in = open(image_path)
     header = file_in.read(MNIST_IMAGE_HEADER_SIZE)
     #
@@ -66,6 +68,19 @@ def make_mnist_train_batch(package):
     for i in range(batch_size):
         image = file_in.read(MNIST_IMAGE_SIZE)
         da = np.frombuffer(image, dtype=np.uint8)
+        #
+        if i<10:
+            img = Image.new("L", (28, 28), 0)
+            pix = img.load()
+            for y in range(28):
+                for x in range(28):
+                    v = da[28*y + x]
+                    pix[x, y] = int(v)
+                #
+            #
+            img.save("./debug/mnist/%05d-%d.png" %(i, labels[i]))
+        #
+        #
         a_float = da.astype(np.float32) # convert from uint8 to float32
         images[i] = a_float
     #
@@ -245,7 +260,7 @@ def main():
     # 0 : MNIST
     # 1 : MNIST2 (smaller network)
     # 2 : CIFAR-10
-    package_id = 2
+    package_id = 0
     package = util.Package(package_id)
     #
 #    package.load_batch()
@@ -258,7 +273,7 @@ def main():
     #
     if package_id==0:
         make_mnist_train_batch(package)
-        make_mnist_test_batch(package)
+        #make_mnist_test_batch(package)
     elif package_id==1:
         pass
     elif package_id==2:

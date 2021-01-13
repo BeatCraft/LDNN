@@ -213,7 +213,7 @@ def main():
         t.set_layer_direction(1) # 0 : in to out, 1 : out to in
         #t.disable_mini_batch()
         #
-        t.loop_alt()
+        t.loop_alt_2()
     else:
         print("input error")
         pass

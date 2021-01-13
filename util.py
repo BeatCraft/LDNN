@@ -333,12 +333,12 @@ class Package:
                 r.layers.append(input)
                 # 1 : hidden : 28 x 28 x 1 = 784
                 c = r.countLayers()
-                hidden_1 = core.HiddenLayer(c, 784, 128, input, my_gpu)
+                hidden_1 = core.HiddenLayer(c, 784, 256, input, my_gpu)
                 hidden_1.set_num_update(32)
                 r.layers.append(hidden_1)
                 # 2 : hidden : 64
                 c = r.countLayers()
-                hidden_2 = core.HiddenLayer(c, 128, 128, hidden_1, my_gpu)
+                hidden_2 = core.HiddenLayer(c, 256, 128, hidden_1, my_gpu)
                 hidden_2.set_num_update(8)
                 r.layers.append(hidden_2)
                 # 3 : output

@@ -58,10 +58,6 @@ class worker(object):
         print("rank=%d" % (self._rank ))
         print("size=%d" % (self._size ))
         
-    # cmd
-    def init(self, size):
-        pass
-        
     def set_batch(self, start):
         pass
         
@@ -85,8 +81,6 @@ class client(worker):
         self._class_array = np.zeros(self._batch_size , dtype=np.int32)
         self._roster.prepare(self._batch_size, self._data_size)
 
-    def init(self, size):
-        pass
 
     def set_batch(self):
         for i in range(self._batch_size):
@@ -110,9 +104,9 @@ class server(worker):
     def __init__(self, com, platform_id, device_id, package_id, config_id):
         super(worker, self).__init__(com, platform_id, device_id, package_id, config_id)
 
-    def init(self, size):
-        pass
-        comm.send((10, "test"), dest=1, tag=1)
+#   def init(self, size):
+#        pass
+#        comm.send((10, "test"), dest=1, tag=1)
         
     def set_batch(self, start):
         pass
@@ -126,7 +120,7 @@ class server(worker):
     def update(self):
         pass
 
-    def train()
+    def train(self):
         pass
 
 def main():
@@ -155,21 +149,23 @@ def main():
     device_id = 0
     #
     cmd = 0
-    ent = np.arange(10, dtype=dtype=np.float32))
+    ent = np.arange(10, dtype=np.float32)
     #
     if rank == 0: # server
         platform_id = 0
         device_id = 0
         #
-        server = server(comm, platform_id, device_id, package_id, config_id)
-        server.debug()
+        s = server(comm, platform_id, device_id, package_id, config_id)
+        s.debug()
         #cmd = comm.bcast(cmd, root=0)
     else:
         platform_id = 1
         device_id = 1
         #
-        client = client(comm, platform_id, device_id, package_id, config_id)
-        client.debug()
+        size = 100
+        start = 100
+        c = client(comm, platform_id, device_id, package_id, config_id, size, start)
+        c.debug()
     #
     return 0
 #

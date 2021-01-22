@@ -751,6 +751,10 @@ class Roster:
             layer.update_weight()
         #
 
+    def count_layers(self):
+        return len(self.layers)
+
+    # this should be obsolute
     def countLayers(self):
         return len(self.layers)
 

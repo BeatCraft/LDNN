@@ -447,7 +447,7 @@ class Train:
                 w_list = self.get_weight_list_by_mbid(0)
                 #
                 print("%d : %d" % (j, len(w_list)))
-                attack_num = int(len(w_list)/200) #int(len(w_list)/10)
+                attack_num = int(len(w_list)/1000) #int(len(w_list)/10)
                 random.shuffle(w_list)
                 random.shuffle(w_list)
                 for m in range(self._loop): # 1, 2, 4, 8, 16
@@ -482,6 +482,130 @@ class Train:
 #
 #
 #
+    def loop_alt_3(self):
+        entropy = 1.0
+        r = self._r
+        package = self._package
+        mini_batch_size = self._mini_batch_size
+        print("it : %d" % (self._it))
+        epoc = self._epoc
+        limit = self._limit # 0.000001
+        package.load_batch()
+        batch_size = package._train_batch_size
+        data_size = package._image_size
+        num_class = package._num_class
+        #
+        r.prepare(mini_batch_size, data_size, num_class)
+        print(">>mini_batch_size(%d)" % (mini_batch_size))
+        #
+        
+        #
+        fc_layers = []
+        cnn_layers = []
+        c = r.count_layers()
+        for i in range(c):
+            layer = r.get_layer_at(i)
+            type = layer.get_type()
+            if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT:
+                fc_layers.append(i)
+            elif type==core.LAYER_TYPE_CONV_4:
+                cnn_layers.append(i)
+            #
+        #
+        #print(len(fc_layers))
+        #print(len(cnn_layers))
+                
+        start_time = time.time()
+        for e in range(epoc): # epoc
+            self._cnt_e = e
+            for j in range(self._it): # iteration / mini batch
+                self._cnt_i = j
+                #
+                self.set_mini_batch(j)
+                r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
+                r.propagate()
+                entropy = r.get_cross_entropy()
+                print(entropy)
+                #
+                w_list = []
+                for i in fc_layers:
+                    layer = r.getLayerAt(i)
+                    for ni in range(layer._num_node):
+                        for ii in range(layer._num_input):
+                            w_list.append((i, ni, ii))
+                        #
+                    #
+                #
+                #print(len(w_list))
+                random.shuffle(w_list)
+                random.shuffle(w_list)
+                attack_num = int(len(w_list)/1000)
+                for m in range(self._loop):
+                    for p in range(attack_num):
+                        tp = w_list[p]
+                        li = tp[0]
+                        ni = tp[1]
+                        ii = tp[2]
+                        entropy, ret = self.weight_shift(li, ni, ii, entropy)
+                        if ret:
+                            print("[%d %d %d](%d/%d)[%d|%d|%d] %f" % (e, j, m, p, attack_num, li, ni, ii, entropy))
+                        #
+                    #
+                    r.export_weight_index(package._wi_csv_path)
+                    if entropy<limit:
+                        print("reach to the limit(%f), exit iterations" %(limit))
+                        return
+                    #
+                # for m
+                if self._disable_mini_batch:
+                    break
+                #
+                r.reset_weight_property()
+                r.unlock_weight_all()
+            # for j
+            for j in range(self._it): # iteration / mini batch
+                self._cnt_i = j
+                #
+                w_list = []
+                for i in cnn_layers:
+                    layer = r.getLayerAt(i)
+                    for ni in range(layer._num_node):
+                        for ii in range(layer._num_input):
+                            w_list.append((i, ni, ii))
+                        #
+                    #
+                #
+                random.shuffle(w_list)
+                random.shuffle(w_list)
+                attack_num = int(len(w_list)/10)
+                for m in range(self._loop):
+                    for p in range(attack_num):
+                        tp = w_list[p]
+                        li = tp[0]
+                        ni = tp[1]
+                        ii = tp[2]
+                        entropy, ret = self.weight_shift(li, ni, ii, entropy)
+                        if ret:
+                            print("[%d %d %d](%d/%d)[%d|%d|%d] %f" % (e, j, m, p, attack_num, li, ni, ii, entropy))
+                        #
+                    #
+                    r.export_weight_index(package._wi_csv_path)
+                    if entropy<limit:
+                        print("reach to the limit(%f), exit iterations" %(limit))
+                        return
+                    #
+                # for m
+                if self._disable_mini_batch:
+                    break
+                #
+                r.reset_weight_property()
+                r.unlock_weight_all()
+            # for j
+        # e
+        elapsed_time = time.time() - start_time
+        t = format(elapsed_time, "0")
+        print("time = %s" % (t))
+    #
 
 
 

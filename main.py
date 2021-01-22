@@ -173,7 +173,7 @@ def main():
     #
     if mode==0: # train
         epoc = 4
-        mini_batch_size = 500
+        mini_batch_size = 250
         loop = 1#16 # 1 2 4 8
         print("package._train_batch_size=%d" % (package._train_batch_size))
         it = int(package._train_batch_size/mini_batch_size)
@@ -197,8 +197,8 @@ def main():
         test.cnn_test(r, package)
     elif mode==4: #
         print("new train")
-        epoc = 8
-        mini_batch_size = 1000
+        epoc = 1
+        mini_batch_size = 200
         loop = 1
         print("package._train_batch_size=%d" % (package._train_batch_size))
         it = int(package._train_batch_size/mini_batch_size)
@@ -213,7 +213,7 @@ def main():
         t.set_layer_direction(1) # 0 : in to out, 1 : out to in
         #t.disable_mini_batch()
         #
-        t.loop_alt_2()
+        t.loop_alt_3()
     else:
         print("input error")
         pass

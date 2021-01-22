@@ -31,6 +31,9 @@ sys.setrecursionlimit(10000)
 #
 #
 HOST_NAMES = ["threadripper", "amd-1", "amd-2", "amd-3"]
+PACKAGE_IDS = [1, ]
+DEVICE_IDS =  [0, ]
+
 MINI_BATCH_SIZE = [1000, 250, 250, 250]
 
 def get_host_index_by_name(name):
@@ -38,19 +41,30 @@ def get_host_index_by_name(name):
 
 class worker(object):
     def __init__(self, com, platform_id, device_id, package_id, config_id):
+#    def __init__(self, com, platform_id, device_id, package_id, config_id):
         self._com = com
-        self._gpu = gpu.Gpu(platform_id, device_id)
-        self._gpu.set_kernel_code()
-        #
-        self._package = util.Package(package_id)
-        self._roster = self._package.setup_dnn(self._gpu, config_id)
-        self._package.load_batch()
-        self._data_size = self._package._image_size
-        #
+        self._gpu = gpu
+        
         self._processor_name = MPI.Get_processor_name()
         self._host_index = get_host_index_by_name(self._processor_name)
         self._rank = self._com.Get_rank()
         self._size = self._com.Get_size()
+        
+        if self._rank==0: # server
+            self._gpu = None
+        else:
+            pass
+            
+        
+#        self._gpu = gpu.Gpu(platform_id, device_id)
+#        self._gpu.set_kernel_code()
+        #
+#        self._package = util.Package(package_id)
+#        self._roster = self._package.setup_dnn(self._gpu, config_id)
+#        self._package.load_batch()
+#        self._data_size = self._package._image_size
+        #
+
         
     def debug(self):
         print("processor_name=%s" %(self._processor_name))
@@ -71,15 +85,15 @@ class worker(object):
         pass
 
 class client(worker):
-    def __init__(self, com, platform_id, device_id, package_id, config_id, size, start):
-        super(client, self).__init__(com, platform_id, device_id, package_id, config_id)
+    def __init__(self, com, gpu, package_id, config_id, size, start):
+        super(client, self).__init__(com, gpu, package_id, config_id)
         #
         self._batch_size = size
         self._batch_start = start
         #
-        self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
-        self._class_array = np.zeros(self._batch_size , dtype=np.int32)
-        self._roster.prepare(self._batch_size, self._data_size)
+#        self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
+#        self._class_array = np.zeros(self._batch_size , dtype=np.int32)
+#        self._roster.prepare(self._batch_size, self._data_size)
 
 
     def set_batch(self):
@@ -102,7 +116,7 @@ class client(worker):
 
 class server(worker):
     def __init__(self, com, platform_id, device_id, package_id, config_id):
-        super(server, self).__init__(com, platform_id, device_id, package_id, config_id)
+        super(server, self).__init__(com, gpu, package_id, config_id)
 
 #   def init(self, size):
 #        pass
@@ -155,16 +169,19 @@ def main():
         platform_id = 0
         device_id = 0
         #
+        #gpu = None
         s = server(comm, platform_id, device_id, package_id, config_id)
         s.debug()
         #cmd = comm.bcast(cmd, root=0)
     else:
         platform_id = 1
-        device_id = 1
+        device_id = 0
         #
+        #gpu = gpu.Gpu(platform_id, device_id)
+        #gpu.set_kernel_code()
         size = 100
         start = 100
-        c = client(comm, platform_id, device_id, package_id, config_id, size, start)
+        c = client(comm, gpu, platform_id, device_id, package_id, config_id, size, start)
         c.debug()
     #
     return 0

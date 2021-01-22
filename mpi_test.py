@@ -152,34 +152,35 @@ def main():
     my_self = MPI.COMM_SELF
     my_rank = my_self.group.Get_rank()
     my_size = my_self.group.Get_size()
-    print(f"info : %d, %d, %d, %d" % (rank, size, my_rank, my_size))
+    print("s : %d, %d, %d, %d" % (rank, size, my_rank, my_size))
     #
     package_id = 0
     config_id = 0
     #
-    cmd = 1
-    ent = np.arange(10, dtype=np.float32)
+    data = 0
     #
-    data = (rank+1)**2
-    data = comm.gather(data, root=0)
-    
     if rank == 0: # server
-        platform_id = 0
-        device_id = 0
-        #
-        #gpu = None
-        s = server(comm, package_id, config_id)
+        #s = server(comm, package_id, config_id)
         #s.debug()
         #ret = comm.bcast(cmd, root=0)
-        for i in range(size):
-            assert data[i] == (i+1)**2
+        #data[rank] = float(rank)
+        #data = comm.gather(data, root=0)
+        #data = 256
+        #data = np.arange(size, dtype=np.int32i)
+        #data_list = comm.gather(data, root=0)
+        pass  
     else:
-        c = client(comm, package_id, config_id)
+        #c = client(comm, package_id, config_id)
         #c.debug()
         #cmd = cmd + 1
-        assert data is None
+        data = rank
+        #data[rank] = int(rank)
     #
-    print(data)
+    data_list = comm.gather(data, root=0)
+    if rank==0:
+        print(data_list)
+    #
+    print("e : %d, %d, %d, %d" % (rank, size, my_rank, my_size))
     return 0
 #
 #

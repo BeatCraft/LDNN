@@ -31,41 +31,45 @@ sys.setrecursionlimit(10000)
 #
 #
 HOST_NAMES = ["threadripper", "amd-1", "amd-2", "amd-3"]
-PACKAGE_IDS = [1, ]
-DEVICE_IDS =  [0, ]
-
+PACKAGE_IDS = [1, 0, 0, 0]
+DEVICE_IDS =  [0, 0, 0, 0]
 MINI_BATCH_SIZE = [1000, 250, 250, 250]
-
-def get_host_index_by_name(name):
+MINI_BATCH_START = [0, 1000, 1250, 1500, 1750]
+#
+def get_host_id_by_name(name):
     return HOST_NAMES.index(name)
 
+def get_package_by_host_id(host_id):
+    return PACKAGE_IDS[host_id]
+    
+def get_device_by_host_id(host_id):
+    return DEVICE_IDS[host_id]
+
 class worker(object):
-    def __init__(self, com, platform_id, device_id, package_id, config_id):
-#    def __init__(self, com, platform_id, device_id, package_id, config_id):
+    def __init__(self, com, package_id, config_id):
         self._com = com
         self._gpu = gpu
-        
+        #
         self._processor_name = MPI.Get_processor_name()
-        self._host_index = get_host_index_by_name(self._processor_name)
         self._rank = self._com.Get_rank()
         self._size = self._com.Get_size()
-        
+        #
+        self._host_id = get_host_id_by_name(self._processor_name)
         if self._rank==0: # server
+            self._platform_id = -1
+            self._device_id = -1
             self._gpu = None
         else:
-            pass
-            
-        
-#        self._gpu = gpu.Gpu(platform_id, device_id)
-#        self._gpu.set_kernel_code()
+            self._platform_id = get_package_by_host_id(self._host_id)
+            self._device_id = get_device_by_host_id(self._host_id)
+            self._gpu = gpu.Gpu(self._platform_id, self._device_id)
+            self._gpu.set_kernel_code()
         #
-#        self._package = util.Package(package_id)
-#        self._roster = self._package.setup_dnn(self._gpu, config_id)
-#        self._package.load_batch()
-#        self._data_size = self._package._image_size
-        #
+        self._package = util.Package(package_id)
+        self._roster = self._package.setup_dnn(self._gpu, config_id)
+        self._package.load_batch()
+        self._data_size = self._package._image_size
 
-        
     def debug(self):
         print("processor_name=%s" %(self._processor_name))
         print("host_id=%d" % (self._host_index ))
@@ -85,15 +89,15 @@ class worker(object):
         pass
 
 class client(worker):
-    def __init__(self, com, platform_id, device_id, package_id, config_id, size, start):
-        super(client, self).__init__(com, platform_id, device_id, package_id, config_id)
+    def __init__(self, com, package_id, config_id, size, start):
+        super(client, self).__init__(com, package_id, config_id)
         #
-        self._batch_size = size
-        self._batch_start = start
+        self._batch_size = MINI_BATCH_SIZE[self._host_id]
+        self._batch_start = MINI_BATCH_START[self._host_id]
         #
-#        self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
-#        self._class_array = np.zeros(self._batch_size , dtype=np.int32)
-#        self._roster.prepare(self._batch_size, self._data_size)
+        self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
+        self._class_array = np.zeros(self._batch_size , dtype=np.int32)
+        self._roster.prepare(self._batch_size, self._data_size)
 
 
     def set_batch(self):
@@ -115,8 +119,8 @@ class client(worker):
         pass
 
 class server(worker):
-    def __init__(self, com, platform_id, device_id, package_id, config_id):
-        super(server, self).__init__(com, platform_id, device_id, package_id, config_id)
+    def __init__(self, com, package_id, config_id):
+        super(server, self).__init__(com, package_id, config_id)
 
 #   def init(self, size):
 #        pass
@@ -144,23 +148,13 @@ def main():
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
-    print(f"comm : rank={rank}, size={size}")
     my_self = MPI.COMM_SELF
-    my_size = my_self.group.Get_size()
     my_rank = my_self.group.Get_rank()
-    print(f"self : rank={my_rank}, size={my_size}")
-
-    #pname = MPI.Get_processor_name()
-    #print(f"Hello, world! from {pname}")
-    #h_id = get_host_index_by_name(pname)
-    #print(f"index={i}")
-    #
-    #
+    my_size = my_self.group.Get_size()
+    print(f"info : %d, %d, %d, %d" % (rank, size, my_rank, my_size))
     #
     package_id = 0
     config_id = 0
-    platform_id = 0
-    device_id = 0
     #
     cmd = 0
     ent = np.arange(10, dtype=np.float32)
@@ -170,45 +164,12 @@ def main():
         device_id = 0
         #
         #gpu = None
-        s = server(comm, platform_id, device_id, package_id, config_id)
+        s = server(comm, package_id, config_id)
         s.debug()
         #cmd = comm.bcast(cmd, root=0)
     else:
-        platform_id = 1
-        device_id = 0
-        #
-        #gpu = gpu.Gpu(platform_id, device_id)
-        #gpu.set_kernel_code()
-        size = 100
-        start = 100
-        c = client(comm, platform_id, device_id, package_id, config_id, size, start)
+        c = client(comm, platform_id, config_id)
         c.debug()
-    #
-    return 0
-#
-#
-#
-    if rank == 0: # server
-        #print(f"server({rank})={pname}")
-        print("server : %s, %d, %d" % (pname, rank, i))
-        comm.send((10, "test"), dest=1, tag=1)
-        if i==0:
-            pass
-            #comm.send((rank, size, pname, my_rank, my_size), dest=0, tag=1)
-        else:
-            pass
-        #
-    else: # client
-        print("client : %s, %d, %d" % (pname, rank, i))
-        k, t = comm.recv(source=0, tag=1)
-        print("%d : %s" % (k, t))
-        if i==0:
-            pass
-        else:
-            pass
-            #world_rank, world_size, your_name, your_rank, your_size = comm.recv(source=i, tag=1)
-            #print("%d, %d, %d, %d,%d" % (world_rank, world_size, your_name, your_rank, your_size))
-        #
     #
     return 0
 #

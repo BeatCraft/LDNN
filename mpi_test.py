@@ -157,24 +157,19 @@ def main():
     package_id = 0
     config_id = 0
     #
+    #
+    
+    cmd = 0
     data = 0
     #
     if rank == 0: # server
         #s = server(comm, package_id, config_id)
         #s.debug()
-        #ret = comm.bcast(cmd, root=0)
-        #data[rank] = float(rank)
-        #data = comm.gather(data, root=0)
-        #data = 256
-        #data = np.arange(size, dtype=np.int32i)
-        #data_list = comm.gather(data, root=0)
-        pass  
+        ret = comm.bcast(cmd, root=0)
     else:
         #c = client(comm, package_id, config_id)
         #c.debug()
-        #cmd = cmd + 1
-        data = rank
-        #data[rank] = int(rank)
+        data = rank + cmd
     #
     data_list = comm.gather(data, root=0)
     if rank==0:

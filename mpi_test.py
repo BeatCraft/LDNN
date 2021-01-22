@@ -69,6 +69,7 @@ class worker(object):
         self._roster = self._package.setup_dnn(self._gpu, config_id)
         self._package.load_batch()
         self._data_size = self._package._image_size
+        self._num_class = self._package._num_class
 
     def debug(self):
         print("processor_name=%s" %(self._processor_name))
@@ -97,7 +98,7 @@ class client(worker):
         #
         self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
         self._class_array = np.zeros(self._batch_size , dtype=np.int32)
-        self._roster.prepare(self._batch_size, self._data_size)
+        self._roster.prepare(self._batch_size, self._data_size, self._num_class)
 
 
     def set_batch(self):

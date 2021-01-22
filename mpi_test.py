@@ -168,7 +168,7 @@ def main():
         s.debug()
         #cmd = comm.bcast(cmd, root=0)
     else:
-        c = client(comm, platform_id, config_id)
+        c = client(comm, package_id, config_id)
         c.debug()
     #
     return 0

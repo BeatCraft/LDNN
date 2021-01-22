@@ -167,7 +167,8 @@ def main():
         #gpu = None
         s = server(comm, package_id, config_id)
         s.debug()
-        cmd = comm.bcast(cmd, root=0)
+        ret = comm.bcast(cmd, root=0)
+        print(ret)
     else:
         c = client(comm, package_id, config_id)
         c.debug()

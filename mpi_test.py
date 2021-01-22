@@ -157,7 +157,7 @@ def main():
     package_id = 0
     config_id = 0
     #
-    cmd = 0
+    cmd = 1
     ent = np.arange(10, dtype=np.float32)
     #
     if rank == 0: # server
@@ -172,7 +172,7 @@ def main():
     else:
         c = client(comm, package_id, config_id)
         c.debug()
-        cmd = cmd +1
+        cmd = cmd + 1
     #
     print(cmd)
     return 0

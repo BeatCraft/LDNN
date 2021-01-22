@@ -72,7 +72,7 @@ class worker(object):
 
     def debug(self):
         print("processor_name=%s" %(self._processor_name))
-        print("host_id=%d" % (self._host_index ))
+        print("host_id=%d" % (self._host_id))
         print("rank=%d" % (self._rank ))
         print("size=%d" % (self._size ))
         

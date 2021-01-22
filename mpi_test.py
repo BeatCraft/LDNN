@@ -160,21 +160,29 @@ def main():
     cmd = 1
     ent = np.arange(10, dtype=np.float32)
     #
+    data = (rank+1)**2
+    data = comm.gather(data, root=0)
+    
     if rank == 0: # server
         platform_id = 0
         device_id = 0
         #
         #gpu = None
         s = server(comm, package_id, config_id)
-        s.debug()
-        ret = comm.bcast(cmd, root=0)
-        print(ret)
+        #s.debug()
+        #ret = comm.bcast(cmd, root=0)
+        for i in range(size):
+        assert data[i] == (i+1)**2
+
     else:
         c = client(comm, package_id, config_id)
-        c.debug()
-        cmd = cmd + 1
+        #c.debug()
+        #cmd = cmd + 1
+        
+        assert data is None
     #
-    print(cmd)
+
+    print(data)
     return 0
 #
 #

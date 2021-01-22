@@ -43,7 +43,7 @@ class worker(object):
         self._gpu.set_kernel_code()
         #
         self._package = util.Package(package_id)
-        self._roster = package.setup_dnn(self._gpu, config_id)
+        self._roster = self._package.setup_dnn(self._gpu, config_id)
         self._package.load_batch()
         self._data_size = self._package._image_size
         #

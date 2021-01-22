@@ -172,16 +172,13 @@ def main():
         #s.debug()
         #ret = comm.bcast(cmd, root=0)
         for i in range(size):
-        assert data[i] == (i+1)**2
-
+            assert data[i] == (i+1)**2
     else:
         c = client(comm, package_id, config_id)
         #c.debug()
         #cmd = cmd + 1
-        
         assert data is None
     #
-
     print(data)
     return 0
 #

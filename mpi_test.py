@@ -33,17 +33,17 @@ sys.setrecursionlimit(10000)
 HOST_NAMES = ["threadripper", "amd-1", "amd-2", "amd-3"]
 PACKAGE_IDS = [1, 0, 0, 0]
 DEVICE_IDS =  [0, 0, 0, 0]
-MINI_BATCH_SIZE = [1000, 250, 250, 250]
-MINI_BATCH_START = [0, 1000, 1250, 1500, 1750]
+MINI_BATCH_SIZE = [0, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000]
+MINI_BATCH_START = [0, 0, 2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000, 18000]
 #
 def get_host_id_by_name(name):
     return HOST_NAMES.index(name)
 
-def get_package_by_host_id(host_id):
-    return PACKAGE_IDS[host_id]
+def get_package_by_host_id(h):
+    return PACKAGE_IDS[h]
     
-def get_device_by_host_id(host_id):
-    return DEVICE_IDS[host_id]
+def get_device_by_host_id(h):
+    return DEVICE_IDS[h]
 
 class worker(object):
     def __init__(self, com, package_id, config_id):
@@ -93,8 +93,8 @@ class client(worker):
     def __init__(self, com, package_id, config_id):
         super(client, self).__init__(com, package_id, config_id)
         #
-        self._batch_size = MINI_BATCH_SIZE[self._host_id]
-        self._batch_start = MINI_BATCH_START[self._host_id]
+        self._batch_size = MINI_BATCH_SIZE[self._rank]
+        self._batch_start = MINI_BATCH_START[self._rank]
         #
         self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
         self._class_array = np.zeros(self._batch_size , dtype=np.int32)
@@ -157,19 +157,37 @@ def main():
     package_id = 0
     config_id = 0
     #
+    # init
+    if rank==0:
+        s = server(comm, package_id, config_id)
+    else:
+        c  = client(comm, package_id, config_id)
+        c.set_batch()
+        #
+        c._roster.propagate()
+        ce = c._roster.get_cross_entropy()
+        print(ce)
     #
-    
-    cmd = 0
-    data = 0
+    return 0
+
+
+
+    if rank==0:
+        li = 3
+    else:
+        li = 0
     #
+    li = comm.bcast(li, root=0)
+
     if rank == 0: # server
         #s = server(comm, package_id, config_id)
         #s.debug()
-        ret = comm.bcast(cmd, root=0)
+        #ret = comm.bcast(cmd, root=0)
+        data = 0
     else:
         #c = client(comm, package_id, config_id)
         #c.debug()
-        data = rank + cmd
+        data = rank + li
     #
     data_list = comm.gather(data, root=0)
     if rank==0:

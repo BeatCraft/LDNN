@@ -181,7 +181,7 @@ def main():
         #gpu.set_kernel_code()
         size = 100
         start = 100
-        c = client(comm, gpu, platform_id, device_id, package_id, config_id, size, start)
+        c = client(comm, platform_id, device_id, package_id, config_id, size, start)
         c.debug()
     #
     return 0

@@ -72,7 +72,7 @@ class worker(object):
 
 class client(worker):
     def __init__(self, com, platform_id, device_id, package_id, config_id, size, start):
-        super(worker, self).__init__(com, platform_id, device_id, package_id, config_id)
+        super(client, self).__init__(com, platform_id, device_id, package_id, config_id)
         #
         self._batch_size = size
         self._batch_start = start
@@ -102,7 +102,7 @@ class client(worker):
 
 class server(worker):
     def __init__(self, com, platform_id, device_id, package_id, config_id):
-        super(worker, self).__init__(com, platform_id, device_id, package_id, config_id)
+        super(server, self).__init__(com, platform_id, device_id, package_id, config_id)
 
 #   def init(self, size):
 #        pass

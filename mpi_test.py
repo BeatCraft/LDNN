@@ -89,7 +89,7 @@ class worker(object):
         pass
 
 class client(worker):
-    def __init__(self, com, package_id, config_id, size, start):
+    def __init__(self, com, package_id, config_id):
         super(client, self).__init__(com, package_id, config_id)
         #
         self._batch_size = MINI_BATCH_SIZE[self._host_id]

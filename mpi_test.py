@@ -167,11 +167,13 @@ def main():
         #gpu = None
         s = server(comm, package_id, config_id)
         s.debug()
-        #cmd = comm.bcast(cmd, root=0)
+        cmd = comm.bcast(cmd, root=0)
     else:
         c = client(comm, package_id, config_id)
         c.debug()
+        cmd = cmd +1
     #
+    print cmd
     return 0
 #
 #

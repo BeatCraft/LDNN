@@ -30,7 +30,7 @@ sys.setrecursionlimit(10000)
 #
 #
 #
-HOST_NAMES = ["tr", "amd-1", "amd-2", "amd-3"]
+HOST_NAMES = ["threadripper", "amd-1", "amd-2", "amd-3"]
 MINI_BATCH_SIZE = [1000, 250, 250, 250]
 
 def get_host_index_by_name(name):

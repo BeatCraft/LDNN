@@ -124,7 +124,7 @@ class worker(object):
             ce = 0
         else:
             self._roster.propagate(li, ni, ii, wi_alt, 0)
-            ce = c._roster.get_cross_entropy()
+            ce = self._roster.get_cross_entropy()
         #
         ce_list = self._com.gather(ce, root=0)
         if self._rank==0:

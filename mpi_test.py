@@ -154,8 +154,6 @@ class worker(object):
         wi = layer.get_weight_index(ni, ii)
         return wi
         
-        
-        
     def init_weight_list(self):
         if self._rank==0:
             self._w_list  = []
@@ -175,7 +173,7 @@ class worker(object):
         else:
             self._attack_num = 0
         #
-        attack_num = comm.bcast(self._attack_num, root=0)
+        attack_num = self._com.bcast(self._attack_num, root=0)
         return attack_num
 
 def main():

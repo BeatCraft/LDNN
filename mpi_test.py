@@ -114,7 +114,7 @@ class worker(object):
             for i in ce_list:
                 sum = sum + i
             #
-            entropy = sum/float(size)
+            entropy = sum/float(self._size-1)
             print("entropy=%f" % (entropy))
             self._ce = entropy
         #
@@ -132,7 +132,7 @@ class worker(object):
             for i in ce_list:
                 sum = sum + i
             #
-            entropy = sum/float(size)
+            entropy = sum/float(self._size-1)
             print("entropy=%f" % (entropy))
             self._ce_alt = entropy
         #

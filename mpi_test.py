@@ -168,9 +168,6 @@ def main():
     wk = worker(com, package_id, config_id)
     wk.set_batch()
     wk.evaluate()
-    return 0
-    
-    
     wi  = wk.get_weight_index(1, 2, 3)
     print("%d : %d" % (rank, wi))
     #

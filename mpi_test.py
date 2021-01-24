@@ -84,6 +84,7 @@ class worker(object):
             self._roster.prepare(self._batch_size, self._data_size, self._num_class)
         #
         self._attack_num = 0
+        self._attack_cnt = 0
 
     def debug(self):
         print("processor_name=%s" %(self._processor_name))
@@ -175,6 +176,21 @@ class worker(object):
         #
         attack_num = self._com.bcast(self._attack_num, root=0)
         return attack_num
+    
+    def attack(self, i):
+        if self._rank==0:
+            tp = self._w_list[i]
+            li = tp[0]
+            ni = tp[1]
+            ii = tp[2]
+        else:
+            li = 0
+            ni = 0
+            ii = 0
+        #
+        tp = self._com.bcast((li, ni, ii), root=0)
+        return tp
+        
 
 def main():
     argvs = sys.argv
@@ -198,6 +214,10 @@ def main():
     num = wk.init_weight_list()
     print("%d : num=%d" % (rank, num))
     
+    for i in num:
+        tp = wk.attack(i)
+        print("[%d, %d] %d, %d, %d" % (rank, i, tp[0], tp[1], tp[2]))
+    #
     
 #    wk.evaluate()
 #    wi  = wk.get_weight_index(1, 2, 3)

@@ -214,7 +214,7 @@ def main():
     num = wk.init_weight_list()
     print("%d : num=%d" % (rank, num))
     
-    for i in num:
+    for i in range(num):
         tp = wk.attack(i)
         print("[%d, %d] %d, %d, %d" % (rank, i, tp[0], tp[1], tp[2]))
     #

@@ -202,7 +202,7 @@ def main():
     my_self = MPI.COMM_SELF
     my_rank = my_self.group.Get_rank()
     my_size = my_self.group.Get_size()
-    print("s : %d, %d, %d, %d" % (rank, size, my_rank, my_size))
+    print("%d, %d, %d, %d" % (rank, size, my_rank, my_size))
     #
     package_id = 0
     config_id = 0

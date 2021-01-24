@@ -163,13 +163,13 @@ class worker(object):
                 layer = r.getLayerAt(li)
                 for ni in range(layer._num_node):
                     for ii in range(layer._num_input):
-                        self._w_list .append((li, ni, ii))
+                        self._w_list.append((li, ni, ii))
                     #
                 #
             #
-            self._attack_num = int(len(w_list)/1000)
-            random.shuffle(w_list)
-            random.shuffle(w_list)
+            self._attack_num = int(len(self._w_list)/1000)
+            random.shuffle(self._w_list)
+            random.shuffle(self._w_list)
         else:
             self._attack_num = 0
         #

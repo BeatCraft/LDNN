@@ -139,7 +139,7 @@ class worker(object):
         
     def update_weight(self, li, ni, ii, wi):
         layer = self._roster.getLayerAt(li)
-        layer.set_weight_index(self, li, ni, ii, wi)
+        layer.set_weight_index(li, ni, ii, wi)
         layer.update_weight()
         
     # this is probably used only rank_0
@@ -167,6 +167,9 @@ def main():
     #
     wk = worker(com, package_id, config_id)
     wk.evaluate()
+    return 0
+    
+    
     wi  = wk.get_weight_index(1, 2, 3)
     print("%d : %d" % (rank, wi))
     #

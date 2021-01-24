@@ -160,7 +160,7 @@ class worker(object):
             r = self._roster
             c = r.countLayers()
             for li in range(1, c):
-                layer = r.getLayerAt(i)
+                layer = r.getLayerAt(li)
                 for ni in range(layer._num_node):
                     for ii in range(layer._num_input):
                         self._w_list .append((li, ni, ii))

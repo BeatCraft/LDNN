@@ -216,7 +216,9 @@ def main():
     
     for i in range(num):
         tp = wk.attack(i)
-        print("[%d, %d] %d, %d, %d" % (rank, i, tp[0], tp[1], tp[2]))
+        if rank==0:
+            print("[%d, %d] %d, %d, %d" % (rank, i, tp[0], tp[1], tp[2]))
+        #
     #
     
 #    wk.evaluate()

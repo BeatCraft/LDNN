@@ -166,7 +166,7 @@ def main():
     #
     #
     wk = worker(com, package_id, config_id)
-    wk.evaluate()
+    #wk.evaluate()
     return 0
     
     

@@ -101,7 +101,7 @@ class worker(object):
         #
 
     def evaluate(self):
-        if rank==0:
+        if self._rank==0:
             ce = 0.0
         else:
             self._roster.propagate()
@@ -109,7 +109,7 @@ class worker(object):
         #
         ce_list = self._com.gather(ce, root=0)
         #
-        if rank==0:
+        if self._rank==0:
             sum = 0.0
             for i in ce_list:
                 sum = sum + i
@@ -120,14 +120,14 @@ class worker(object):
         #
     
     def evaluate_alt(self, li, ni, ii, wi_alt):
-        if rank==0:
+        if self._rank==0:
             ce = 0
         else:
             self._roster.propagate(li, ni, ii, wi_alt, 0)
             ce = c._roster.get_cross_entropy()
         #
         ce_list = self._com.gather(ce, root=0)
-        if rank==0:
+        if self._rank==0:
             sum = 0.0
             for i in ce_list:
                 sum = sum + i

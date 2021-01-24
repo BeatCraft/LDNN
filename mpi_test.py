@@ -166,7 +166,8 @@ def main():
     #
     #
     wk = worker(com, package_id, config_id)
-    #wk.evaluate()
+    wk.set_batch()
+    wk.evaluate()
     return 0
     
     

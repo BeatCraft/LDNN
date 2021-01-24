@@ -63,6 +63,7 @@ class worker(object):
             self._platform_id = get_package_by_host_id(self._host_id)
             self._device_id = get_device_by_host_id(self._host_id)
             self._gpu = gpu.Gpu(self._platform_id, self._device_id)
+            #
             self._gpu.set_kernel_code()
         #
         self._package = util.Package(package_id)
@@ -70,85 +71,90 @@ class worker(object):
         self._package.load_batch()
         self._data_size = self._package._image_size
         self._num_class = self._package._num_class
+        #
+        if self._rank==0: # server
+            pass
+        else:
+            self._batch_size = MINI_BATCH_SIZE[self._rank]
+            self._batch_start = MINI_BATCH_START[self._rank]
+            #
+            self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
+            self._class_array = np.zeros(self._batch_size , dtype=np.int32)
+            self._roster.prepare(self._batch_size, self._data_size, self._num_class)
+        #
 
     def debug(self):
         print("processor_name=%s" %(self._processor_name))
         print("host_id=%d" % (self._host_id))
         print("rank=%d" % (self._rank ))
         print("size=%d" % (self._size ))
-        
-    def set_batch(self, start):
-        pass
-        
-    def evaluate(self):
-        pass
-
-    def alt(self):
-        pass
-
-    def update(self):
-        pass
-
-class client(worker):
-    def __init__(self, com, package_id, config_id):
-        super(client, self).__init__(com, package_id, config_id)
-        #
-        self._batch_size = MINI_BATCH_SIZE[self._rank]
-        self._batch_start = MINI_BATCH_START[self._rank]
-        #
-        self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
-        self._class_array = np.zeros(self._batch_size , dtype=np.int32)
-        self._roster.prepare(self._batch_size, self._data_size, self._num_class)
-
 
     def set_batch(self):
-        for i in range(self._batch_size):
-            self._data_array[i] = self._package._train_image_batch[self._batch_start + i]
-            self._class_array[i] = self._package._train_label_batch[self._batch_start + i]
+        if self._rank==0:
+            pass
+        else:
+            for i in range(self._batch_size):
+                self._data_array[i] = self._package._train_image_batch[self._batch_start + i]
+                self._class_array[i] = self._package._train_label_batch[self._batch_start + i]
+            #
+            self._roster.set_data(self._data_array, self._data_size, self._class_array, self._batch_size)
         #
-        self._roster.set_data(self._data_array, self._data_size, self._class_array, self._batch_size)
 
     def evaluate(self):
-        self._roster.propagate()
-        ce = self._roster.get_cross_entropy()
-        return ce
+        if rank==0:
+            ce = 0.0
+        else:
+            self._roster.propagate()
+            ce = self._roster.get_cross_entropy()
+        #
+        ce_list = self._com.gather(ce, root=0)
+        #
+        if rank==0:
+            sum = 0.0
+            for i in ce_list:
+                sum = sum + i
+            #
+            entropy = sum/float(size)
+            print("entropy=%f" % (entropy))
+            self._ce = entropy
+        #
+    
+    def evaluate_alt(self, li, ni, ii, wi_alt):
+        if rank==0:
+            ce = 0
+        else:
+            self._roster.propagate(li, ni, ii, wi_alt, 0)
+            ce = c._roster.get_cross_entropy()
+        #
+        ce_list = self._com.gather(ce, root=0)
+        if rank==0:
+            sum = 0.0
+            for i in ce_list:
+                sum = sum + i
+            #
+            entropy = sum/float(size)
+            print("entropy=%f" % (entropy))
+            self._ce_alt = entropy
+        #
         
-    def alt(self):
-        pass
-
-    def update(self):
-        pass
-
-class server(worker):
-    def __init__(self, com, package_id, config_id):
-        super(server, self).__init__(com, package_id, config_id)
-
-#   def init(self, size):
-#        pass
-#        comm.send((10, "test"), dest=1, tag=1)
+    def update_weight(self, li, ni, ii, wi):
+        layer = self._roster.getLayerAt(li)
+        layer.set_weight_index(self, li, ni, ii, wi)
+        layer.update_weight()
         
-    def set_batch(self, start):
-        pass
-        
-    def evaluate(self):
-        pass
-
-    def alt(self):
-        pass
-
-    def update(self):
-        pass
-
-    def train(self):
-        pass
+    # this is probably used only rank_0
+    def get_weight_index(self, li, ni, ii):
+        layer = self._roster.getLayerAt(li)
+        wi = layer.get_weight_index(ni, ii)
+        return wi
 
 def main():
     argvs = sys.argv
     argc = len(argvs)
     #
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
+    com = MPI.COMM_WORLD
+    rank = com.Get_rank()
+    size = com.Get_size()
     my_self = MPI.COMM_SELF
     my_rank = my_self.group.Get_rank()
     my_size = my_self.group.Get_size()
@@ -157,43 +163,16 @@ def main():
     package_id = 0
     config_id = 0
     #
-    # init
-    if rank==0:
-        s = server(comm, package_id, config_id)
-    else:
-        c  = client(comm, package_id, config_id)
-        c.set_batch()
-        #
-        c._roster.propagate()
-        ce = c._roster.get_cross_entropy()
-        print(ce)
     #
-    return 0
-
-
-
-    if rank==0:
-        li = 3
-    else:
-        li = 0
     #
-    li = comm.bcast(li, root=0)
-
-    if rank == 0: # server
-        #s = server(comm, package_id, config_id)
-        #s.debug()
-        #ret = comm.bcast(cmd, root=0)
-        data = 0
-    else:
-        #c = client(comm, package_id, config_id)
-        #c.debug()
-        data = rank + li
+    wk = worker(com, package_id, config_id)
+    wk.evaluate()
+    wi  = wk.get_weight_index(1, 2, 3)
+    print("%d : %d" % (rank, wi))
     #
-    data_list = comm.gather(data, root=0)
-    if rank==0:
-        print(data_list)
+    wk.evaluate_alt(1, 2, 3, 5)
+    wk.update_weight(1, 2, 3, 5)
     #
-    print("e : %d, %d, %d, %d" % (rank, size, my_rank, my_size))
     return 0
 #
 #

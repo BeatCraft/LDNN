@@ -138,9 +138,13 @@ class worker(object):
         #
         
     def update_weight(self, li, ni, ii, wi):
-        layer = self._roster.getLayerAt(li)
-        layer.set_weight_index(ni, ii, wi)
-        layer.update_weight()
+        if self._rank==0:
+            pass
+        else:
+            layer = self._roster.getLayerAt(li)
+            layer.set_weight_index(ni, ii, wi)
+            layer.update_weight()
+        #
         
     # this is probably used only rank_0
     def get_weight_index(self, li, ni, ii):

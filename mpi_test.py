@@ -73,7 +73,8 @@ class worker(object):
         self._num_class = self._package._num_class
         #
         if self._rank==0: # server
-            pass
+            self._w_list = []
+            #self._attack_num = 0
         else:
             self._batch_size = MINI_BATCH_SIZE[self._rank]
             self._batch_start = MINI_BATCH_START[self._rank]
@@ -82,6 +83,7 @@ class worker(object):
             self._class_array = np.zeros(self._batch_size , dtype=np.int32)
             self._roster.prepare(self._batch_size, self._data_size, self._num_class)
         #
+        self._attack_num = 0
 
     def debug(self):
         print("processor_name=%s" %(self._processor_name))
@@ -151,6 +153,30 @@ class worker(object):
         layer = self._roster.getLayerAt(li)
         wi = layer.get_weight_index(ni, ii)
         return wi
+        
+        
+        
+    def init_weight_list(self):
+        if self._rank==0:
+            self._w_list  = []
+            r = self._roster
+            c = r.countLayers()
+            for li in range(1, c):
+                layer = r.getLayerAt(i)
+                for ni in range(layer._num_node):
+                    for ii in range(layer._num_input):
+                        self._w_list .append((li, ni, ii))
+                    #
+                #
+            #
+            self._attack_num = int(len(w_list)/1000)
+            random.shuffle(w_list)
+            random.shuffle(w_list)
+        else:
+            self._attack_num = 0
+        #
+        attack_num = comm.bcast(self._attack_num, root=0)
+        return attack_num
 
 def main():
     argvs = sys.argv
@@ -171,12 +197,16 @@ def main():
     #
     wk = worker(com, package_id, config_id)
     wk.set_batch()
-    wk.evaluate()
-    wi  = wk.get_weight_index(1, 2, 3)
-    print("%d : %d" % (rank, wi))
+    num = wk.init_weight_list()
+    print("%d : num=%d" % (rank, num))
+    
+    
+#    wk.evaluate()
+#    wi  = wk.get_weight_index(1, 2, 3)
+#    print("%d : %d" % (rank, wi))
     #
-    wk.evaluate_alt(1, 2, 3, 5)
-    wk.update_weight(1, 2, 3, 5)
+#    wk.evaluate_alt(1, 2, 3, 5)
+#    wk.update_weight(1, 2, 3, 5)
     #
     return 0
 #

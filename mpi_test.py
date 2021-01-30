@@ -114,18 +114,20 @@ class worker(object):
     def evaluate_alt(self, li, ni, ii, wi_alt):
         self._roster.propagate(li, ni, ii, wi_alt, 0)
         ce = self._roster.get_cross_entropy()
-        #
         ce_list = self._com.gather(ce, root=0)
+        #
         if self._rank==0:
             sum = 0.0
             for i in ce_list:
                 sum = sum + i
             #
-            entropy = sum/float(self._size)
-            print("entropy=%f" % (entropy))
-            self._ce_alt = entropy
+            avg = sum/float(self._size)
+            print("ce_avg=%f" % (avg))
+            self._ce_avg = avg
+        else:
+            self._ce_avg = 0.0
         #
-        return self._ce_alt
+        return self._ce_avg
         
     def update_weight(self, li, ni, ii, wi):
         layer = self._roster.getLayerAt(li)
@@ -172,13 +174,13 @@ class worker(object):
         #tp = self._com.bcast((li, ni, ii, wi), root=0)
         #return tp
     
-    def weight_shift(self, li, ni, ii, wi):
-        layer = self._roster.getLayerAt(li)
-        wi_alt = wi
-        entropy = self._ce
-        entropy_alt = entropy
-        maximum = core.WEIGHT_INDEX_MAX
-        minimum = core.WEIGHT_INDEX_MIN
+#    def weight_shift(self, li, ni, ii, wi):
+#        layer = self._roster.getLayerAt(li)
+#        wi_alt = wi
+#        entropy = self._ce
+#        entropy_alt = entropy
+#        maximum = core.WEIGHT_INDEX_MAX
+#        minimum = core.WEIGHT_INDEX_MIN
 #
 #
 #
@@ -203,6 +205,75 @@ def average_float(com, rank, v):
         avg = 0
     #
     return avg
+    
+#def weight_shift(com, wk, entropy, li, ni, ii, wi):
+
+    #evaluate_alt(self, li, ni, ii, wi_alt):
+    
+def weight_shift(com, wk, entropy, attack_i):
+    w = wk._w_list[attack_i]
+    li = w[0]
+    ni = w[1]
+    ii = w[2]
+    wi = w[3]
+    r = wk._roster
+    layer = r.getLayerAt(li)
+    lock = layer.get_weight_lock(ni, ii)   # default : 0
+    if lock>0:
+        return entropy, 0
+    #
+    wp = layer.get_weight_property(ni, ii) # default : 0
+    wi = layer.get_weight_index(ni, ii)
+    wi_alt = wi
+    entropy_alt = entropy
+    maximum = core.WEIGHT_INDEX_MAX
+    minimum = core.WEIGHT_INDEX_MIN
+    #
+    wp_alt = wp
+    if wp_alt==0:
+        if wi==maximum:
+            wp_alt = -1
+        else:
+            wp_alt = 1
+        #
+    else:
+        if wi==maximum or wi==minimum:
+            layer.set_weight_property(ni, ii, 0)
+            layer.set_weight_lock(ni, ii, 1)
+            print("lock at(%d)" % wi)
+            return entropy, 0
+        #
+    #
+    wi_alt = wi + wp_alt
+    entropy_alt = wk.evaluate_alt(li, ni, ii, wi_alt)
+#    if r._gpu:
+#        r.propagate(li, ni, ii, wi_alt, 0)
+#        entropy_alt = r.get_cross_entropy()
+#    else:
+#        entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
+#    #
+    if entropy_alt<entropy:
+        layer.set_weight_property(ni, ii, wp_alt)
+        layer.set_weight_index(ni, ii, wi_alt)
+        layer.update_weight()
+#        if r._gpu:
+#            layer.update_weight()
+#        else:
+#            entropy_alt = r._remote.update(li, ni, ii, wi_alt)
+#        #
+        return entropy_alt, 1
+    else:
+        if wp==0:
+            # reverse
+            wp_alt = wp_alt*(-1)
+            layer.set_weight_property(ni, ii, wp_alt)
+        else:
+            layer.set_weight_property(ni, ii, 0)
+            layer.set_weight_lock(ni, ii, 1)
+            print("lock at(%d)" % wi)
+        #
+    #
+    return entropy, 0
 #
 #
 #
@@ -225,34 +296,41 @@ def main():
     #
     wk = worker(com, package_id, config_id)
     wk.set_batch()
+    ce = wk.evaluate()
+    print("CE : %d : %f" % (rank, ce))
+    #
     w_num = wk.make_w_list()
     print("%d : num=%d" % (rank, w_num))
+    #max = core.WEIGHT_INDEX_MAX
+    #min = core.WEIGHT_INDEX_MIN
     attack_num = int(w_num / 1000)
+    #
+    attack_num = 1
+    #
     for i in range(attack_num):
         attack_i = bcast_random_int(com, rank, attack_num)
         #
-        tp = wk.get_weight_pack(attack_i)
-        li = tp[0]
-        ni = tp[1]
-        ii = tp[2]
-        wi = tp[3]
-        max = core.WEIGHT_INDEX_MAX
-        min = core.WEIGHT_INDEX_MIN
-        if rank==0:
-            print("[%d, %d] %d, %d, %d,  %d" % (rank, i, tp[0], tp[1], tp[2], tp[3]))
+        ce, k = weight_shift(com, wk, ce, attack_i)
+        
+        
+#        tp = wk.get_weight_pack(attack_i)
+#        li = tp[0]
+#        ni = tp[1]
+#        ii = tp[2]
+#        wi = tp[3]
+#        if rank==0:
+#            print("[%d, %d] %d, %d, %d,  %d" % (rank, i, tp[0], tp[1], tp[2], tp[3]))
         #
     #
-    ce = wk.evaluate()
-    print("CE : %d : %f" % (rank, ce))
     return 0
     
-    wk._roster.propagate()
-    ce = wk._roster.get_cross_entropy()
-    print("CE : %d : %f" % (rank, ce))
-    
-    avg_ce = average_float(com, rank, ce)
-    print("Avg CE : %d : %f" % (rank, avg_ce))
-    return 0
+#    wk._roster.propagate()
+#    ce = wk._roster.get_cross_entropy()
+#    print("CE : %d : %f" % (rank, ce))
+#
+#    avg_ce = average_float(com, rank, ce)
+#    print("Avg CE : %d : %f" % (rank, avg_ce))
+#    return 0
         
 
 

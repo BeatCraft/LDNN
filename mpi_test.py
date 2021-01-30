@@ -120,6 +120,9 @@ class worker(object):
         if self._rank==0:
             sum = 0.0
             for i in ce_list:
+                if rank==0:
+                    print("        %f" % (i))
+                #
                 sum = sum + i
             #
             avg = sum/float(self._size)

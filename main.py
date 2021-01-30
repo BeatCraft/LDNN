@@ -173,7 +173,7 @@ def main():
     #
     if mode==0: # train
         epoc = 4
-        mini_batch_size = 250
+        mini_batch_size = 2000
         loop = 1#16 # 1 2 4 8
         print("package._train_batch_size=%d" % (package._train_batch_size))
         it = int(package._train_batch_size/mini_batch_size)
@@ -198,7 +198,7 @@ def main():
     elif mode==4: #
         print("new train")
         epoc = 1
-        mini_batch_size = 200
+        mini_batch_size = 2000
         loop = 1
         print("package._train_batch_size=%d" % (package._train_batch_size))
         it = int(package._train_batch_size/mini_batch_size)

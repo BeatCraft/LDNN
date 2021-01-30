@@ -283,8 +283,8 @@ def main():
     my_size = my_self.group.Get_size()
     print("%d, %d, %d, %d" % (rank, size, my_rank, my_size))
     #
-    package_id = 0
-    config_id = 0
+    package_id = 0  # MNIST
+    config_id = 0   # FC
     #
     #
     #

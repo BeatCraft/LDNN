@@ -216,7 +216,7 @@ def weight_shift(com, rank, wk, entropy, attack_i):
     lock = layer.get_weight_lock(ni, ii)   # default : 0
     if lock>0:
         if rank==0:
-            print("locked(%d)" % wi)
+            print("locked")
         #
         return entropy, 0
     #
@@ -256,6 +256,9 @@ def weight_shift(com, rank, wk, entropy, attack_i):
             # reverse
             wp_alt = wp_alt*(-1)
             layer.set_weight_property(ni, ii, wp_alt)
+            if rank==0:
+                print("reverse at(%d)" % wi)
+            #
         else:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_lock(ni, ii, 1)

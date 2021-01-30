@@ -189,17 +189,12 @@ def bcast_random_int(com, rank, max):
     return ri
 
 def average_float(com, rank, v):
-    if rank==0:
-        v_list = com.gather(v, root=0)
-        v_sum = 0
-        for n in v_list:
-            v_sum = v_sum + n
-        #
-        avg = v_sum/float(len(v_list))
-    else:
-        avg = 0.0
+    v_list = com.gather(v, root=0)
+    v_sum = 0
+    for n in v_list:
+        v_sum = v_sum + n
     #
-    avg = com.bcast(avg, root=0)
+    avg = v_sum/float(len(v_list))
     return avg
 #
 #

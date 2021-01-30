@@ -94,7 +94,7 @@ class worker(object):
 
     def evaluate(self):
         self._roster.propagate()
-        ce = self._roster.get_cross_entropy()
+        self._ce = self._roster.get_cross_entropy()
         ce_list = self._com.gather(ce, root=0)
         #
         if self._rank==0:
@@ -102,13 +102,13 @@ class worker(object):
             for i in ce_list:
                 sum = sum + i
             #
-            entropy = sum/float(self._size)
-            print("entropy=%f" % (entropy))
-            self._ce = entropy
+            avg = sum/float(self._size)
+            print("ce_avg=%f" % (avg))
+            self._ce_avg = avg
         else:
-            self._ce = 0.0
+            self._ce_avg = 0.0
         #
-        return self._ce
+        return self._ce_avg
     
     def evaluate_alt(self, li, ni, ii, wi_alt):
         self._roster.propagate(li, ni, ii, wi_alt, 0)

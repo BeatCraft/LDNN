@@ -251,6 +251,7 @@ def weight_shift(com, rank, wk, entropy, attack_i):
     #
     wi_alt = wi + wp_alt
     entropy_alt = wk.evaluate_alt(li, ni, ii, wi_alt)
+    print("ce_alt = %f" %(entropy_alt))
     if entropy_alt<entropy:
         layer.set_weight_property(ni, ii, wp_alt)
         layer.set_weight_index(ni, ii, wi_alt)

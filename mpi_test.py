@@ -305,14 +305,13 @@ def main():
     #min = core.WEIGHT_INDEX_MIN
     attack_num = int(w_num / 1000)
     #
-    attack_num = 1
+    attack_num = 100
     #
     for i in range(attack_num):
         attack_i = bcast_random_int(com, rank, attack_num)
         #
         ce, k = weight_shift(com, wk, ce, attack_i)
-        
-        
+        print("[%d] %f (%d)" %(i, ce, k))
 #        tp = wk.get_weight_pack(attack_i)
 #        li = tp[0]
 #        ni = tp[1]

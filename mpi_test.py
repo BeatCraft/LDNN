@@ -187,6 +187,7 @@ class worker(object):
 def bcast_random_int(com, rank, max):
     if rank==0:
         ri = random.randrange(max)
+        print("bcast_random_int(%d)" % (ri))
     else:
         ri = 0
     #

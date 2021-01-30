@@ -113,9 +113,11 @@ class worker(object):
     
     def evaluate_alt(self, li, ni, ii, wi_alt):
         self._roster.propagate(li, ni, ii, wi_alt, 0)
+        print("    %d : propagate" % (self._rank))
         ce = self._roster.get_cross_entropy()
         print("    %d : ce : %f" % (self._rank, ce))
         ce_list = self._com.gather(ce, root=0)
+        print("    %d : gather" % (self._rank))
         #
         if self._rank==0:
             sum = 0.0

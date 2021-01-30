@@ -239,6 +239,10 @@ def main():
             print("[%d, %d] %d, %d, %d,  %d" % (rank, i, tp[0], tp[1], tp[2], tp[3]))
         #
     #
+    ce = wk.evaluate()
+    print("CE : %d : %f" % (rank, ce))
+    return 0
+    
     wk._roster.propagate()
     ce = wk._roster.get_cross_entropy()
     print("CE : %d : %f" % (rank, ce))

@@ -281,12 +281,12 @@ def main():
     wk = worker(com, package_id, config_id)
     wk.set_batch()
     ce = wk.evaluate()
-    print("CE : %d : %f" % (rank, ce))
-    #
     w_num = wk.make_w_list()
-    print("%d : num=%d" % (rank, w_num))
-    attack_num = int(w_num / 1000)
-    #attack_num = 100
+    attack_num = int(w_num / 100)
+    if rank==0:
+        print("CE : %d : %f" % (rank, ce))
+        print("%d : num=%d" % (rank, w_num))
+    #
     #
     for i in range(attack_num):
         attack_i = bcast_random_int(com, rank, attack_num)

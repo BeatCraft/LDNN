@@ -108,6 +108,7 @@ class worker(object):
         else:
             self._ce_avg = 0.0
         #
+        self._ce_avg = com.bcast(self._ce_avg, root=0)
         return self._ce_avg
     
     def evaluate_alt(self, li, ni, ii, wi_alt):

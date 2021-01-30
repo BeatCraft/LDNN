@@ -95,7 +95,6 @@ class worker(object):
     def evaluate(self):
         self._roster.propagate()
         ce = self._roster.get_cross_entropy()
-        #
         ce_list = self._com.gather(ce, root=0)
         #
         if self._rank==0:
@@ -107,7 +106,7 @@ class worker(object):
             print("entropy=%f" % (entropy))
             self._ce = entropy
         #
-        # return ce???
+        return self._ce
     
     def evaluate_alt(self, li, ni, ii, wi_alt):
         self._roster.propagate(li, ni, ii, wi_alt, 0)
@@ -123,7 +122,7 @@ class worker(object):
             print("entropy=%f" % (entropy))
             self._ce_alt = entropy
         #
-        # return ce???
+        return self._ce_alt
         
     def update_weight(self, li, ni, ii, wi):
         layer = self._roster.getLayerAt(li)
@@ -137,46 +136,38 @@ class worker(object):
         return wi
         
     def make_w_list(self):
-        if self._rank==0:
-            self._w_list  = []
-            r = self._roster
-            c = r.countLayers()
-            for li in range(1, c):
-                layer = r.getLayerAt(li)
-                for ni in range(layer._num_node):
-                    for ii in range(layer._num_input):
-                        self._w_list.append((li, ni, ii))
-                    #
+        self._w_list  = []
+        r = self._roster
+        c = r.countLayers()
+        for li in range(1, c):
+            layer = r.getLayerAt(li)
+            for ni in range(layer._num_node):
+                for ii in range(layer._num_input):
+                    self._w_list.append((li, ni, ii))
                 #
             #
-            self._attack_num = int(len(self._w_list)/1000)
-            random.shuffle(self._w_list)
-            random.shuffle(self._w_list)
-        else:
-            self._attack_num = 0
+        
         #
-        attack_num = self._com.bcast(self._attack_num, root=0)
-        return attack_num
+        #self._attack_num = int(len(self._w_list)/1000)
+        return len(self._w_list)
+        #random.shuffle(self._w_list)
+        #random.shuffle(self._w_list)
+        #else:
+        #    self._attack_num = 0
+        #
+#        attack_num = self._com.bcast(self._attack_num, root=0)
+#        return attack_num
     
     def get_weight_pack(self, i):
-        if self._rank==0:
-            tp = self._w_list[i]
-            li = tp[0]
-            ni = tp[1]
-            ii = tp[2]
-            layer = self._roster.getLayerAt(li)
-            wi = layer.get_weight_index(ni, ii)
-            #
-            # shift
-            #
-        else:
-            li = 0
-            ni = 0
-            ii = 0
-            wi = 0
-        #
-        tp = self._com.bcast((li, ni, ii, wi), root=0)
-        return tp
+        tp = self._w_list[i]
+        li = tp[0]
+        ni = tp[1]
+        ii = tp[2]
+        layer = self._roster.getLayerAt(li)
+        wi = layer.get_weight_index(ni, ii)
+        return (li, ni, ii, wi)
+        #tp = self._com.bcast((li, ni, ii, wi), root=0)
+        #return tp
     
     def weight_shift(self, li, ni, ii, wi):
         layer = self._roster.getLayerAt(li)
@@ -185,7 +176,32 @@ class worker(object):
         entropy_alt = entropy
         maximum = core.WEIGHT_INDEX_MAX
         minimum = core.WEIGHT_INDEX_MIN
+#
+#
+#
+def bcast_random_int(rank, max):
+    if rank==0:
+        ri = random.randrange(max)
+    else:
+        ri = 0
+    #
+    ri = self._com.bcast(ri, root=0)
+    return ri
 
+def average_float(rank, v):
+    if rank==0:
+        v_list = self._com.gather(v, root=0)
+        v_sum = 0
+        for n in v_list:
+            v_sum = v_sum + n
+        #
+        avg = v_sum/float(len(v_list))
+    #
+    avg = self._com.bcast(avg, root=0)
+    return avg
+#
+#
+#
 def main():
     argvs = sys.argv
     argc = len(argvs)
@@ -201,45 +217,46 @@ def main():
     package_id = 0
     config_id = 0
     #
-    test = 0
-    if rank==0:
-        test = 1
-    #
-    #print(test)
-    print("%d : num=%d" % (rank, test))
-    return 0
-    
     #
     #
     wk = worker(com, package_id, config_id)
     wk.set_batch()
-    num = wk.make_w_list()
-    print("%d : num=%d" % (rank, num))
-    
-    for i in range(num):
-        tp = wk.get_weight_pack(i)
-        if rank==0:
-            print("[%d, %d] %d, %d, %d" % (rank, i, tp[0], tp[1], tp[2], tp[3]))
+    w_num = wk.make_w_list()
+    print("%d : num=%d" % (rank, w_num))
+    attack_num = w_num / 1000
+    for i in range(attack_num):
+        attack_i = bcast_random_int(rank, attack_num)
         #
+        tp = wk.get_weight_pack(attack_i)
         li = tp[0]
         ni = tp[1]
         ii = tp[2]
         wi = tp[3]
         max = core.WEIGHT_INDEX_MAX
         min = core.WEIGHT_INDEX_MIN
-        if wi==max:
-            wi = wi - 1
-            
-        elif wi==min:
-            wi = wi + 1
-        else:
-            pass
-            # +
-        
-            # -
+        if rank==0:
+            print("[%d, %d] %d, %d, %d" % (rank, i, tp[0], tp[1], tp[2], tp[3]))
         #
     #
-    
+    wk._roster.propagate()
+    ce = wk._roster.get_cross_entropy()
+    avg_ce = average_float(rank, ce)
+    print("CE : %d : %f" % (rank, avg_ce))
+    return 0
+        
+
+
+    if wi==max:
+        wi = wi - 1
+    elif wi==min:
+        wi = wi + 1
+    else:
+        pass
+        # +
+        
+        # -
+        #
+    #
 #    wk.evaluate()
 #    wi  = wk.get_weight_index(1, 2, 3)
 #    print("%d : %d" % (rank, wi))

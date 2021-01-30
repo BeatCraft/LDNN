@@ -300,6 +300,9 @@ def main():
     #
     cnt = 0
     for i in range(attack_num):
+        if rank==0:
+            print("%d" % i)
+        #
         attack_i = bcast_random_int(com, rank, attack_num)
         #
         ce, k = weight_shift(com, rank, wk, ce, attack_i)

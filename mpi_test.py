@@ -190,15 +190,15 @@ class worker(object):
 #
 #
 #
-def bcast_random_int(com, rank, max):
-    print("[%d] bcast_random_int()" % (rank))
+def bcast_random_int(i, com, rank, max):
+    print("[%d | %d] bcast_random_int()" % (i, rank))
     if rank==0:
         ri = random.randrange(max)
     else:
         ri = 0
     #
     ri = com.bcast(ri, root=0)
-    print("[%d]    =%d" % (rank, ri))
+    print("[%d | %d]    =%d" % (i, rank, ri))
     return ri
 
 def average_float(com, rank, v):
@@ -214,10 +214,11 @@ def average_float(com, rank, v):
     #
     return avg
     
-def weight_shift(com, rank, wk, entropy, attack_i):
-    if rank==0:
-        print("weight_shift : %d" % attack_i)
-    #
+def weight_shift(i, com, rank, wk, entropy, attack_i):
+    print("[%d | %d]weight_shift : %d" % i, rank, attack_i)
+#    if rank==0:
+#        print("weight_shift : %d" % attack_i)
+#    #
     
     w = wk._w_list[attack_i]
     li = w[0]
@@ -318,7 +319,7 @@ def main():
         if rank==0:
             print("%d" % i)
         #
-        attack_i = bcast_random_int(com, rank, attack_num)
+        attack_i = bcast_random_int(i, com, rank, attack_num)
         #
         ce, k = weight_shift(com, rank, wk, ce, attack_i)
         cnt = cnt + k

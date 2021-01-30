@@ -103,7 +103,7 @@ class worker(object):
                 sum = sum + i
             #
             avg = sum/float(self._size)
-            print("ce_avg=%f" % (avg))
+            #print("ce_avg=%f" % (avg))
             self._ce_avg = avg
         else:
             self._ce_avg = 0.0
@@ -122,7 +122,7 @@ class worker(object):
                 sum = sum + i
             #
             avg = sum/float(self._size)
-            print("ce_avg=%f" % (avg))
+            #print("ce_avg=%f" % (avg))
             self._ce_avg = avg
         else:
             self._ce_avg = 0.0
@@ -311,7 +311,9 @@ def main():
         attack_i = bcast_random_int(com, rank, attack_num)
         #
         ce, k = weight_shift(com, wk, ce, attack_i)
-        print("[%d] %f (%d)" %(i, ce, k))
+        if rank==0:
+            print("[%d] %f (%d)" %(i, ce, k))
+        #
 #        tp = wk.get_weight_pack(attack_i)
 #        li = tp[0]
 #        ni = tp[1]

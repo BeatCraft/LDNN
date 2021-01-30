@@ -225,7 +225,7 @@ def main():
     print("%d : num=%d" % (rank, w_num))
     attack_num = int(w_num / 1000)
     for i in range(attack_num):
-        attack_i = bcast_random_int(rank, attack_num)
+        attack_i = bcast_random_int(com, rank, attack_num)
         #
         tp = wk.get_weight_pack(attack_i)
         li = tp[0]
@@ -240,7 +240,7 @@ def main():
     #
     wk._roster.propagate()
     ce = wk._roster.get_cross_entropy()
-    avg_ce = average_float(rank, ce)
+    avg_ce = average_float(com, rank, ce)
     print("CE : %d : %f" % (rank, avg_ce))
     return 0
         

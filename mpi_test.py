@@ -321,7 +321,7 @@ def main():
         #
         attack_i = bcast_random_int(i, com, rank, attack_num)
         #
-        ce, k = weight_shift(com, rank, wk, ce, attack_i)
+        ce, k = weight_shift(i, com, rank, wk, ce, attack_i)
         cnt = cnt + k
         if rank==0:
             print("[%d][%d] %f (%d) %d" %(i, attack_i, ce, k, cnt))

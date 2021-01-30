@@ -211,13 +211,13 @@ def average_float(com, rank, v):
     #evaluate_alt(self, li, ni, ii, wi_alt):
     
 def weight_shift(com, wk, entropy, attack_i):
-    r = wk._roster
-    layer = r.getLayerAt(li)
     w = wk._w_list[attack_i]
     li = w[0]
     ni = w[1]
     ii = w[2]
-    wi = layer.get_weight_index(ni, ii)
+    r = wk._roster
+    layer = r.getLayerAt(li)
+    #wi = layer.get_weight_index(ni, ii)
     lock = layer.get_weight_lock(ni, ii)   # default : 0
     if lock>0:
         return entropy, 0

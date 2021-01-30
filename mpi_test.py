@@ -223,7 +223,7 @@ def main():
     wk.set_batch()
     w_num = wk.make_w_list()
     print("%d : num=%d" % (rank, w_num))
-    attack_num = w_num / 1000
+    attack_num = int(w_num / 1000)
     for i in range(attack_num):
         attack_i = bcast_random_int(rank, attack_num)
         #

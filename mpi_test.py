@@ -208,6 +208,10 @@ def average_float(com, rank, v):
     return avg
     
 def weight_shift(com, rank, wk, entropy, attack_i):
+    if rank==0:
+        print("weight_shift : %d" % attack_i)
+    #
+    
     w = wk._w_list[attack_i]
     li = w[0]
     ni = w[1]

@@ -105,6 +105,8 @@ class worker(object):
             entropy = sum/float(self._size)
             print("entropy=%f" % (entropy))
             self._ce = entropy
+        else:
+            self._ce = 0.0
         #
         return self._ce
     

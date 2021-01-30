@@ -179,25 +179,25 @@ class worker(object):
 #
 #
 #
-def bcast_random_int(rank, max):
+def bcast_random_int(com, rank, max):
     if rank==0:
         ri = random.randrange(max)
     else:
         ri = 0
     #
-    ri = self._com.bcast(ri, root=0)
+    ri = com.bcast(ri, root=0)
     return ri
 
-def average_float(rank, v):
+def average_float(com, rank, v):
     if rank==0:
-        v_list = self._com.gather(v, root=0)
+        v_list = com.gather(v, root=0)
         v_sum = 0
         for n in v_list:
             v_sum = v_sum + n
         #
         avg = v_sum/float(len(v_list))
     #
-    avg = self._com.bcast(avg, root=0)
+    avg = com.bcast(avg, root=0)
     return avg
 #
 #

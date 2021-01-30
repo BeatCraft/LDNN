@@ -95,7 +95,7 @@ class worker(object):
     def evaluate(self):
         self._roster.propagate()
         self._ce = self._roster.get_cross_entropy()
-        ce_list = self._com.gather(ce, root=0)
+        ce_list = self._com.gather(self._ce, root=0)
         #
         if self._rank==0:
             sum = 0.0

@@ -191,13 +191,14 @@ class worker(object):
 #
 #
 def bcast_random_int(com, rank, max):
+    print("bcast_random_int()")
     if rank==0:
         ri = random.randrange(max)
-        print("bcast_random_int(%d)" % (ri))
     else:
         ri = 0
     #
     ri = com.bcast(ri, root=0)
+    print("    =%d" % (ri))
     return ri
 
 def average_float(com, rank, v):

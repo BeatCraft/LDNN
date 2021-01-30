@@ -206,7 +206,7 @@ def average_float(com, rank, v):
     #
     return avg
     
-def weight_shift(com, wk, entropy, attack_i):
+def weight_shift(com, rank, wk, entropy, attack_i):
     w = wk._w_list[attack_i]
     li = w[0]
     ni = w[1]
@@ -299,7 +299,7 @@ def main():
     for i in range(attack_num):
         attack_i = bcast_random_int(com, rank, attack_num)
         #
-        ce, k = weight_shift(com, wk, ce, attack_i)
+        ce, k = weight_shift(com, rank, wk, ce, attack_i)
         cnt = cnt + k
         if rank==0:
             print("[%d][%d] %f (%d) %d" %(i, attack_i, ce, k, cnt))

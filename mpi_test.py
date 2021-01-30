@@ -228,7 +228,8 @@ def weight_shift(com, rank, wk, entropy, attack_i):
     wp = layer.get_weight_property(ni, ii) # default : 0
     wi = layer.get_weight_index(ni, ii)
     wi_alt = wi
-    entropy_alt = entropy
+    
+     = entropy
     maximum = core.WEIGHT_INDEX_MAX
     minimum = core.WEIGHT_INDEX_MIN
     #
@@ -297,7 +298,7 @@ def main():
     wk.set_batch()
     ce = wk.evaluate()
     w_num = wk.make_w_list()
-    attack_num = int(w_num / 100)
+    attack_num = int(w_num / 10)
     if rank==0:
         print("CE : %d : %f" % (rank, ce))
         print("%d : num=%d" % (rank, w_num))

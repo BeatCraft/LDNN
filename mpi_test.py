@@ -215,6 +215,9 @@ def weight_shift(com, wk, entropy, attack_i):
     layer = r.getLayerAt(li)
     lock = layer.get_weight_lock(ni, ii)   # default : 0
     if lock>0:
+        if rank==0:
+            print("locked(%d)" % wi)
+        #
         return entropy, 0
     #
     wp = layer.get_weight_property(ni, ii) # default : 0
@@ -235,7 +238,9 @@ def weight_shift(com, wk, entropy, attack_i):
         if wi==maximum or wi==minimum:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_lock(ni, ii, 1)
-            print("lock at(%d)" % wi)
+            if rank==0:
+                print("lock at(%d)" % wi)
+            #
             return entropy, 0
         #
     #
@@ -254,7 +259,9 @@ def weight_shift(com, wk, entropy, attack_i):
         else:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_lock(ni, ii, 1)
-            print("lock at(%d)" % wi)
+            if rank==0:
+                print("lock at(%d)" % wi)
+            #
         #
     #
     return entropy, 0
@@ -288,12 +295,14 @@ def main():
         print("%d : num=%d" % (rank, w_num))
     #
     #
+    cnt = 0
     for i in range(attack_num):
         attack_i = bcast_random_int(com, rank, attack_num)
         #
         ce, k = weight_shift(com, wk, ce, attack_i)
+        cnt = cnt + k
         if rank==0:
-            print("[%d] %f (%d)" %(i, ce, k))
+            print("[%d][%d] %f (%d) %d" %(i, attack_i, ce, k, cnt))
         #
     #
     if rank==0:

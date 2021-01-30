@@ -242,8 +242,10 @@ def main():
     #
     wk._roster.propagate()
     ce = wk._roster.get_cross_entropy()
+    print("CE : %d : %f" % (rank, ce))
+    
     avg_ce = average_float(com, rank, ce)
-    print("CE : %d : %f" % (rank, avg_ce))
+    print("Avg CE : %d : %f" % (rank, avg_ce))
     return 0
         
 

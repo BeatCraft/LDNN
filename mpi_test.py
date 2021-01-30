@@ -114,6 +114,7 @@ class worker(object):
     def evaluate_alt(self, li, ni, ii, wi_alt):
         self._roster.propagate(li, ni, ii, wi_alt, 0)
         ce = self._roster.get_cross_entropy()
+        print("    %d : ce : %f" % (self._rank, ce))
         ce_list = self._com.gather(ce, root=0)
         #
         if self._rank==0:
@@ -251,7 +252,9 @@ def weight_shift(com, rank, wk, entropy, attack_i):
     #
     wi_alt = wi + wp_alt
     entropy_alt = wk.evaluate_alt(li, ni, ii, wi_alt)
-    print("ce_alt = %f | %f" %(entropy_alt, entropy))
+    if rank==0:
+        print("ce_alt = %f | %f" %(entropy_alt, entropy))
+    #
     if entropy_alt<entropy:
         layer.set_weight_property(ni, ii, wp_alt)
         layer.set_weight_index(ni, ii, wi_alt)

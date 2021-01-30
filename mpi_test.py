@@ -206,10 +206,6 @@ def average_float(com, rank, v):
     #
     return avg
     
-#def weight_shift(com, wk, entropy, li, ni, ii, wi):
-
-    #evaluate_alt(self, li, ni, ii, wi_alt):
-    
 def weight_shift(com, wk, entropy, attack_i):
     w = wk._w_list[attack_i]
     li = w[0]
@@ -217,7 +213,6 @@ def weight_shift(com, wk, entropy, attack_i):
     ii = w[2]
     r = wk._roster
     layer = r.getLayerAt(li)
-    #wi = layer.get_weight_index(ni, ii)
     lock = layer.get_weight_lock(ni, ii)   # default : 0
     if lock>0:
         return entropy, 0
@@ -246,21 +241,10 @@ def weight_shift(com, wk, entropy, attack_i):
     #
     wi_alt = wi + wp_alt
     entropy_alt = wk.evaluate_alt(li, ni, ii, wi_alt)
-#    if r._gpu:
-#        r.propagate(li, ni, ii, wi_alt, 0)
-#        entropy_alt = r.get_cross_entropy()
-#    else:
-#        entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-#    #
     if entropy_alt<entropy:
         layer.set_weight_property(ni, ii, wp_alt)
         layer.set_weight_index(ni, ii, wi_alt)
         layer.update_weight()
-#        if r._gpu:
-#            layer.update_weight()
-#        else:
-#            entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-#        #
         return entropy_alt, 1
     else:
         if wp==0:
@@ -301,11 +285,8 @@ def main():
     #
     w_num = wk.make_w_list()
     print("%d : num=%d" % (rank, w_num))
-    #max = core.WEIGHT_INDEX_MAX
-    #min = core.WEIGHT_INDEX_MIN
     attack_num = int(w_num / 1000)
-    #
-    attack_num = 100
+    #attack_num = 100
     #
     for i in range(attack_num):
         attack_i = bcast_random_int(com, rank, attack_num)
@@ -314,45 +295,14 @@ def main():
         if rank==0:
             print("[%d] %f (%d)" %(i, ce, k))
         #
-#        tp = wk.get_weight_pack(attack_i)
-#        li = tp[0]
-#        ni = tp[1]
-#        ii = tp[2]
-#        wi = tp[3]
-#        if rank==0:
-#            print("[%d, %d] %d, %d, %d,  %d" % (rank, i, tp[0], tp[1], tp[2], tp[3]))
-        #
     #
-    return 0
-    
-#    wk._roster.propagate()
-#    ce = wk._roster.get_cross_entropy()
-#    print("CE : %d : %f" % (rank, ce))
-#
-#    avg_ce = average_float(com, rank, ce)
-#    print("Avg CE : %d : %f" % (rank, avg_ce))
-#    return 0
-        
-
-
-    if wi==max:
-        wi = wi - 1
-    elif wi==min:
-        wi = wi + 1
+    if rank==0:
+        package = wk._package
+        wk._roster.export_weight_index(package._wi_csv_path)
     else:
         pass
-        # +
-        
-        # -
-        #
     #
-#    wk.evaluate()
-#    wi  = wk.get_weight_index(1, 2, 3)
-#    print("%d : %d" % (rank, wi))
-    #
-#    wk.evaluate_alt(1, 2, 3, 5)
-#    wk.update_weight(1, 2, 3, 5)
-    #
+    
     return 0
 #
 #

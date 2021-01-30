@@ -228,8 +228,7 @@ def weight_shift(com, rank, wk, entropy, attack_i):
     wp = layer.get_weight_property(ni, ii) # default : 0
     wi = layer.get_weight_index(ni, ii)
     wi_alt = wi
-    
-     = entropy
+    entropy_alt = entropy
     maximum = core.WEIGHT_INDEX_MAX
     minimum = core.WEIGHT_INDEX_MIN
     #

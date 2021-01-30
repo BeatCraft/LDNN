@@ -235,7 +235,7 @@ def main():
         max = core.WEIGHT_INDEX_MAX
         min = core.WEIGHT_INDEX_MIN
         if rank==0:
-            print("[%d, %d] %d, %d, %d" % (rank, i, tp[0], tp[1], tp[2], tp[3]))
+            print("[%d, %d] %d, %d, %d,  %d" % (rank, i, tp[0], tp[1], tp[2], tp[3]))
         #
     #
     wk._roster.propagate()

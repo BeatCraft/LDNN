@@ -190,10 +190,11 @@ class worker(object):
 #
 #
 #
-def bcast_random_int(i, com, rank, max):
+def bcast_random_int(i, com, rank, size, max):
     print("[%d | %d] bcast_random_int()" % (i, rank))
     if rank==0:
-        ri = random.randrange(max)
+        k = random.randrange(max)
+        ri = [k] * size
     else:
         ri = 0
     #
@@ -302,19 +303,17 @@ def main():
     #
     package_id = 0  # MNIST
     config_id = 0   # FC
-    
     #
-    if rank == 0:
-        data = [2, 2]
-        print(data)
-    else:
-        data = None
-    #
-    data = com.scatter(data, root=0)
-    print(data)
-    #
-    return 0
-    
+#    if rank == 0:
+#        data = [2, 2]
+#        print(data)
+#    else:
+#        data = None
+#    #
+#    data = com.scatter(data, root=0)
+#    print(data)
+#    #
+#    return 0
     #
     #
     #
@@ -333,7 +332,7 @@ def main():
         if rank==0:
             print("%d" % i)
         #
-        attack_i = bcast_random_int(i, com, rank, attack_num)
+        attack_i = bcast_random_int(i, com, rank, size, attack_num)
         #
         ce, k = weight_shift(i, com, rank, wk, ce, attack_i)
         cnt = cnt + k

@@ -340,8 +340,8 @@ def main():
         else:
             ri = None
         #
-        ri = com.scatter(ri, root=0)
-        print("[%d | %d] scatter(%d)" % (i, rank, ri))
+        attack_i = com.scatter(ri, root=0)
+        print("[%d | %d] scatter(%d)" % (i, rank, attack_i))
     
         #
         ce, k = weight_shift(i, com, rank, wk, ce, attack_i)

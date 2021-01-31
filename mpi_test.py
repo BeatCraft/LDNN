@@ -309,7 +309,7 @@ def main():
     else:
         data = None
     #
-    data = comm.scatter(data, root=0)
+    data = com.scatter(data, root=0)
     print(data)
     #
     return 0

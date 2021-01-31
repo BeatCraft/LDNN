@@ -86,6 +86,7 @@ class worker(object):
         print("size=%d" % (self._size ))
 
     def set_batch(self):
+        print("[%d] bsize = %d, start = %d", % (self._rank, self._batch_size, self._batch_start))
         for i in range(self._batch_size):
             self._data_array[i] = self._package._train_image_batch[self._batch_start + i]
             self._class_array[i] = self._package._train_label_batch[self._batch_start + i]

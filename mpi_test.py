@@ -199,7 +199,7 @@ def bcast_random_int(i, com, rank, size, max):
         ri = 0
     #
     #ri = com.bcast(ri, root=0)
-    ri = comm.scatter(ri, root=0)
+    ri = com.scatter(ri, root=0)
     print("[%d | %d]    =%d" % (i, rank, ri))
     return ri
 

@@ -222,7 +222,6 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
 #    if rank==0:
 #        print("weight_shift : %d" % attack_i)
 #    #
-    
     w = wk._w_list[attack_i]
     li = w[0]
     ni = w[1]
@@ -231,9 +230,10 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
     layer = r.getLayerAt(li)
     lock = layer.get_weight_lock(ni, ii)   # default : 0
     if lock>0:
-        if rank==0:
-            print("locked")
-        #
+#        if rank==0:
+#            print("locked")
+#        #
+        print("[%d][%d] lock(%d)" % (i, rank, wi))
         return entropy, 0
     #
     wp = layer.get_weight_property(ni, ii) # default : 0
@@ -254,17 +254,19 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
         if wi==maximum or wi==minimum:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_lock(ni, ii, 1)
-            if rank==0:
-                print("lock (%d)" % wi)
-            #
+#            if rank==0:
+#                print("lock (%d)" % wi)
+#            #
+            print("[%d][%d] lock(%d)" % (i, rank, wi))
             return entropy, 0
         #
     #
     wi_alt = wi + wp_alt
     entropy_alt = wk.evaluate_alt(li, ni, ii, wi_alt)
-    if rank==0:
-        print("ce_alt = %f | %f" %(entropy_alt, entropy))
-    #
+    print("[%d][%d] ce=%f, alt=%f (%f)" % (i, rank, entropy, entropy_alt, entropy-entropy_alt))
+#    if rank==0:
+#        print("ce_alt = %f | %f" %(entropy_alt, entropy))
+#    #
     if entropy_alt<entropy:
         layer.set_weight_property(ni, ii, wp_alt)
         layer.set_weight_index(ni, ii, wi_alt)
@@ -275,15 +277,11 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
             # reverse
             wp_alt = wp_alt*(-1)
             layer.set_weight_property(ni, ii, wp_alt)
-            if rank==0:
-                print("reverse (%d)" % wp_alt)
-            #
+            print("[%d][%d] reverse(%d)" % (i, rank, wp_alt))
         else:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_lock(ni, ii, 1)
-            if rank==0:
-                print("lock (%d)" % wi)
-            #
+            print("[%d][%d] lock(%d)" % (i, rank, wi))
         #
     #
     return entropy, 0

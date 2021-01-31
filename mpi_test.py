@@ -233,7 +233,7 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
 #        if rank==0:
 #            print("locked")
 #        #
-        print("[%d][%d] lock(%d)" % (i, rank, wi))
+        print("[%d][%d] locked(%d)" % (i, rank, wi))
         return entropy, 0
     #
     wp = layer.get_weight_property(ni, ii) # default : 0
@@ -257,7 +257,7 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
 #            if rank==0:
 #                print("lock (%d)" % wi)
 #            #
-            print("[%d][%d] lock(%d)" % (i, rank, wi))
+            print("[%d][%d] lock_1(%d)" % (i, rank, wi))
             return entropy, 0
         #
     #
@@ -281,7 +281,7 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
         else:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_lock(ni, ii, 1)
-            print("[%d][%d] lock(%d)" % (i, rank, wi))
+            print("[%d][%d] lock_2(%d)" % (i, rank, wi))
         #
     #
     return entropy, 0

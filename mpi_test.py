@@ -333,7 +333,16 @@ def main():
         if rank==0:
             print("%d" % i)
         #
-        attack_i = bcast_random_int(i, com, rank, size, attack_num)
+        #attack_i = bcast_random_int(i, com, rank, size, attack_num)
+        if rank==0:
+            k = random.randrange(max)
+            ri = [k] * size
+        else:
+            ri = None
+        #
+        ri = com.scatter(ri, root=0)
+        print("[%d | %d] scatter(%d)" % (i, rank, ri))
+    
         #
         ce, k = weight_shift(i, com, rank, wk, ce, attack_i)
         cnt = cnt + k

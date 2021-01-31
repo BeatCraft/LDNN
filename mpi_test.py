@@ -335,7 +335,7 @@ def main():
         #
         #attack_i = bcast_random_int(i, com, rank, size, attack_num)
         if rank==0:
-            k = random.randrange(max)
+            k = random.randrange(attack_num)
             ri = [k] * size
         else:
             ri = None

@@ -305,7 +305,7 @@ def main():
     
     #
     if rank == 0:
-        data = 1#[(i+1)**2 for i in range(size)]
+        data = [0, 2]
         print(data)
     else:
         data = None

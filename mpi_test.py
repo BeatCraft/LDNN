@@ -306,11 +306,12 @@ def main():
     #
     if rank == 0:
         data = [(i+1)**2 for i in range(size)]
+        print(data)
     else:
         data = None
     #
     data = com.scatter(data, root=0)
-    print(data)
+    print(len(data))
     #
     return 0
     

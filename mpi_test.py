@@ -197,7 +197,8 @@ def bcast_random_int(i, com, rank, max):
     else:
         ri = 0
     #
-    ri = com.bcast(ri, root=0)
+    #ri = com.bcast(ri, root=0)
+    ri = comm.scatter(ri, root=0)
     print("[%d | %d]    =%d" % (i, rank, ri))
     return ri
 
@@ -301,6 +302,18 @@ def main():
     #
     package_id = 0  # MNIST
     config_id = 0   # FC
+    
+    #
+    if rank == 0:
+        data = [(i+1)**2 for i in range(size)]
+    else:
+        data = None
+    #
+    data = comm.scatter(data, root=0)
+    print(data)
+    #
+    return 0
+    
     #
     #
     #

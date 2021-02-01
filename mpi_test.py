@@ -98,7 +98,7 @@ class worker(object):
         self._ce = self._roster.get_cross_entropy()
         ce_list = self._com.gather(self._ce, root=0)
         #
-        print(ce_list)
+        #print(ce_list)
         sum = 0.0
         if self._rank==0:
             for i in ce_list:
@@ -107,7 +107,6 @@ class worker(object):
             avg = sum/float(self._size)
             self._ce_avg = avg
         #
-        #self._ce_avg = self._com.bcast(self._ce_avg, root=0)
         if self._rank==0:
             ce_avg_list = [self._ce_avg]*self._size
         else:
@@ -115,28 +114,29 @@ class worker(object):
         #
         ce_avg_list = self._com.scatter(ce_avg_list, root=0)
         self._ce_avg = ce_avg_list
-        print("[%d] ce_avg = %f" % (self._rank, self._ce_avg))
-        
+        #print("[%d] ce_avg = %f" % (self._rank, self._ce_avg))
         return self._ce_avg
     
     def evaluate_alt(self, li, ni, ii, wi_alt):
         self._roster.propagate(li, ni, ii, wi_alt, 0)
-        print("    %d : propagate" % (self._rank))
         ce = self._roster.get_cross_entropy()
-        print("    %d : ce : %f" % (self._rank, ce))
         ce_list = self._com.gather(ce, root=0)
-        print("    %d : gather" % (self._rank))
         #
         sum = 0.0
-        for i in ce_list:
-            if self._rank==0:
-                print("        %f" % (i))
+        if self._rank==0:
+            for i in ce_list:
+                sum = sum + i
             #
-            sum = sum + i
+            avg = sum/float(self._size)
+            self._ce_avg = avg
         #
-        avg = sum/float(self._size)
-        self._ce_avg = avg
+        if self._rank==0:
+            ce_avg_list = [self._ce_avg]*self._size
+        else:
+            ce_avg_list = None
         #
+        ce_avg_list = self._com.scatter(ce_avg_list, root=0)
+        self._ce_avg = ce_avg_list
         return self._ce_avg
         
     def update_weight(self, li, ni, ii, wi):

@@ -112,8 +112,10 @@ class worker(object):
         else:
             ce_avg_list = None
         #
-        self._ce_avg = self._com.scatter(ce_avg_list, root=0)
-        print(self._ce_avg)
+        ce_avg_list = self._com.scatter(ce_avg_list, root=0)
+        self._ce_avg = ce_avg_list
+        print("[%d] ce_avg = %f" % (self._rank, self._ce_avg))
+        
         return self._ce_avg
     
     def evaluate_alt(self, li, ni, ii, wi_alt):

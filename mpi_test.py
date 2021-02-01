@@ -163,50 +163,8 @@ class worker(object):
             #
         
         #
-        #self._attack_num = int(len(self._w_list)/1000)
         return len(self._w_list)
-        #random.shuffle(self._w_list)
-        #random.shuffle(self._w_list)
-        #else:
-        #    self._attack_num = 0
-        #
-#        attack_num = self._com.bcast(self._attack_num, root=0)
-#        return attack_num
-    
-    def get_weight_pack(self, i):
-        tp = self._w_list[i]
-        li = tp[0]
-        ni = tp[1]
-        ii = tp[2]
-        layer = self._roster.getLayerAt(li)
-        wi = layer.get_weight_index(ni, ii)
-        return (li, ni, ii, wi)
-        #tp = self._com.bcast((li, ni, ii, wi), root=0)
-        #return tp
-    
-#    def weight_shift(self, li, ni, ii, wi):
-#        layer = self._roster.getLayerAt(li)
-#        wi_alt = wi
-#        entropy = self._ce
-#        entropy_alt = entropy
-#        maximum = core.WEIGHT_INDEX_MAX
-#        minimum = core.WEIGHT_INDEX_MIN
-#
-#
-#
-def bcast_random_int(i, com, rank, size, max):
-    print("[%d | %d] bcast_random_int()" % (i, rank))
-    if rank==0:
-        k = random.randrange(max)
-        ri = [k] * size
-    else:
-        ri = 0
-    #
-    #ri = com.bcast(ri, root=0)
-    ri = com.scatter(ri, root=0)
-    print("[%d | %d]    =%d" % (i, rank, ri))
-    return ri
-
+        
 def average_float(com, rank, v):
     v_list = com.gather(v, root=0)
     if rank==0:
@@ -303,6 +261,7 @@ def main():
     #
     package_id = 0  # MNIST
     config_id = 0   # FC
+    loop_n = 3
     #
     #
     #
@@ -317,25 +276,29 @@ def main():
     #
     #
     cnt = 0
-    for i in range(attack_num):
+    for n in range(loop_n):
+        for i in range(attack_num):
+            if rank==0:
+                k = random.randrange(attack_num)
+                ri = [k] * size
+            else:
+                ri = None
+            #
+            attack_i = com.scatter(ri, root=0)
+            ce, k = weight_shift(i, com, rank, wk, ce, attack_i)
+            cnt = cnt + k
+            if rank==0:
+                print("[%d][%d] %f (%d) %d" %(i, attack_i, ce, k, cnt))
+            #
+        #
         if rank==0:
-            k = random.randrange(attack_num)
-            ri = [k] * size
+            package = wk._package
+            wk._roster.export_weight_index(package._wi_csv_path)
         else:
-            ri = None
+            pass
         #
-        attack_i = com.scatter(ri, root=0)
-        ce, k = weight_shift(i, com, rank, wk, ce, attack_i)
-        cnt = cnt + k
-        if rank==0:
-            print("[%d][%d] %f (%d) %d" %(i, attack_i, ce, k, cnt))
+        # reset
         #
-    #
-    if rank==0:
-        package = wk._package
-        wk._roster.export_weight_index(package._wi_csv_path)
-    else:
-        pass
     #
     return 0
 #

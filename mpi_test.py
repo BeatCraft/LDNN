@@ -100,11 +100,12 @@ class worker(object):
         #
         print(ce_list)
         sum = 0.0
-        for i in ce_list:
-            sum = sum + i
-        #
-        avg = sum/float(self._size)
-        self._ce_avg = avg
+        if self._rank==0:
+            for i in ce_list:
+                sum = sum + i
+            #
+            avg = sum/float(self._size)
+            self._ce_avg = avg
         #
         #self._ce_avg = self._com.bcast(self._ce_avg, root=0)
         if self._rank==0:

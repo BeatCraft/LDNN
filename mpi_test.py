@@ -98,17 +98,12 @@ class worker(object):
         self._ce = self._roster.get_cross_entropy()
         ce_list = self._com.gather(self._ce, root=0)
         #
-        if self._rank==0:
-            sum = 0.0
-            for i in ce_list:
-                sum = sum + i
-            #
-            avg = sum/float(self._size)
-            #print("ce_avg=%f" % (avg))
-            self._ce_avg = avg
-        else:
-            self._ce_avg = 0.0
+        sum = 0.0
+        for i in ce_list:
+            sum = sum + i
         #
+        avg = sum/float(self._size)
+        self._ce_avg = avg
         self._ce_avg = self._com.bcast(self._ce_avg, root=0)
         return self._ce_avg
     
@@ -120,19 +115,15 @@ class worker(object):
         ce_list = self._com.gather(ce, root=0)
         print("    %d : gather" % (self._rank))
         #
-        if self._rank==0:
-            sum = 0.0
-            for i in ce_list:
-                if self._rank==0:
-                    print("        %f" % (i))
-                #
-                sum = sum + i
+        sum = 0.0
+        for i in ce_list:
+            if self._rank==0:
+                print("        %f" % (i))
             #
-            avg = sum/float(self._size)
-            #print("ce_avg=%f" % (avg))
-            self._ce_avg = avg
-        else:
-            self._ce_avg = 0.0
+            sum = sum + i
+        #
+        avg = sum/float(self._size)
+        self._ce_avg = avg
         #
         return self._ce_avg
         

@@ -108,7 +108,7 @@ class worker(object):
         #
         #self._ce_avg = self._com.bcast(self._ce_avg, root=0)
         if self._rank==0:
-            ce_avg_list = [self._ce_avg]*
+            ce_avg_list = [self._ce_avg]*self._size
         else:
             ce_avg_list = None
         #

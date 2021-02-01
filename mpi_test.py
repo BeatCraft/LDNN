@@ -97,6 +97,8 @@ class worker(object):
         self._roster.propagate()
         self._ce = self._roster.get_cross_entropy()
         ce_list = self._com.gather(self._ce, root=0)
+        print(ce_list)
+        #
         if self._rank==0:
             ce_list = ce_list
         else:

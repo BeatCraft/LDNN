@@ -221,10 +221,6 @@ def average_float(com, rank, v):
     return avg
     
 def weight_shift(i, com, rank, wk, entropy, attack_i):
-    #print("[%d | %d] weight_shift : %d" % (i, rank, attack_i))
-#    if rank==0:
-#        print("weight_shift : %d" % attack_i)
-#    #
     w = wk._w_list[attack_i]
     li = w[0]
     ni = w[1]
@@ -233,9 +229,6 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
     layer = r.getLayerAt(li)
     lock = layer.get_weight_lock(ni, ii)   # default : 0
     if lock>0:
-#        if rank==0:
-#            print("locked")
-#        #
         print("[%d][%d] locked" % (i, rank))
         return entropy, 0
     #
@@ -257,9 +250,6 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
         if wi==maximum or wi==minimum:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_lock(ni, ii, 1)
-#            if rank==0:
-#                print("lock (%d)" % wi)
-#            #
             print("[%d][%d] lock_1(%d)" % (i, rank, wi))
             return entropy, 0
         #
@@ -306,17 +296,6 @@ def main():
     package_id = 0  # MNIST
     config_id = 0   # FC
     #
-#    if rank == 0:
-#        data = [2, 2]
-#        print(data)
-#    else:
-#        data = None
-#    #
-#    data = com.scatter(data, root=0)
-#    print(data)
-#    #
-#    return 0
-    #
     #
     #
     wk = worker(com, package_id, config_id)
@@ -331,10 +310,6 @@ def main():
     #
     cnt = 0
     for i in range(attack_num):
-#        if rank==0:
-#            print("%d" % i)
-#        #
-        #attack_i = bcast_random_int(i, com, rank, size, attack_num)
         if rank==0:
             k = random.randrange(attack_num)
             ri = [k] * size
@@ -342,8 +317,6 @@ def main():
             ri = None
         #
         attack_i = com.scatter(ri, root=0)
-        #print("[%d | %d] scatter(%d)" % (i, rank, attack_i))
-        #
         ce, k = weight_shift(i, com, rank, wk, ce, attack_i)
         cnt = cnt + k
         if rank==0:
@@ -356,7 +329,6 @@ def main():
     else:
         pass
     #
-    
     return 0
 #
 #

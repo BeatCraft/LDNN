@@ -221,7 +221,7 @@ def average_float(com, rank, v):
     return avg
     
 def weight_shift(i, com, rank, wk, entropy, attack_i):
-    print("[%d | %d] weight_shift : %d" % (i, rank, attack_i))
+    #print("[%d | %d] weight_shift : %d" % (i, rank, attack_i))
 #    if rank==0:
 #        print("weight_shift : %d" % attack_i)
 #    #
@@ -236,7 +236,7 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
 #        if rank==0:
 #            print("locked")
 #        #
-        print("[%d][%d] locked(%d)" % (i, rank, wi))
+        print("[%d][%d] locked" % (i, rank))
         return entropy, 0
     #
     wp = layer.get_weight_property(ni, ii) # default : 0
@@ -266,7 +266,7 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
     #
     wi_alt = wi + wp_alt
     entropy_alt = wk.evaluate_alt(li, ni, ii, wi_alt)
-    print("[%d][%d] ce=%f, alt=%f (%f)" % (i, rank, entropy, entropy_alt, entropy-entropy_alt))
+    #print("[%d][%d] ce=%f, alt=%f (%f)" % (i, rank, entropy, entropy_alt, entropy-entropy_alt))
 #    if rank==0:
 #        print("ce_alt = %f | %f" %(entropy_alt, entropy))
 #    #
@@ -331,9 +331,9 @@ def main():
     #
     cnt = 0
     for i in range(attack_num):
-        if rank==0:
-            print("%d" % i)
-        #
+#        if rank==0:
+#            print("%d" % i)
+#        #
         #attack_i = bcast_random_int(i, com, rank, size, attack_num)
         if rank==0:
             k = random.randrange(attack_num)
@@ -342,8 +342,7 @@ def main():
             ri = None
         #
         attack_i = com.scatter(ri, root=0)
-        print("[%d | %d] scatter(%d)" % (i, rank, attack_i))
-    
+        #print("[%d | %d] scatter(%d)" % (i, rank, attack_i))
         #
         ce, k = weight_shift(i, com, rank, wk, ce, attack_i)
         cnt = cnt + k

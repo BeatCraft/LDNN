@@ -274,7 +274,7 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
         else:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_lock(ni, ii, 1)
-            print("[%d][%d] lock_2(%d)" % (i, rank, wi))
+            #print("[%d][%d] lock_2(%d)" % (i, rank, wi))
         #
     #
     return entropy, 0

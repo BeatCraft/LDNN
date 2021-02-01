@@ -229,7 +229,9 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
     layer = r.getLayerAt(li)
     lock = layer.get_weight_lock(ni, ii)   # default : 0
     if lock>0:
-        print("[%d][%d] locked" % (i, rank))
+        if rank==0:
+            print("[%d][%d] locked" % (i, rank))
+        #
         return entropy, 0
     #
     wp = layer.get_weight_property(ni, ii) # default : 0
@@ -250,7 +252,9 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
         if wi==maximum or wi==minimum:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_lock(ni, ii, 1)
-            print("[%d][%d] lock_1(%d)" % (i, rank, wi))
+            if rank==0:
+                print("[%d][%d] lock_1(%d)" % (i, rank, wi))
+            #
             return entropy, 0
         #
     #
@@ -270,11 +274,15 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
             # reverse
             wp_alt = wp_alt*(-1)
             layer.set_weight_property(ni, ii, wp_alt)
-            print("[%d][%d] reverse(%d)" % (i, rank, wp_alt))
+            if rank==0:
+                print("[%d][%d] reverse(%d)" % (i, rank, wp_alt))
+            #
         else:
             layer.set_weight_property(ni, ii, 0)
             layer.set_weight_lock(ni, ii, 1)
-            #print("[%d][%d] lock_2(%d)" % (i, rank, wi))
+            if rank==0:
+                print("[%d][%d] lock_2(%d)" % (i, rank, wi))
+            #
         #
     #
     return entropy, 0

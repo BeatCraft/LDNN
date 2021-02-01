@@ -310,7 +310,7 @@ def main():
     wk.set_batch()
     ce = wk.evaluate()
     w_num = wk.make_w_list()
-    attack_num = int(w_num / 10)
+    attack_num = int(w_num/10*3)
     if rank==0:
         print("CE : %d : %f" % (rank, ce))
         print("%d : num=%d" % (rank, w_num))

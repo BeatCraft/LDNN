@@ -97,14 +97,6 @@ class worker(object):
         self._roster.propagate()
         self._ce = self._roster.get_cross_entropy()
         ce_list = self._com.gather(self._ce, root=0)
-        print(ce_list)
-        #
-        if self._rank==0:
-            ce_list = ce_list
-        else:
-            ce_list = None
-        #
-        ce_list = self._com.scatter(ce_list, root=0)
         #
         print(ce_list)
         sum = 0.0
@@ -115,6 +107,13 @@ class worker(object):
         self._ce_avg = avg
         #
         #self._ce_avg = self._com.bcast(self._ce_avg, root=0)
+        if self._rank==0:
+            ce_avg_list = [self._ce_avg]*
+        else:
+            ce_avg_list = None
+        #
+        self._ce_avg = self._com.scatter(ce_avg_list, root=0)
+        print(self._ce_avg)
         return self._ce_avg
     
     def evaluate_alt(self, li, ni, ii, wi_alt):

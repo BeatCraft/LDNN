@@ -34,7 +34,7 @@ HOST_NAMES = ["threadripper", "amd-1", "amd-2", "amd-3"]
 PACKAGE_IDS = [1, 0, 0, 0]
 DEVICE_IDS =  [0, 0, 0, 0]
 MINI_BATCH_SIZE = [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000]
-MINI_BATCH_START = [0, 1000, 2000, 3000, 4000, 50000, 6000, 7000, 8000, 9000, 10000]
+MINI_BATCH_START = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
 #
 def get_host_id_by_name(name):
     return HOST_NAMES.index(name)

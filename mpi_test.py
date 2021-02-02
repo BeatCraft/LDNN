@@ -277,6 +277,12 @@ def main():
     #
     cnt = 0
     for n in range(loop_n):
+        # reset
+        if n>0 and n%3==0:
+            wk._roster.reset_weight_property()
+            wk._roster.unlock_weight_all()
+            wk._roster.reset_weight_mbid()
+        #
         for i in range(attack_num):
             if rank==0:
                 k = random.randrange(attack_num)
@@ -296,8 +302,6 @@ def main():
             wk._roster.export_weight_index(package._wi_csv_path)
         else:
             pass
-        #
-        # reset
         #
     #
     return 0

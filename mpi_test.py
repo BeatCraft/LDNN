@@ -261,7 +261,7 @@ def main():
     #
     package_id = 0  # MNIST
     config_id = 0   # FC
-    loop_n = 3
+    loop_n = 3*10
     #
     #
     #

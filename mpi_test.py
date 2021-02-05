@@ -156,12 +156,16 @@ class worker(object):
         c = r.countLayers()
         for li in range(1, c):
             layer = r.getLayerAt(li)
-            for ni in range(layer._num_node):
-                for ii in range(layer._num_input):
-                    self._w_list.append((li, ni, ii))
+            type = layer.get_type()
+            if type==core.LAYER_TYPE_HIDDEN or
+                    type==core.LAYER_TYPE_OUTPUT or
+                    type==core.LAYER_TYPE_CONV_4:
+                for ni in range(layer._num_node):
+                    for ii in range(layer._num_input):
+                        self._w_list.append((li, ni, ii))
+                    #
                 #
             #
-        
         #
         return len(self._w_list)
         
@@ -259,8 +263,8 @@ def main():
     my_size = my_self.group.Get_size()
     print("%d, %d, %d, %d" % (rank, size, my_rank, my_size))
     #
-    package_id = 0  # MNIST
-    config_id = 0   # FC
+    package_id = 0  # 0 : MNIST, 1 : Cifar-10
+    config_id = 0   # 0 : FC, 1 : CNN
     loop_n = 3*10
     #
     #
@@ -294,7 +298,7 @@ def main():
             ce, k = weight_shift(i, com, rank, wk, ce, attack_i)
             cnt = cnt + k
             if rank==0:
-                print("[%d][%d] %f (%d) %d" %(i, attack_i, ce, k, cnt))
+                print("(%d) [%d][%d] %f (%d) %d" %(n, i, attack_i, ce, k, cnt))
             #
         #
         if rank==0:

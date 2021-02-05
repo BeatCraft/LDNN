@@ -348,7 +348,30 @@ class Package:
                 r.layers.append(output)
             elif config==1:
                 print("CNN")
-                pass
+                # 0 : input 28 x 28 x 1 = 784
+                c = r.countLayers()
+                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
+                r.layers.append(input)
+                # 1 : CNN 28 x 28 x 1 > 28 x 28 x 4
+                c = r.countLayers()
+                cnn_1 = core.Conv_4_Layer(c, 28, 28, 1, 4, input, my_gpu)
+                r.layers.append(cnn_1)
+                # 2 : max
+                c = r.countLayers()
+                max_1 = core.MaxLayer(c, 4, 28, 28, cnn_1, my_gpu)
+                r.layers.append(max_1)
+                # 3 hidden : 14 x 14 x 4 = 784
+                c = r.countLayers()
+                hidden_1 = core.HiddenLayer(c, 784, 128, max_1, my_gpu)
+                r.layers.append(hidden_1)
+                # 4 hidden : 128
+                c = r.countLayers()
+                hidden_2 = core.HiddenLayer(c, 128, 128, hidden_1, my_gpu)
+                r.layers.append(hidden_2)
+                # 5 : output
+                c = r.countLayers()
+                output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
+                r.layers.append(output)
             #
         elif self._package_id==1: # cifa-10
             if config==0:

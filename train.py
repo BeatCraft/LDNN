@@ -606,6 +606,122 @@ class Train:
         t = format(elapsed_time, "0")
         print("time = %s" % (t))
     #
+    
+    def simple_weight_shift(self, i, entropy, attack_i):
+        w = self._w_list[attack_i]
+        li = w[0]
+        ni = w[1]
+        ii = w[2]
+        print("(%d, %d, %d) %d" % (li, ni, ii, attack_i))
+        
+        r = self._r
+        layer = r.getLayerAt(li)
+        lock = layer.get_weight_lock(ni, ii)   # default : 0
+        if lock>0:
+            print("[%d] locked" % (i))
+            return entropy, 0
+        #
+        wp = layer.get_weight_property(ni, ii) # default : 0
+        wi = layer.get_weight_index(ni, ii)
+        wi_alt = wi
+        entropy_alt = entropy
+        maximum = core.WEIGHT_INDEX_MAX
+        minimum = core.WEIGHT_INDEX_MIN
+        #
+        wp_alt = wp
+        if wp_alt==0:
+            if wi==maximum:
+                wp_alt = -1
+            else:
+                wp_alt = 1
+            #
+        else:
+            if wi==maximum or wi==minimum:
+                layer.set_weight_property(ni, ii, 0)
+                layer.set_weight_lock(ni, ii, 1)
+                print("[%d] lock_1(%d)" % (i, wi))
+                return entropy, 0
+            #
+        #
+        wi_alt = wi + wp_alt
+        r.propagate(li, ni, ii, wi_alt, 0)
+        entropy_alt = r.get_cross_entropy()
+        if entropy_alt<entropy:
+            layer.set_weight_property(ni, ii, wp_alt)
+            layer.set_weight_index(ni, ii, wi_alt)
+            layer.update_weight()
+            return entropy_alt, 1
+        else:
+            if wp==0:
+            # reverse
+                wp_alt = wp_alt*(-1)
+                layer.set_weight_property(ni, ii, wp_alt)
+                print("[%d] reverse(%d)" % (i, wp_alt))
+            else:
+                layer.set_weight_property(ni, ii, 0)
+                layer.set_weight_lock(ni, ii, 1)
+                print("[%d] lock_2(%d)" % (i, wi))
+            #
+        #
+        return entropy, 0
+    
+    def make_w_list(self):
+        self._w_list  = []
+        r = self._r
+        c = r.countLayers()
+        for li in range(1, c):
+            layer = r.getLayerAt(li)
+            type = layer.get_type()
+            if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT or type==core.LAYER_TYPE_CONV_4:
+                for ni in range(layer._num_node):
+                    for ii in range(layer._num_input):
+                        self._w_list.append((li, ni, ii))
+                    #
+                #
+            #
+        #
+        return len(self._w_list)
 
-
-
+    def simple_loop(self):
+        entropy = 1.0
+        loop_n = 1
+        r = self._r
+        package = self._package
+        mini_batch_size = self._mini_batch_size
+        print("mini_batch_size=%d" % (mini_batch_size))
+        #
+        package.load_batch()
+        batch_size = package._train_batch_size
+        data_size = package._image_size
+        num_class = package._num_class
+        r.prepare(mini_batch_size, data_size, num_class)
+        #
+        self.set_mini_batch(0)
+        r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
+        #
+        w_num = self.make_w_list()
+        #
+        attack_num = int(w_num/10)
+        r.propagate()
+        ce = r.get_cross_entropy()
+        print("CE=%f" % (ce))
+        print("num=%d" % (w_num))
+        #
+        #
+        cnt = 0
+        for n in range(loop_n):
+            # reset
+            if n>0 and n%3==0:
+                r.reset_weight_property()
+                r.unlock_weight_all()
+                r.reset_weight_mbid()
+            #
+            for i in range(attack_num):
+                attack_i = random.randrange(attack_num)
+                ce, k = self.simple_weight_shift(i, ce, attack_i)
+                cnt = cnt + k
+                print("[%d][%d] %f (%d) %d" %(i, attack_i, ce, k, cnt))
+            #
+            r.export_weight_index(package._wi_csv_path)
+        #
+        return 0

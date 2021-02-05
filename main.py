@@ -28,14 +28,6 @@ import gpu
 import train
 import test
 #
-#import logging
-#logger = logging.getLogger(__name__)
-#logger.setLevel(logging.DEBUG)
-#get_handler = logging.FileHandler("log/log.txt")
-#logger.addHandler(get_handler)
-#
-#
-#
 sys.setrecursionlimit(10000)
 #
 # constant values
@@ -96,127 +88,45 @@ def get_key_input(prompt):
 def main():
     argvs = sys.argv
     argc = len(argvs)
+    print(argc)
     #
-    # GPU
-    #
-    platform_id = 0
-    device_id = 0
-    package_id = 0
-    config = 0
-    mode = 0
-    
-    print("- Select an OpenCL platform -")
-    d = 0
-    for platform in cl.get_platforms():
-        print("%d : %s" % (d, platform.name))
-        d = d + 1
-    #
-    platform_id = get_key_input("input command >")
-    if platform_id<0 or platform_id>=d:
-        print("error : platform_id=%d" % (platform_id))
+    if argc==6:
+        pass
+    else:
+        print("error in sh")
         return 0
     #
-    
-    print("- Select a device -")
-    d = 0
-    for device in platform.get_devices():
-        print("%d : %s" % (d, device.name))
-        d = d + 1
+    platform_id = int(argvs[1])
+    device_id = int(argvs[2])
+    package_id = int(argvs[3])
+    config = int(argvs[4])
+    mode = int(argvs[5])
+    print("platform_id=%d" % (platform_id))
+    print("device_id=%d" % (device_id))
+    print("package_id=%d" % (package_id))
+    print("config=%d" % (config))
+    print("mode=%d" % (mode))
     #
-    device_id = get_key_input("input command >")
-    if device_id<0 or device_id>=d:
-        print("error : device_id=%d" % (device_id))
-        return 0
-    #
-    print("%d : %d" %(platform_id, device_id))
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
-    #
-    #
-    #
-    package_id = 0
-    print("- Select a package -")
-    print("0 : MNIST")
-    print("1 : CIFAR-10")
-    package_id = get_key_input("input command >")
-    if package_id<0 or package_id>1:
-        print("error : package_id=%d" % package_id)
-        return 0
-    #
-
-    print("- Select a config-")
-    print("0 : FC for MNIST")
-    print("1 : CNN for MNIST")
-    config = get_key_input("input command >")
-    if config<0 or config>1:
-        print("error : config=%d" % config)
-        return 0
-    #
-    
-    print("- Select a command-")
-    print("0 : train (mini-batch)")
-    print("1 : test (500)")
-    print("2 : ? (unit test)")
-    print("3 : CNN Test")
-    print("4 : new train")
-    mode = get_key_input("input command >")
-    if mode<0 or mode>4:
-        print("error : mode=%d" % mode)
-        return 0
-    #
-
     package = util.Package(package_id)
     r = package.setup_dnn(my_gpu, config)
-    if r is None:
-        print("fatal DNN error")
-        return 0
     #
     if mode==0: # train
-        epoc = 4
-        mini_batch_size = 2000
-        loop = 1#16 # 1 2 4 8
+        mini_batch_size = 200
         print("package._train_batch_size=%d" % (package._train_batch_size))
-        it = int(package._train_batch_size/mini_batch_size)
-        print("it = %d" % (it))
-        #
         t = train.Train(package, r)
-        t.set_limit(0.000001)
         t.set_mini_batch_size(mini_batch_size)
-        t.set_iteration(it)
-        t.set_epoc(epoc)
-        t.set_loop(loop)
-        t.set_layer_direction(1) # 0 : in to out, 1 : out to in
-        #t.disable_mini_batch()
-        #
-        t.loop()
-    elif mode==1: # test (batch)
+        t.simple_loop()
+    elif mode==1: # test
         test.test_n(r, package, 500)
     elif mode==2: #
         test.unit_test(r, package)
     elif mode==3: #
         test.cnn_test(r, package)
-    elif mode==4: #
-        print("new train")
-        epoc = 1
-        mini_batch_size = 2000
-        loop = 1
-        print("package._train_batch_size=%d" % (package._train_batch_size))
-        it = int(package._train_batch_size/mini_batch_size)
-        print("it = %d" % (it))
-        #
-        t = train.Train(package, r)
-        t.set_limit(0.000001)
-        t.set_mini_batch_size(mini_batch_size)
-        t.set_iteration(it)
-        t.set_epoc(epoc)
-        t.set_loop(loop)
-        t.set_layer_direction(1) # 0 : in to out, 1 : out to in
-        #t.disable_mini_batch()
-        #
-        t.loop_alt_3()
     else:
-        print("input error")
-        pass
+        print("mode error : %d" % (mode))
+        return 0
     #
     return 0
 #

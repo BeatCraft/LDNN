@@ -113,7 +113,7 @@ def main():
     r = package.setup_dnn(my_gpu, config)
     #
     if mode==0: # train
-        mini_batch_size = 200
+        mini_batch_size = 500
         print("package._train_batch_size=%d" % (package._train_batch_size))
         t = train.Train(package, r)
         t.set_mini_batch_size(mini_batch_size)

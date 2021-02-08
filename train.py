@@ -701,7 +701,7 @@ class Train:
         #
         w_num = self.make_w_list()
         #
-        attack_num = int(w_num/10)
+        attack_num = int(w_num/10*3)
         r.propagate()
         ce = r.get_cross_entropy()
         print("CE=%f" % (ce))

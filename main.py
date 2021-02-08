@@ -90,7 +90,7 @@ def main():
     argc = len(argvs)
     print(argc)
     #
-    if argc==6:
+    if argc==7:
         pass
     else:
         print("error in sh")
@@ -101,11 +101,13 @@ def main():
     package_id = int(argvs[3])
     config = int(argvs[4])
     mode = int(argvs[5])
+    size = int(argvs[6])
     print("platform_id=%d" % (platform_id))
     print("device_id=%d" % (device_id))
     print("package_id=%d" % (package_id))
     print("config=%d" % (config))
     print("mode=%d" % (mode))
+    print("mini_batch_size=%d" % (size))
     #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
@@ -113,7 +115,7 @@ def main():
     r = package.setup_dnn(my_gpu, config)
     #
     if mode==0: # train
-        mini_batch_size = 500
+        mini_batch_size = size
         print("package._train_batch_size=%d" % (package._train_batch_size))
         t = train.Train(package, r)
         t.set_mini_batch_size(mini_batch_size)

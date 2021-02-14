@@ -126,6 +126,12 @@ def main():
         test.unit_test(r, package)
     elif mode==3: #
         test.cnn_test(r, package)
+    elif mode==4: #
+        mini_batch_size = size
+        print("package._train_batch_size=%d" % (package._train_batch_size))
+        t = train.Train(package, r)
+        t.set_mini_batch_size(mini_batch_size)
+        t.loop_hb()
     else:
         print("mode error : %d" % (mode))
         return 0

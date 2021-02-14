@@ -172,6 +172,9 @@ class Layer(object):
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         pass
     
+    def back_propagate(self, debug=0):
+        pass
+    
     def get_weight_index(self, ni, ii):
         return self._weight_index_matrix[ni][ii]
     
@@ -335,13 +338,13 @@ class HiddenLayer(Layer):
         self._batch_size = batch_size
         #
         self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
-        
         if self._gpu:
             self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
         #
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
         if self._gpu:
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        #
     
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
@@ -380,6 +383,9 @@ class OutputLayer(Layer):
         #
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+        #
+        self._errors = np.zeros(self._num_node, dtype=np.float32)
+        self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
 
     def prepare(self, batch_size):
         self._batch_size = batch_size
@@ -388,9 +394,11 @@ class OutputLayer(Layer):
         if self._gpu:
             self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
         #
+        
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
         if self._gpu:
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        #
         
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
@@ -414,9 +422,29 @@ class OutputLayer(Layer):
         #
         self._gpu.softmax(self._gpu_output, self._num_node, self._batch_size)
         #
-        # debug
-#        self._gpu.copy(self._output_array, self._gpu_output)
-#        print self._output_array
+        if debug:
+            self._gpu.copy(self._output_array, self._gpu_output)
+            print self._output_array
+        #
+        
+    def back_propagate(self, t_array, debug=0):
+        self._gpu.copy(self._output_array, self._gpu_output)
+        size = t_array.shape[0]
+        for i in range(size):
+            label = t_array[i]
+            self._output_array[i][label] = self._output_array[i][label] - 1.0
+        #
+        k = self._output_array.T
+        for i in range(self._num_node):
+            avg = k[i].sum()/float(size)
+            self._errors[i] = avg
+        #
+#        if debug:
+#            print self._errors
+        #
+        for ni in range(self._num_node):
+            self._error_matrix[ni] = self._weight_matrix[ni] * self._errors[ni]
+        #
 
 #
 # 2 x 2 simple max filter for 2D image data
@@ -838,7 +866,6 @@ class Roster:
         #return ret
         s = np.sum(self._batch_cross_entropy)
         s = s/float(self._batch_size)
-        
         if np.isnan(s):
             for i in range(self._batch_size):
                 li = c-1
@@ -915,6 +942,11 @@ class Roster:
             #
             pre = layer
         #
+        
+    def back_propagate(self, t_array, debug=0):
+        c = self.countLayers()
+        output = self.getLayerAt(c-1)
+        output.back_propagate(t_array, debug)
 #
 #
 def main():

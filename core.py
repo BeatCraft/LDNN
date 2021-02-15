@@ -28,6 +28,7 @@ WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078
                 0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
 WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0]
 WEIGHT_SET_2 = [-1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0]
+WEIGHT_SET_3 = [-1.0, -0.5, -0.25, -0.125, 0.125, 0.25, 0.5, 1.0]
 #
 WEIGHT_SET = WEIGHT_SET_1
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
@@ -105,7 +106,12 @@ class Layer(object):
     # node : neurons
     # num_node  : numbers of neurons in a layer
     def __init__(self, i, type, num_input, num_node, pre, gpu=None):
+        self._pre = None
+        self._next = None
         self._pre = pre
+        if self._pre:
+            self._pre._next = self
+        #
         self._index = i
         self._type = type
         if gpu is not None:
@@ -333,6 +339,8 @@ class HiddenLayer(Layer):
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
         #
+        self._errors = np.zeros(self._num_node, dtype=np.float32)
+        self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
     
     def prepare(self, batch_size):
         self._batch_size = batch_size
@@ -367,6 +375,30 @@ class HiddenLayer(Layer):
         self._gpu.sum(self._gpu_product, self._gpu_output,
                         self._num_input, self._num_node, activation, self._batch_size)
         self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
+        
+    def back_propagate(self, t_array, debug=0):
+        print("HiddenLayer::back_propagate()")
+        print self._index
+        #
+        next = self._next
+        #print next._index
+        #print next._error_matrix[0]
+        for ii in range(self._num_input):
+            for ni in range(next._num_node):
+                self._errors[ii] = self._errors[ii] + next._error_matrix[ni][ii]
+            #
+        #
+        self._errors = self._errors / float(self._errors.size)
+        #print self._errors
+        #return
+        #
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                self._error_matrix[ni][ii] = self._errors[ni] * self._weight_matrix[ni][ii]
+            #
+        #
+        #print self._error_matrix[0]
+        return
 #
 #
 #
@@ -384,6 +416,7 @@ class OutputLayer(Layer):
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
         #
+        self._output_avg = np.zeros(self._num_node, dtype=np.float32)
         self._errors = np.zeros(self._num_node, dtype=np.float32)
         self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
 
@@ -428,12 +461,44 @@ class OutputLayer(Layer):
         #
         
     def back_propagate(self, t_array, debug=0):
+        print("OutputLayer::back_propagate()")
+        print self._index
+        #
         self._gpu.copy(self._output_array, self._gpu_output)
         size = t_array.shape[0]
+        #
+        #print self._output_array[0]
+        #print self._output_array[0].sum()
+        #
         for i in range(size):
             label = t_array[i]
-            self._output_array[i][label] = self._output_array[i][label] - 1.0
+            for j in range(self._num_node):
+                if j==label:
+                    self._output_avg[j] = self._output_avg[j] + self._output_array[i][j] - 1.0
+                else:
+                    self._output_avg[j] = self._output_avg[j] + self._output_array[i][j]
+                #
+            #
         #
+        #print self._output_avg.shape
+        self._errors = self._output_avg / float(size)
+        #print self._errors
+        #print self._errors.sum()
+        #print self._weight_matrix[0].shape
+        #print self._error_matrix[0]
+        for ni in range(self._num_node):
+            self._weight_matrix[ni]
+            for ii in range(self._num_input):
+                #self._error_matrix[ni][ii] = self._errors[ni] * self._output_avg[ni] / self._weight_matrix[ni][ii]
+                self._error_matrix[ni][ii] = self._errors[ni] * self._weight_matrix[ni][ii]
+                # / self._errors[ni]
+        #
+        #print self._error_matrix[0]
+        #print self._output_array[0] / self._weight_matrix[0]
+        #print self._error_matrix[0]
+        return
+        
+        
         k = self._output_array.T
         for i in range(self._num_node):
             avg = k[i].sum()/float(size)
@@ -947,6 +1012,10 @@ class Roster:
         c = self.countLayers()
         output = self.getLayerAt(c-1)
         output.back_propagate(t_array, debug)
+        #
+        layer = self.getLayerAt(c-2)
+        layer.back_propagate(t_array, debug)
+#
 #
 #
 def main():

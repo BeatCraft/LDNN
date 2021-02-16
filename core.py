@@ -115,7 +115,7 @@ class Layer(object):
         self._index = i
         self._type = type
         if gpu is not None:
-            #print "GPU"
+            #print("GPU")
             self._gpu = gpu
         else:
             self._gpu = None
@@ -178,7 +178,7 @@ class Layer(object):
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         pass
     
-    def back_propagate(self, debug=0):
+    def back_propagate(self, error_array, debug=0):
         pass
     
     def get_weight_index(self, ni, ii):
@@ -376,9 +376,12 @@ class HiddenLayer(Layer):
                         self._num_input, self._num_node, activation, self._batch_size)
         self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
         
-    def back_propagate(self, t_array, debug=0):
-        print("HiddenLayer::back_propagate()")
-        print self._index
+    def back_propagate(self, error_array, debug=0):
+        if debug:
+            print("HiddenLayer::back_propagate()")
+            print(self._index)
+        #
+        return
         #
         next = self._next
         #print next._index
@@ -419,6 +422,8 @@ class OutputLayer(Layer):
         self._output_avg = np.zeros(self._num_node, dtype=np.float32)
         self._errors = np.zeros(self._num_node, dtype=np.float32)
         self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        self._dx = np.zeros( self._num_input, dtype=np.float32)
+        self._dw = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
 
     def prepare(self, batch_size):
         self._batch_size = batch_size
@@ -435,7 +440,7 @@ class OutputLayer(Layer):
         
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
-        #
+        
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         stride_1 = self._num_node * self._num_input
         stride_2 = self._num_input
@@ -457,18 +462,25 @@ class OutputLayer(Layer):
         #
         if debug:
             self._gpu.copy(self._output_array, self._gpu_output)
-            print self._output_array
+            print(self._output_array)
         #
         
     def back_propagate(self, t_array, debug=0):
-        print("OutputLayer::back_propagate()")
-        print self._index
+        if debug:
+            print("OutputLayer::back_propagate()")
+            print(self._index)
         #
         self._gpu.copy(self._output_array, self._gpu_output)
-        size = t_array.shape[0]
+        if debug:
+            print(self._output_array.shape)
         #
-        #print self._output_array[0]
-        #print self._output_array[0].sum()
+        self._gpu.copy(self._pre._output_array, self._pre._gpu_output)
+        if debug:
+            print(self._pre._output_array.shape) # x (16, 128)
+        #
+        size = t_array.shape[0]
+        if debug:
+            print(size)
         #
         for i in range(size):
             label = t_array[i]
@@ -480,36 +492,43 @@ class OutputLayer(Layer):
                 #
             #
         #
-        #print self._output_avg.shape
         self._errors = self._output_avg / float(size)
-        #print self._errors
-        #print self._errors.sum()
-        #print self._weight_matrix[0].shape
-        #print self._error_matrix[0]
+        if debug:
+            print(self._errors) # dy (10,)
+        #
+        #
+        #
+#        print(self._weight_matrix.shape) # (10, 128)
+#        print(self._pre._output_array[0])
+        x = sum(self._pre._output_array) / float(self._num_input)
         for ni in range(self._num_node):
-            self._weight_matrix[ni]
             for ii in range(self._num_input):
-                #self._error_matrix[ni][ii] = self._errors[ni] * self._output_avg[ni] / self._weight_matrix[ni][ii]
-                self._error_matrix[ni][ii] = self._errors[ni] * self._weight_matrix[ni][ii]
-                # / self._errors[ni]
+                self._dw[ni][ii] = x[ii] * self._errors[ni]
+            #
         #
-        #print self._error_matrix[0]
-        #print self._output_array[0] / self._weight_matrix[0]
-        #print self._error_matrix[0]
-        return
-        
-        
-        k = self._output_array.T
-        for i in range(self._num_node):
-            avg = k[i].sum()/float(size)
-            self._errors[i] = avg
+        if debug:
+            print(self._dw.shape)
         #
-#        if debug:
-#            print self._errors
+        #self._
+        #dw = sum(self._error_matrix) / float(self._num_node)
+        if debug:
+            print("dw")
+            print(self._dw.shape)
         #
+        dx_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        ww = sum(self._weight_matrix) / float(self._num_input)
         for ni in range(self._num_node):
-            self._error_matrix[ni] = self._weight_matrix[ni] * self._errors[ni]
+            for ii in range(self._num_input):
+                dx_matrix[ni][ii] = ww[ii] * self._errors[ni]
+            #
         #
+        #print(dx_matrix.shape)
+        self._dx = sum(dx_matrix) / float(self._num_node)
+        if debug:
+            print("dx")
+            print(self._dx.shape)
+        #
+        return self._dx, self._dw
 
 #
 # 2 x 2 simple max filter for 2D image data
@@ -669,12 +688,12 @@ class Conv_4_Layer(Layer):
         size = self._filter * self._w * self._h
         self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
         #
-        # debug
-#        self._gpu.copy(self._output_array, self._gpu_output)
-#        print(self._output_array)
+        if debug:
+            self._gpu.copy(self._output_array, self._gpu_output)
+            print(self._output_array)
+        #
     #
     def save_output(self):
-        #pass
         self._gpu.copy(self._output_array, self._gpu_output)
         #
         for bi in range(self._batch_size):
@@ -684,24 +703,15 @@ class Conv_4_Layer(Layer):
                 max = np.max(data_array)
                 min = np.min(data_array)
                 print("max=%f, min=%f" % (max, min))
-                #img_array = np.zeros( (self._h, self._w), dtype=np.int32)
                 img = Image.new("L", (self._w, self._h), 0)
                 pix = img.load()
                 for y in range(self._h):
                     for x in range(self._w):
                         v = data_array[self._w*y + x]
-                        #print v
                         v1 = int(v*255/max)
                         pix[x,y] = v1
-                        
-                        #img_array[y, x] = int(v*255/max)
-                        #print img_array[y, x]
-#                        v1 / 255 = v / max
                     #
                 #
-                #print img_array
-                #img_gray = Image.fromarray(img_array)
-                #print(img_gray.mode)
                 img.save("./debug/cnn/%d_%d.png" %(bi, fi))
             #
         #
@@ -747,10 +757,6 @@ class Roster:
         layer = self.getLayerAt(0) # input layer
         layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0), layer._num_node, batch_size, 0)
         #
-        #layer = self.getLayerAt(1) # CNN
-        #layer._cache = 0
-#        self._gpu.copy(layer._output_array, layer._gpu_output)
-#        print layer._output_array[0]
             
     def init_weight(self):
         c = self.countLayers()
@@ -768,17 +774,6 @@ class Roster:
         for i in range(1, c):
             layer = self.getLayerAt(i)
             layer.reset_weight_property_all()
-#            nc = layer._num_node
-#            ic = layer._num_input
-#            for ni in range(nc):
-#                for ii in range(ic):
-#                    if layer.get_type()==LAYER_TYPE_MAX:
-#                        pass
-#                    else:
-#                        layer.set_weight_property(ni, ii, p)
-#                    #
-#                #
-#            #
         #
 
     def count_locked_weight(self):
@@ -787,16 +782,6 @@ class Roster:
         for i in range(1, c):
             layer = self.getLayerAt(i)
             cnt = cnt + layer.count_locked_weight()
-#            nc = layer._num_node
-#            ic = layer._num_input
-#            for ni in range(nc):
-#                for ii in range(ic):
-#                    lock = layer.get_weight_lock(ni, ii)
-#                    if lock>0:
-#                        cnt = cnt + 1
-#                    #
-#                #
-#            #
         #
         return cnt
     
@@ -830,13 +815,6 @@ class Roster:
         for i in range(1, c):
             layer = self.getLayerAt(i)
             layer.unlock_weight_all()
-#            nc = layer._num_node
-#            ic = layer._num_input
-#            for ni in range(nc):
-#                for ii in range(ic):
-#                    layer.set_weight_lock(ni, ii, 0)
-#                #
-#            #
         #
 
     def update_weight(self):
@@ -890,11 +868,9 @@ class Roster:
             return
  
     def get_inference(self):
-        #ret = []
         c = self.countLayers()
         output = self.getLayerAt(c-1)
         output._gpu.copy(output._output_array, output._gpu_output)
-        #print output._output_array[0]
         return output._output_array
 
     def get_answer(self):
@@ -923,12 +899,7 @@ class Roster:
         self._gpu.k_cross_entropy(output._gpu_output, self._gpu_entropy,
                                   self._gpu_labels, self.num_class, self._batch_size)
         self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
-        # debug
-        #print self._batch_cross_entropy
         #
-        #ret = np.sum(self._batch_cross_entropy)/float(self._batch_size)
-        #print "    CE=%f" % (ret)
-        #return ret
         s = np.sum(self._batch_cross_entropy)
         s = s/float(self._batch_size)
         if np.isnan(s):
@@ -947,7 +918,6 @@ class Roster:
             #
         #
         return s
-        #return np.sum(self._batch_cross_entropy)/float(self._batch_size)
     
     def export_weight_index(self, path):
         print("Roster : export_weight_index(%s)" % path)
@@ -971,10 +941,6 @@ class Roster:
             lc = self.countLayers()
             for i in range(1, lc):
                 layer = self.getLayerAt(i)
-                #print "%d : %d" % (i, layer.get_type())
-                
-                #count_weight
-                
                 if layer.get_type()==LAYER_TYPE_MAX:
                     #print "fuck"
                     continue
@@ -1010,6 +976,12 @@ class Roster:
         
     def back_propagate(self, t_array, debug=0):
         c = self.countLayers()
+        for i in reversed(range(c)):
+            layer = self.getLayerAt(i)
+            layer.back_propagate(t_array, debug)
+        #
+        return
+        
         output = self.getLayerAt(c-1)
         output.back_propagate(t_array, debug)
         #

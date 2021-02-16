@@ -2,7 +2,7 @@
 
 platform_id=1   # Thread Ripper
 device_id=0     #
-package_id=0    # CIFAER-10
+package_id=1    # CIFAER-10
 config=0        # FC
 mode=0          # train
 size=5000       # size of batch

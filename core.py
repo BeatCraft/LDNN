@@ -339,8 +339,10 @@ class HiddenLayer(Layer):
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
         #
-        self._errors = np.zeros(self._num_node, dtype=np.float32)
-        self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        self.dy = np.zeros(self._num_node, dtype=np.float32)
+        self.dx = np.zeros(self._num_input, dtype=np.float32)
+        self.dw = np.zeros((self._num_node, self._num_input), dtype=np.float32)
+        #self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
     
     def prepare(self, batch_size):
         self._batch_size = batch_size
@@ -388,16 +390,13 @@ class HiddenLayer(Layer):
         #print next._error_matrix[0]
         for ii in range(self._num_input):
             for ni in range(next._num_node):
-                self._errors[ii] = self._errors[ii] + next._error_matrix[ni][ii]
+                self.dy[ii] = self.dy[ii] + next._error_matrix[ni][ii]
             #
         #
-        self._errors = self._errors / float(self._errors.size)
-        #print self._errors
-        #return
-        #
+        self.dy = self.dy / float(self.dy.size)
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                self._error_matrix[ni][ii] = self._errors[ni] * self._weight_matrix[ni][ii]
+                self._error_matrix[ni][ii] = self.dy[ni] * self._weight_matrix[ni][ii]
             #
         #
         #print self._error_matrix[0]
@@ -419,11 +418,11 @@ class OutputLayer(Layer):
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
         #
-        self._output_avg = np.zeros(self._num_node, dtype=np.float32)
-        self._errors = np.zeros(self._num_node, dtype=np.float32)
-        self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
-        self._dx = np.zeros( self._num_input, dtype=np.float32)
-        self._dw = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        #self._output_avg = np.zeros(self._num_node, dtype=np.float32)
+        #self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        self.dy = np.zeros(self._num_node, dtype=np.float32)
+        self.dx = np.zeros(self._num_input, dtype=np.float32)
+        self.dw = np.zeros((self._num_node, self._num_input), dtype=np.float32)
 
     def prepare(self, batch_size):
         self._batch_size = batch_size
@@ -478,57 +477,47 @@ class OutputLayer(Layer):
         if debug:
             print(self._pre._output_array.shape) # x (16, 128)
         #
-        size = t_array.shape[0]
+        size = t_array.shape[0] # batch size
         if debug:
-            print(size)
+            print("batch size=%d" % (size))
         #
         for i in range(size):
             label = t_array[i]
             for j in range(self._num_node):
                 if j==label:
-                    self._output_avg[j] = self._output_avg[j] + self._output_array[i][j] - 1.0
+                    self.dy[j] = self.dy[j] + self._output_array[i][j] - 1.0
                 else:
-                    self._output_avg[j] = self._output_avg[j] + self._output_array[i][j]
+                    self.dy[j] = self.dy[j] + self._output_array[i][j]
                 #
             #
         #
-        self._errors = self._output_avg / float(size)
+        self.dy = self.dy / float(size)
         if debug:
-            print(self._errors) # dy (10,)
+            print(self.dy) # (10,) for MNIST and cifar-10
         #
-        #
-        #
-#        print(self._weight_matrix.shape) # (10, 128)
-#        print(self._pre._output_array[0])
         x = sum(self._pre._output_array) / float(self._num_input)
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                self._dw[ni][ii] = x[ii] * self._errors[ni]
+                self.dw[ni][ii] = x[ii] * self.dy[ni]
             #
         #
         if debug:
-            print(self._dw.shape)
-        #
-        #self._
-        #dw = sum(self._error_matrix) / float(self._num_node)
-        if debug:
             print("dw")
-            print(self._dw.shape)
+            print(self.dw.shape)
         #
         dx_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
         ww = sum(self._weight_matrix) / float(self._num_input)
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                dx_matrix[ni][ii] = ww[ii] * self._errors[ni]
+                dx_matrix[ni][ii] = ww[ii] * self.dy[ni]
             #
         #
-        #print(dx_matrix.shape)
-        self._dx = sum(dx_matrix) / float(self._num_node)
+        self.dx = sum(dx_matrix) / float(self._num_node)
         if debug:
             print("dx")
-            print(self._dx.shape)
+            print(self.dx.shape)
         #
-        return self._dx, self._dw
+        return self.dx, self.dw
 
 #
 # 2 x 2 simple max filter for 2D image data

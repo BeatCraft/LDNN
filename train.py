@@ -747,7 +747,7 @@ class Train:
         #
         debug = 1
         r.back_propagate(self._class_array, debug)
-        #return 0
+        return 0
         #
         #
         #

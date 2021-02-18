@@ -334,17 +334,17 @@ class Package:
                 # 1 : hidden : 28 x 28 x 1 = 784
                 c = r.countLayers()
                 hidden_1 = core.HiddenLayer(c, 784, 128, input, my_gpu)
-                hidden_1.set_num_update(32)
+                #hidden_1.set_num_update(32)
                 r.layers.append(hidden_1)
                 # 2 : hidden : 64
                 c = r.countLayers()
                 hidden_2 = core.HiddenLayer(c, 128, 128, hidden_1, my_gpu)
-                hidden_2.set_num_update(8)
+                #hidden_2.set_num_update(8)
                 r.layers.append(hidden_2)
                 # 3 : output
                 c = r.countLayers()
                 output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
-                output.set_num_update(8)
+                #output.set_num_update(8)
                 r.layers.append(output)
             elif config==1:
                 print("CNN")

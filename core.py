@@ -268,7 +268,6 @@ class InputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
         print("InputLayer::__init__()")
         super(InputLayer, self).__init__(i, LAYER_TYPE_INPUT, num_input, num_node, pre, gpu)
-        #
         
     def count_locked_weight(self):
         return 0
@@ -339,7 +338,7 @@ class HiddenLayer(Layer):
         if gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
         #
-        self.dy = np.zeros(self._num_node, dtype=np.float32)
+        #self.dy = np.zeros(self._num_node, dtype=np.float32)
         self.dx = np.zeros(self._num_input, dtype=np.float32)
         self.dw = np.zeros((self._num_node, self._num_input), dtype=np.float32)
         #self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
@@ -383,23 +382,36 @@ class HiddenLayer(Layer):
             print("HiddenLayer::back_propagate()")
             print(self._index)
         #
-        return
-        #
         next = self._next
-        #print next._index
-        #print next._error_matrix[0]
-        for ii in range(self._num_input):
-            for ni in range(next._num_node):
-                self.dy[ii] = self.dy[ii] + next._error_matrix[ni][ii]
-            #
+        dy = next.dx
+        if debug:
+            print("dy")
+            print((dy.shape))
         #
-        self.dy = self.dy / float(self.dy.size)
+        #
+        # dw
+        #
+        x = sum(self._pre._output_array) / float(self._num_input)
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                self._error_matrix[ni][ii] = self.dy[ni] * self._weight_matrix[ni][ii]
+                self.dw[ni][ii] = x[ii] * dy[ni]
             #
         #
-        #print self._error_matrix[0]
+        # dx
+        #
+        dx_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        ww = sum(self._weight_matrix) / float(self._num_input)
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                dx_matrix[ni][ii] = ww[ii] * dy[ni]
+            #
+        #
+        self.dx = sum(dx_matrix) / float(self._num_node)
+        if debug:
+            print("dx")
+            print(self.dx.shape)
+        #
+        self._pre.dy = self.dx
         return
 #
 #
@@ -495,6 +507,7 @@ class OutputLayer(Layer):
         if debug:
             print(self.dy) # (10,) for MNIST and cifar-10
         #
+        # dw
         x = sum(self._pre._output_array) / float(self._num_input)
         for ni in range(self._num_node):
             for ii in range(self._num_input):
@@ -505,6 +518,7 @@ class OutputLayer(Layer):
             print("dw")
             print(self.dw.shape)
         #
+        # dx
         dx_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
         ww = sum(self._weight_matrix) / float(self._num_input)
         for ni in range(self._num_node):
@@ -517,7 +531,9 @@ class OutputLayer(Layer):
             print("dx")
             print(self.dx.shape)
         #
-        return self.dx, self.dw
+        self._pre.dy = self.dx
+        return
+        #return self.dx, self.dw
 
 #
 # 2 x 2 simple max filter for 2D image data
@@ -908,6 +924,35 @@ class Roster:
         #
         return s
     
+    
+    def export_weight_matrix(self, path):
+        ma_list = []
+        c = self.countLayers()
+        for i in range(c):
+            layer = self.getLayerAt(i)
+            ma = layer.export_weight_matrix()
+            if ma:
+                ma_list.append(ma)
+            #
+        #
+        util.pickle_save(path, data)
+        
+    def import_weight_matrix(self, path):
+        ma_list = util.pickle_load(path)
+        if ma_list==None:
+            return None
+        #
+        j = 0
+        for i in range(c):
+            ma = ma_list[j]
+            layer = self.getLayerAt(i)
+            ret = layer.import_weight_matrix()
+            if ret==None:
+                continue
+            #
+            j = j + 1
+        #
+        
     def export_weight_index(self, path):
         print("Roster : export_weight_index(%s)" % path)
         with open(path, "w") as f:

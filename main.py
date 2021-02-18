@@ -132,6 +132,12 @@ def main():
         t = train.Train(package, r)
         t.set_mini_batch_size(mini_batch_size)
         t.loop_hb()
+    elif mode==5: #
+        mini_batch_size = size
+        print("package._train_batch_size=%d" % (package._train_batch_size))
+        t = train.Train(package, r)
+        t.set_mini_batch_size(mini_batch_size)
+        t.loop_hb2()
     else:
         print("mode error : %d" % (mode))
         return 0

@@ -747,7 +747,7 @@ class Train:
         #
         debug = 1
         r.back_propagate(self._class_array, debug)
-        return 0
+        #return 0
         #
         #
         #
@@ -756,46 +756,34 @@ class Train:
         ni = 0
         ii = 1
         output_layer = r.get_layer_at(c-1)
-#        wi = output_layer.get_weight_index(ni, ii)
-#        print "wi = %d" % wi
-        #
-#        wi = output_layer.get_weight_index(ni, ii)
-#        wi_alt = wi - 1
-#        e = output_layer._error_matrix[ni][ii]
-#        r.propagate(li, ni, ii, wi_alt, 0)
-#        ce_alt = r.get_cross_entropy()
-#        print("[%d] CE(%d -> %d) = %f | %f " % (ii, wi, wi_alt, ce-ce_alt, e))
+        hidden_1 = r.get_layer_at(c-2)
+        hidden_2 = r.get_layer_at(c-3)
+        rr = 0.0001
         
-#        print output_layer._error_matrix[ni][ii]
-#        wi = output_layer.get_weight_index(ni, ii)
-#        print wi
-#        for wi_alt in range(core.WEIGHT_INDEX_MAX):
-#            r.propagate(li, ni, ii, wi_alt, 0)
-#            ce_alt = r.get_cross_entropy()
-#            print("[%d] CE(%d -> %d) = %f" % (ii, wi, wi_alt, ce_alt))
-#        #
-#        return 0
-        
-        for k in range(5000):
+        for k in range(20000):
             for ni in range(output_layer._num_node):
                 for ii in range(output_layer._num_input):
                     wi = output_layer.get_weight_index(ni, ii)
                     #print wi
                     wi_alt = wi
-                    e = output_layer._dw[ni][ii]
+                    e = output_layer.dw[ni][ii]
                     if e>0:
                         if wi==0:
                             pass
                         else:
                             wi_alt = wi - 1
-                            output_layer._weight_matrix[ni][ii] = output_layer._weight_matrix[ni][ii] - 0.00001
+                            output_layer._weight_matrix[ni][ii] = output_layer._weight_matrix[ni][ii] - rr
+                            hidden_1._weight_matrix[ni][ii] = hidden_1._weight_matrix[ni][ii] - rr
+                            hidden_2._weight_matrix[ni][ii] = hidden_2._weight_matrix[ni][ii] - rr
                         #
                     elif e<0:
                         if wi==core.WEIGHT_INDEX_MAX:
                             pass
                         else:
                             wi_alt = wi + 1
-                            output_layer._weight_matrix[ni][ii] = output_layer._weight_matrix[ni][ii] + 0.00001
+                            output_layer._weight_matrix[ni][ii] = output_layer._weight_matrix[ni][ii] + rr
+                            hidden_1._weight_matrix[ni][ii] = hidden_1._weight_matrix[ni][ii] + rr
+                            hidden_2._weight_matrix[ni][ii] = hidden_2._weight_matrix[ni][ii] + rr
                         #
                     #
                     #output_layer.set_weight_index(ni, ii, wi_alt)
@@ -813,81 +801,91 @@ class Train:
         #r.export_weight_index(package._wi_csv_path)
         return 0
         
-        ii = 4
-        print output_layer._error_matrix[ni][ii]
-        wi = output_layer.get_weight_index(ni, ii)
-        wi_alt = wi + 1
-        r.propagate(li, ni, ii, wi_alt, 0)
+    def loop_hb2(self):
+        r = self._r
+        package = self._package
+        mini_batch_size = self._mini_batch_size
+        print("mini_batch_size=%d" % (mini_batch_size))
+        #
+        package.load_batch()
+        batch_size = package._train_batch_size
+        data_size = package._image_size
+        num_class = package._num_class
+        r.prepare(mini_batch_size, data_size, num_class)
+        self.set_mini_batch(0)
+        r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
+        #
+        r.propagate()
         ce = r.get_cross_entropy()
-        print("CE alt = %f" % (ce))
-        
-        
-        return 0
+        print("CE = %f" % (ce))
+        #
+        debug = 1
+        r.back_propagate(self._class_array, debug)
         #
         #
         #
-        #for ni in range(output_layer._num_node):
-        for ni in range(1):
-            data = output_layer._error_matrix[ni]
-            data_abs = np.abs(data)
-            min =  np.min(data_abs[np.nonzero(data_abs)])
-            print min
-            (candidates,) = np.where(data_abs==min)
-            c_size = candidates.size
-            print c_size
-            for i in range(c_size):
-                ii = candidates[i]
-                #print output_layer._error_matrix[ni][ii]
-                e = output_layer._error_matrix[ni][ii]
-                wi = output_layer.get_weight_index(ni, ii)
-                #print wi
-                wi_alt = wi
-                if e>0:
-                    wi_alt = wi_alt + 1
-                    #output_layer.set_weight_index(ni, ii, wi_alt)
-                else:
-                    pass
-#                    wi_alt = wi_alt - 1
+        c = r.countLayers()
+        li = c - 1
+        ni = 1
+        ii = 0
+
+
+
+        good = 0
+        #
+        #
+        #
+        for k in range(500):
+            #for li in reversed(range(c)):
+            for q in range(1):
+                li = random.randrange(c)
+                layer = r.get_layer_at(li)
+                type = layer.get_type()
+                #print("%d = %d" % (li, type))
+                if type==core.LAYER_TYPE_INPUT or type==core.LAYER_TYPE_CONV_4 or type==core.LAYER_TYPE_MAX:
+                    continue
                 #
-                r.propagate(li, ni, ii, wi_alt, 0)
-                ce = r.get_cross_entropy()
-                print("[%d] %f, CE alt = %f" % (ii, e, ce))
-                #output_layer.set_weight_index(ni, ii, wi_alt)
-                r.back_propagate(self._class_array, debug)
+                #print layer.dx
+#                for ni in range(layer._num_node):
+                for p in range(1):
+                    ni = random.randrange(layer._num_node)
+                    #
+                    dy = layer.dy[ni]
+                    #print dy
+                    dx = layer.dx[ni]
+#                    dw_array = layer.dw[ni] #[ii]
+#                    if dy<0:
+#                        ii = np.argmin(dw_array)
+#                    else:
+#                        ii = np.argmax(dw_array)
+                    #
+                    #print("dy=%f, dx=%f, dw=%f" % (dy, dx, dw_array[ii]))
+                    wi = layer.get_weight_index(ni, ii)
+                    wi_alt = wi
+                    if dy<0:
+                        if wi<core.WEIGHT_INDEX_MAX:
+                            wi_alt = wi + 1
+                        #
+                    elif dy>0:
+                        if wi>core.WEIGHT_INDEX_MIN:
+                            wi_alt = wi - 1
+                        #
+                    #
+                    layer.set_weight_index(ni, ii, wi_alt)
+                #
+                layer.update_weight()
             #
+            r.propagate()
+            ce_alt = r.get_cross_entropy()
+            print("[%d] CE = %f, %f" % (k, ce_alt, ce-ce_alt))
+            if ce-ce_alt<0:
+                good = good + 1
+            #
+            ce = ce_alt
+            r.back_propagate(self._class_array, 0)
         #
-        output_layer.update_weight()
-        r.propagate()
-        ce = r.get_cross_entropy()
-        print("CE = %f" % (ce))
-        #
-        return 0
-        
-        #wi_alt = wi + 1
-        #r.propagate(li, ni, ii, wi_alt, 0)
-        #ce = r.get_cross_entropy()
-        #print("CE alt = %f" % (ce))
-        
-#        for i in range(9):
-#            r.propagate(li, ni, ii, i, 0)
-#            ce = r.get_cross_entropy()
-#            print("[%d] CE = %f" % (i, ce))
-        #
-        ii = 4
-        wi_alt = 6
-        output_layer.set_weight_index(ni, ii, wi_alt)
-        output_layer.update_weight()
-        r.propagate()
-        ce = r.get_cross_entropy()
-        print("CE = %f" % (ce))
-        #
-        ii = 4
-        wi = output_layer.get_weight_index(ni, ii)
-        wi_alt = wi +1
-        output_layer.set_weight_index(ni, ii, wi_alt)
-        output_layer.update_weight()
-        r.propagate()
-        ce = r.get_cross_entropy()
-        print("CE = %f" % (ce))
-        #
-        return 0
+        print good
+        r.export_weight_index(package._wi_csv_path)
+        return
+
+

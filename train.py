@@ -81,243 +81,6 @@ class Train:
         
     def set_iteration(self, n):
         self._it = n
-
-    # one way
-    def weight_shift(self, li, ni, ii, entropy, zero=0):
-        r = self._r
-        layer = r.getLayerAt(li)
-        #
-        lock = layer.get_weight_lock(ni, ii)   # default : 0
-        if lock>0:
-            return entropy, 0
-        #
-        wp = layer.get_weight_property(ni, ii) # default : 0
-        wi = layer.get_weight_index(ni, ii)
-        wi_alt = wi
-        entropy_alt = entropy
-        maximum = core.WEIGHT_INDEX_MAX
-        minimum = core.WEIGHT_INDEX_MIN
-        #
-        wp_alt = wp
-        if wp_alt==0:
-            if wi==maximum:
-                wp_alt = -1
-            else:
-                wp_alt = 1
-            #
-        else:
-            if wi==maximum or wi==minimum:
-                layer.set_weight_property(ni, ii, 0)
-                layer.set_weight_lock(ni, ii, 1)
-                print("lock at(%d)" % wi)
-                return entropy, 0
-            #
-        #
-        wi_alt = wi + wp_alt
-        if r._gpu:
-            r.propagate(li, ni, ii, wi_alt, 0)
-            entropy_alt = r.get_cross_entropy()
-        else:
-            entropy_alt = r._remote.set_alt(li, ni, ii, wi_alt)
-        #
-        if entropy_alt<entropy:
-            layer.set_weight_property(ni, ii, wp_alt)
-            layer.set_weight_index(ni, ii, wi_alt)
-            if r._gpu:
-                layer.update_weight()
-            else:
-                entropy_alt = r._remote.update(li, ni, ii, wi_alt)
-            #
-            return entropy_alt, 1
-        else:
-            if wp==0:
-                # reverse
-                wp_alt = wp_alt*(-1)
-                layer.set_weight_property(ni, ii, wp_alt)
-            else:
-                layer.set_weight_property(ni, ii, 0)
-                layer.set_weight_lock(ni, ii, 1)
-                print("lock at(%d)" % wi)
-            #
-        #
-        return entropy, 0
-        
-    def weight_loop(self, entropy, layer, li, ni, zero=0):
-        it = 0
-        r = self._r
-        limit = self._limit
-        direction = self._weight_shift_mode
-        epoc = self._epoc
-        cnt = 0
-        #
-        num_w = layer.get_num_input()
-        w_p = layer.get_num_update()
-        #
-        #
-        #
-        wi_list = []
-        for ii in range(num_w):
-            lock = layer.get_weight_lock(ni, ii)
-            if lock==0:
-                wi_list.append(ii)
-            #
-        #
-        random.shuffle(wi_list)
-        print("L(%d)-W(%d) : %d/%d" % (li, ni, len(wi_list), num_w))
-        if w_p>len(wi_list):
-            w_p = len(wi_list)
-        #
-        
-        for p in range(w_p):
-            ii = wi_list[p]
-            entropy, ret = self.weight_shift(li, ni, ii, entropy, zero)
-            if ret>0:
-                cnt = cnt + ret
-                if direction>0:
-                    print("+[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy))
-#                    dmsg = "+[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy)
- #                   logger.debug(dmsg)
-                    
-                else:
-                    print("-[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy))
-#                    dmsg = "-[%d|%d|%d] L=%d, N=%d, W=%d, %d/%d, %d: CE:%f" % (self._cnt_e, self._cnt_i, self._cnt_k, li, ni, ii, p, w_p, cnt, entropy)
- #                   logger.debug(dmsg)
-                #
-            #
-            if entropy<limit:
-                print("reach to the limit(%f), exit w loop" %(limit))
-                break
-            #
-        # for p
-        return entropy, cnt
-
-    def node_loop(self, entropy, layer, li, zero=0):
-        limit = self._limit
-        num_node = layer.get_num_node()
-        num_w = layer._num_input
-        cnt = 0
-        #
-        node_index_list = list(range(num_node))
-        random.shuffle(node_index_list)
-        nc = 0
-        for ni in node_index_list:
-            entropy, ret = self.weight_loop(entropy, layer, li, ni, zero)
-            cnt = cnt + ret
-            if entropy<limit:
-                print("reach to the limit(%f), exit n loop" %(limit))
-                break
-            #
-        # for ni
-        return entropy, cnt
-    
-    def layer_loop(self):
-        r = self._r
-        limit = self._limit
-        reverse = self._layer_direction
-        #
-        entropy = 0.0
-        cnt = 0
-        #
-        if r._gpu:
-            r.propagate()
-            entropy = r.get_cross_entropy()
-            print(entropy)
-        else:
-            entropy = r._remote.evaluate()
-        #
-        c = r.countLayers()
-        list_of_layer_index = []
-        #
-        for i in range(c):
-            layer = r.getLayerAt(i)
-#            if layer.get_learning()>0:
-#                pass
-#            else:
-#                continue
-#            #
-            list_of_layer_index.append(i)
-        #
-        if reverse==0: # input to output
-            pass
-        else: # output to input
-            list_of_layer_index.reverse()
-        #
-        for li in list_of_layer_index:
-            zero = 0
-            layer = r.getLayerAt(li)
-            layer_type = layer.get_type()
-            if layer_type==core.LAYER_TYPE_INPUT:
-                continue
-            elif layer_type==core.LAYER_TYPE_MAX:
-                continue
-            #
-            entropy, ret = self.node_loop(entropy, layer, li, zero)
-            cnt = cnt + ret
-            if entropy<limit:
-                print("reach to the limit(%f), exit l loop" %(limit))
-                break
-            #
-        # for li
-        return entropy, cnt
-    
-    def loop(self):
-        r = self._r
-        package = self._package
-        mini_batch_size = self._mini_batch_size
-        #num = self._it
-        print("it : %d" % (self._it))
-        epoc = self._epoc
-        limit = self._limit # 0.000001
-        package.load_batch()
-        batch_size = package._train_batch_size
-        data_size = package._image_size
-        num_class = package._num_class
-        #
-        r.prepare(mini_batch_size, data_size, num_class)
-        print(">>mini_batch_size(%d)" % (mini_batch_size))
-        #
-        start_time = time.time()
-        for e in range(epoc): # epoc
-            self._cnt_e = e
-            for j in range(self._it): # iteration
-                self._cnt_i = j
-                if r._gpu:
-                    self.set_mini_batch(j)
-                    r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
-                else:
-                    r._remote.set_batch(j)
-                #
-                for m in range(self._loop): # 1, 2, 4, 8, 16
-                    self._cnt_k = m
-                    entropy, c_cnt = self.layer_loop()
-                    r.export_weight(package.save_path())
-                    #
-                    if entropy<limit:
-                        print("reach to the limit(%f), exit iterations" %(limit))
-                        return
-                    #
-                    all = r.count_weight()
-                    locked = r.count_locked_weight()
-                    rate = float(locked) / float(all)
-                    print("[%d|%d|%d] locked weight : %d / %d = %f" %(e, j, m, locked, all, rate))
-                    #dmsg = "[%d|%d|%d] locked weight : %d / %d = %f" % (e, j, m, locked, all, rate)
-                    #logger.debug(dmsg)
-                    
-                    if rate>0.9:
-                        r.reset_weight_property()
-                        r.unlock_weight_all()
-                        r.reset_weight_mbid()
-                        print(">>> unlock all weights")
-                    #
-                # for m
-                if self._disable_mini_batch:
-                    break
-            # for j
-        # for e
-        elapsed_time = time.time() - start_time
-        t = format(elapsed_time, "0")
-        print("time = %s" % (t))
-    #
     
     def get_weight_list_by_mbid(self, mbid):
         w_list = []
@@ -338,269 +101,7 @@ class Train:
         return w_list
     #
     
-    def loop_alt(self):
-        entropy = 1.0
-        r = self._r
-        package = self._package
-        mini_batch_size = self._mini_batch_size
-        print("it : %d" % (self._it))
-        epoc = self._epoc
-        limit = self._limit # 0.000001
-        package.load_batch()
-        batch_size = package._train_batch_size
-        data_size = package._image_size
-        num_class = package._num_class
-        #
-        r.prepare(mini_batch_size, data_size, num_class)
-        print(">>mini_batch_size(%d)" % (mini_batch_size))
-        #
-        # set mbid here
-        #
-        r.assign_weight_mbid(self._it)
-        #
-        start_time = time.time()
-        for e in range(epoc): # epoc
-            self._cnt_e = e
-            for j in range(self._it): # iteration / mini batch
-                self._cnt_i = j
-                if r._gpu:
-                    self.set_mini_batch(j)
-                    r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
-                    r.propagate()
-                    entropy = r.get_cross_entropy()
-                    print(entropy)
-                else:
-                    r._remote.set_batch(j)
-                #
-                w_list = self.get_weight_list_by_mbid(j)
-                print("%d : %d" % (j, len(w_list)))
-                attack_num = int(len(w_list)/4) #int(len(w_list)/10)
-                random.shuffle(w_list)
-                for m in range(self._loop): # 1, 2, 4, 8, 16
-                    for p in range(attack_num):
-                        tp = w_list[p]
-                        li = tp[0]
-                        ni = tp[1]
-                        ii = tp[2]
-                        entropy, ret = self.weight_shift(li, ni, ii, entropy)
-                        if ret:
-                            print("[%d %d %d](%d/%d)[%d|%d|%d] %f" % (e, j, m, p, attack_num, li, ni, ii, entropy))
-                        #
-                    #
-                    r.export_weight(package.save_path())
-                    if entropy<limit:
-                        print("reach to the limit(%f), exit iterations" %(limit))
-                        return
-                    #
-                # for m
-                if self._disable_mini_batch:
-                    break
-                #
-                r.reset_weight_property()
-                r.unlock_weight_all()
-                #r.reset_weight_mbid()
-            # for j
-        # e
-        elapsed_time = time.time() - start_time
-        t = format(elapsed_time, "0")
-        print("time = %s" % (t))
-    #
-    
-    
-    def loop_alt_2(self):
-        entropy = 1.0
-        r = self._r
-        package = self._package
-        mini_batch_size = self._mini_batch_size
-        print("it : %d" % (self._it))
-        epoc = self._epoc
-        limit = self._limit # 0.000001
-        package.load_batch()
-        batch_size = package._train_batch_size
-        data_size = package._image_size
-        num_class = package._num_class
-        #
-        r.prepare(mini_batch_size, data_size, num_class)
-        print(">>mini_batch_size(%d)" % (mini_batch_size))
-        #
-        start_time = time.time()
-        for e in range(epoc): # epoc
-            self._cnt_e = e
-            for j in range(self._it): # iteration / mini batch
-                self._cnt_i = j
-                if r._gpu:
-                    self.set_mini_batch(j)
-                    r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
-                    r.propagate()
-                    entropy = r.get_cross_entropy()
-                    print(entropy)
-                else:
-                    r._remote.set_batch(j)
-                #
-                w_list = self.get_weight_list_by_mbid(0)
-                #
-                print("%d : %d" % (j, len(w_list)))
-                attack_num = int(len(w_list)/1000) #int(len(w_list)/10)
-                random.shuffle(w_list)
-                random.shuffle(w_list)
-                for m in range(self._loop): # 1, 2, 4, 8, 16
-                    for p in range(attack_num):
-                        tp = w_list[p]
-                        li = tp[0]
-                        ni = tp[1]
-                        ii = tp[2]
-                        entropy, ret = self.weight_shift(li, ni, ii, entropy)
-                        if ret:
-                            print("[%d %d %d](%d/%d)[%d|%d|%d] %f" % (e, j, m, p, attack_num, li, ni, ii, entropy))
-                        #
-                    #
-                    r.export_weight(package.save_path())
-                    if entropy<limit:
-                        print("reach to the limit(%f), exit iterations" %(limit))
-                        return
-                    #
-                # for m
-                if self._disable_mini_batch:
-                    break
-                #
-                r.reset_weight_property()
-                r.unlock_weight_all()
-                #r.reset_weight_mbid()
-            # for j
-        # e
-        elapsed_time = time.time() - start_time
-        t = format(elapsed_time, "0")
-        print("time = %s" % (t))
-    #
-#
-#
-#
-    def loop_alt_3(self):
-        entropy = 1.0
-        r = self._r
-        package = self._package
-        mini_batch_size = self._mini_batch_size
-        print("it : %d" % (self._it))
-        epoc = self._epoc
-        limit = self._limit # 0.000001
-        package.load_batch()
-        batch_size = package._train_batch_size
-        data_size = package._image_size
-        num_class = package._num_class
-        #
-        r.prepare(mini_batch_size, data_size, num_class)
-        print(">>mini_batch_size(%d)" % (mini_batch_size))
-        #
-        
-        #
-        fc_layers = []
-        cnn_layers = []
-        c = r.count_layers()
-        for i in range(c):
-            layer = r.get_layer_at(i)
-            type = layer.get_type()
-            if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT:
-                fc_layers.append(i)
-            elif type==core.LAYER_TYPE_CONV_4:
-                cnn_layers.append(i)
-            #
-        #
-        #print(len(fc_layers))
-        #print(len(cnn_layers))
-                
-        start_time = time.time()
-        for e in range(epoc): # epoc
-            self._cnt_e = e
-            for j in range(self._it): # iteration / mini batch
-                self._cnt_i = j
-                #
-                self.set_mini_batch(j)
-                r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
-                r.propagate()
-                entropy = r.get_cross_entropy()
-                print(entropy)
-                #
-                w_list = []
-                for i in fc_layers:
-                    layer = r.getLayerAt(i)
-                    for ni in range(layer._num_node):
-                        for ii in range(layer._num_input):
-                            w_list.append((i, ni, ii))
-                        #
-                    #
-                #
-                #print(len(w_list))
-                random.shuffle(w_list)
-                random.shuffle(w_list)
-                attack_num = int(len(w_list)/1000)
-                for m in range(self._loop):
-                    for p in range(attack_num):
-                        tp = w_list[p]
-                        li = tp[0]
-                        ni = tp[1]
-                        ii = tp[2]
-                        entropy, ret = self.weight_shift(li, ni, ii, entropy)
-                        if ret:
-                            print("[%d %d %d](%d/%d)[%d|%d|%d] %f" % (e, j, m, p, attack_num, li, ni, ii, entropy))
-                        #
-                    #
-                    r.export_weight(package.save_path())
-                    if entropy<limit:
-                        print("reach to the limit(%f), exit iterations" %(limit))
-                        return
-                    #
-                # for m
-                if self._disable_mini_batch:
-                    break
-                #
-                r.reset_weight_property()
-                r.unlock_weight_all()
-            # for j
-            for j in range(self._it): # iteration / mini batch
-                self._cnt_i = j
-                #
-                w_list = []
-                for i in cnn_layers:
-                    layer = r.getLayerAt(i)
-                    for ni in range(layer._num_node):
-                        for ii in range(layer._num_input):
-                            w_list.append((i, ni, ii))
-                        #
-                    #
-                #
-                random.shuffle(w_list)
-                random.shuffle(w_list)
-                attack_num = int(len(w_list)/10)
-                for m in range(self._loop):
-                    for p in range(attack_num):
-                        tp = w_list[p]
-                        li = tp[0]
-                        ni = tp[1]
-                        ii = tp[2]
-                        entropy, ret = self.weight_shift(li, ni, ii, entropy)
-                        if ret:
-                            print("[%d %d %d](%d/%d)[%d|%d|%d] %f" % (e, j, m, p, attack_num, li, ni, ii, entropy))
-                        #
-                    #
-                    r.export_weight(package.save_path())
-                    if entropy<limit:
-                        print("reach to the limit(%f), exit iterations" %(limit))
-                        return
-                    #
-                # for m
-                if self._disable_mini_batch:
-                    break
-                #
-                r.reset_weight_property()
-                r.unlock_weight_all()
-            # for j
-        # e
-        elapsed_time = time.time() - start_time
-        t = format(elapsed_time, "0")
-        print("time = %s" % (t))
-    #
-    
-    def simple_weight_shift(self, i, entropy, attack_i):
+    def weight_shift(self, i, entropy, attack_i):
         w = self._w_list[attack_i]
         li = w[0]
         ni = w[1]
@@ -675,7 +176,129 @@ class Train:
         #
         return len(self._w_list)
 
-    def simple_loop(self):
+    def weight_ops(self, attack_i, mode):
+        w = self._w_list[attack_i]
+        li = w[0]
+        ni = w[1]
+        ii = w[2]
+        #
+        r = self._r
+        layer = r.getLayerAt(li)
+        wi = layer.get_weight_index(ni, ii)
+        wi_alt = wi
+        maximum = core.WEIGHT_INDEX_MAX
+        minimum = core.WEIGHT_INDEX_MIN
+        #
+        if mode>0: # heat
+            if wi<maximum:
+                wi_alt = wi + 1
+                
+            #
+        else:
+            if wi>minimum:
+                wi_alt = wi - 1
+            #
+        #
+        return wi, wi_alt
+
+
+    def multi_attack(self, ce, mode=1):
+        r = self._r
+        pack = self._package
+        #
+        loop_n = 20
+        w_num = self.make_w_list()
+        attack_num = w_num/1000 # 0.1%
+        #
+        attack_list = []
+        for i in range(attack_num*10):
+            if i>=attack_num:
+                break
+            #
+            attack_i = random.randrange(w_num)
+            w = self._w_list[attack_i]
+            li = w[0]
+            ni = w[1]
+            ii = w[2]
+            wi, wi_alt = self.weight_ops(attack_i, mode)
+            if wi!=wi_alt:
+                attack_list.append((attack_i, wi, wi_alt))
+            #
+        #
+        for wt in attack_list:
+            attack_i = wt[0]
+            wi = wt[1]
+            wi_alt = wt[2]
+            w = self._w_list[attack_i]
+            li = w[0]
+            ni = w[1]
+            ii = w[2]
+            #
+            layer = r.get_layer_at(li)
+            layer.set_weight_index(ni, ii, wi_alt)
+        #
+        
+        c =r.countLayers()
+        for li in range(c):
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+        r.propagate()
+        ce_alt = r.get_cross_entropy()
+        if ce_alt<ce:
+            ce = ce_alt
+        else:
+            for wt in attack_list:
+                attack_i = wt[0]
+                wi = wt[1]
+                wi_alt = wt[2]
+                w = self._w_list[attack_i]
+                li = w[0]
+                ni = w[1]
+                ii = w[2]
+                #
+                layer = r.get_layer_at(li)
+                layer.set_weight_index(ni, ii, wi)
+            #
+            for li in range(c):
+                layer = r.get_layer_at(li)
+                layer.update_weight()
+            #
+        #
+        return ce
+    
+    def single_attack(self, ce):
+        r = self._r
+        pack = self._package
+        #
+        loop_n = 20
+        w_num = self.make_w_list()
+        attack_num = int(w_num/10*3)
+        print("w : %d / %d" % (attack_num, w_num))
+        cnt = 0
+        for n in range(loop_n):
+            # reset
+            if n>0 and n%5==0:
+                r.reset_weight_property()
+                r.unlock_weight_all()
+                r.reset_weight_mbid()
+            #
+            for i in range(attack_num):
+                attack_i = random.randrange(attack_num)
+                ce_alt, k = self.weight_shift(i, ce, attack_i)
+                cnt = cnt + k
+                if k>0:
+                    print("o : %d, %d, %d : %f (%f) (%d)" %(n, i, attack_i, ce, ce-ce_alt, cnt))
+                else:
+                    print("x : %d, %d, %d : %f (%f) (%d)" %(n, i, attack_i, ce, ce-ce_alt, cnt))
+                #
+                ce = ce_alt
+                
+            #
+            r.export_weight(pack.save_path())
+        #
+
+    def loop(self):
         r = self._r
         pack = self._package
         mini_batch_size = self._mini_batch_size
@@ -692,29 +315,15 @@ class Train:
         ce = r.get_cross_entropy()
         print("CE=%f" % (ce))
         #
-        loop_n = 20
-        w_num = self.make_w_list()
-        attack_num = int(w_num/10*3)
-        print("w : %d / %d" % (attack_num, w_num))
-        cnt = 0
-        for n in range(loop_n):
-            # reset
-            if n>0 and n%5==0:
-                r.reset_weight_property()
-                r.unlock_weight_all()
-                r.reset_weight_mbid()
+        #self.single_attack(ce)
+        for j in range(10):
+            for i in range(500):
+                ce = self.multi_attack(ce, 1)
+                print("%d : H : %d : %f" % (j, i, ce))
             #
-            for i in range(attack_num):
-                attack_i = random.randrange(attack_num)
-                ce_alt, k = self.simple_weight_shift(i, ce, attack_i)
-                cnt = cnt + k
-                if k>0:
-                    print("o : %d, %d, %d : %f (%f) (%d)" %(n, i, attack_i, ce, ce-ce_alt, cnt))
-                else:
-                    print("x : %d, %d, %d : %f (%f) (%d)" %(n, i, attack_i, ce, ce-ce_alt, cnt))
-                #
-                ce = ce_alt
-                
+            for i in range(500):
+                ce = self.multi_attack(ce, 0)
+                print("%d : C : %d : %f" % (j, i, ce))
             #
             r.export_weight(pack.save_path())
         #

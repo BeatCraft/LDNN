@@ -64,7 +64,7 @@ def main():
         print("package._train_batch_size=%d" % (pack._train_batch_size))
         t = train.Train(pack, r)
         t.set_mini_batch_size(mini_batch_size)
-        t.simple_loop()
+        t.loop()
     elif mode==1: # test
         test.test_n(r, pack, 500)
     elif mode==2: #

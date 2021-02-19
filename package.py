@@ -106,10 +106,10 @@ class Package:
     def setup_dnn(self, my_gpu, config=0, mode=0):
         r = core.Roster(mode)
         r.set_gpu(my_gpu)
-        if mode==0: # float
-            self._w_save_path = self._w_float_path
-        elif mode==1: # quantized
+        if mode==0: # quantized
             self._w_save_path = self._wi_csv_path
+        elif mode==1: # float
+            self._w_save_path = self._w_float_path
         #
         if self._package_id==0: # MNIST
             if config==0:

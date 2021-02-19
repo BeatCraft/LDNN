@@ -605,13 +605,13 @@ class Train:
         li = w[0]
         ni = w[1]
         ii = w[2]
-        print("(%d, %d, %d) %d" % (li, ni, ii, attack_i))
+        #print("(%d, %d, %d) %d" % (li, ni, ii, attack_i))
         
         r = self._r
         layer = r.getLayerAt(li)
         lock = layer.get_weight_lock(ni, ii)   # default : 0
         if lock>0:
-            print("[%d] locked" % (i))
+            print("    [%d] locked" % (i))
             return entropy, 0
         #
         wp = layer.get_weight_property(ni, ii) # default : 0
@@ -632,7 +632,7 @@ class Train:
             if wi==maximum or wi==minimum:
                 layer.set_weight_property(ni, ii, 0)
                 layer.set_weight_lock(ni, ii, 1)
-                print("[%d] lock_1(%d)" % (i, wi))
+                print("    [%d] lock_1(%d)" % (i, wi))
                 return entropy, 0
             #
         #
@@ -649,11 +649,11 @@ class Train:
             # reverse
                 wp_alt = wp_alt*(-1)
                 layer.set_weight_property(ni, ii, wp_alt)
-                print("[%d] reverse(%d)" % (i, wp_alt))
+                print("    [%d] reverse(%d)" % (i, wp_alt))
             else:
                 layer.set_weight_property(ni, ii, 0)
                 layer.set_weight_lock(ni, ii, 1)
-                print("[%d] lock_2(%d)" % (i, wi))
+                print("    [%d] lock_2(%d)" % (i, wi))
             #
         #
         return entropy, 0
@@ -676,45 +676,47 @@ class Train:
         return len(self._w_list)
 
     def simple_loop(self):
-        #entropy = 1.0
-        loop_n = 1
         r = self._r
-        package = self._package
+        pack = self._package
         mini_batch_size = self._mini_batch_size
         print("mini_batch_size=%d" % (mini_batch_size))
         #
-        package.load_batch()
-        batch_size = package._train_batch_size
-        data_size = package._image_size
-        num_class = package._num_class
+        pack.load_batch()
+        batch_size = pack._train_batch_size
+        data_size = pack._image_size
+        num_class = pack._num_class
         r.prepare(mini_batch_size, data_size, num_class)
         self.set_mini_batch(0)
         r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
-        #
-        w_num = self.make_w_list()
-        #
-        attack_num = int(w_num/10*3)
         r.propagate()
         ce = r.get_cross_entropy()
         print("CE=%f" % (ce))
-        print("num=%d" % (w_num))
         #
-        #
+        loop_n = 20
+        w_num = self.make_w_list()
+        attack_num = int(w_num/10*3)
+        print("w : %d / %d" % (attack_num, w_num))
         cnt = 0
         for n in range(loop_n):
             # reset
-            if n>0 and n%3==0:
+            if n>0 and n%5==0:
                 r.reset_weight_property()
                 r.unlock_weight_all()
                 r.reset_weight_mbid()
             #
             for i in range(attack_num):
                 attack_i = random.randrange(attack_num)
-                ce, k = self.simple_weight_shift(i, ce, attack_i)
+                ce_alt, k = self.simple_weight_shift(i, ce, attack_i)
                 cnt = cnt + k
-                print("[%d][%d] %f (%d) %d" %(i, attack_i, ce, k, cnt))
+                if k>0:
+                    print("o : %d, %d, %d : %f (%f) (%d)" %(n, i, attack_i, ce, ce-ce_alt, cnt))
+                else:
+                    print("x : %d, %d, %d : %f (%f) (%d)" %(n, i, attack_i, ce, ce-ce_alt, cnt))
+                #
+                ce = ce_alt
+                
             #
-            r.export_weight(package.save_path())
+            r.export_weight(pack.save_path())
         #
         return 0
 

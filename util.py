@@ -8,6 +8,7 @@ import copy
 import struct
 import pickle
 import numpy as np
+import csv
 
 from PIL import Image
 from PIL import ImageFile
@@ -16,10 +17,10 @@ from PIL import ImageFile
 from PIL import PngImagePlugin
 import zlib
 
-import csv
-
+# LDNN
 import core
-#import gpu
+
+
 #
 # constant values
 #
@@ -31,19 +32,18 @@ C_RIGHT_GREEN = (128, 255, 128)
 C_GREEN = (0, 255, 0)
 C_RIGHT_BLUE = (128, 128, 255)
 C_BLUE = (0, 0, 255)
-COLOR_PALLET = [C_BLUE, C_RIGHT_BLUE, C_GREEN, C_RIGHT_GREEN,
-                C_YELLOW, C_ORANGE, C_RED, C_PURPLE]
+COLOR_PALLET = [C_BLUE, C_RIGHT_BLUE, C_GREEN, C_RIGHT_GREEN, C_YELLOW, C_ORANGE, C_RED, C_PURPLE]
 #
 #
 #
 def cross_emtropy_error(y, y_len, t, t_len):
     if y_len != t_len:
         return None
-
+    #
     s = 0.0
     for i in range(y_len):
         s += (np.log(y[i])*t[i])
-
+    #
     s = s * -1.0
     return s
 
@@ -51,103 +51,86 @@ def cross_emtropy_error_2(y, y_len, t, t_len):
     delta = 1e-7
     #print np.log(y + delta)
     return -np.sum(t * np.log(y + delta))
-#
+
 #def cross_emtropy_error_fast(y, t, t_class):
 #    return np.log(y[t_class]) * t[t_class] * -1
 #
+
 def cross_emtropy_error_fast(y, t_class):
     delta = 1e-7
     return -np.log(y[t_class]+delta)
-#
-#
-#
+
 def mean_squared_error_np(y, y_len, t, t_len):
     return np.sum( (y-t)**2.0 )/float(y_len)
-#
-#
-#
+
 def mean_squared_error(y, y_len, t, t_len):
     if y_len != t_len:
         return None
-    
+    #
     s = 0.0
     for i in range(y_len):
         s += (y[i]-t[i])**2.0
-    
+    #
     s = s / float(y_len)
     return s
-#
-#
-#
+
 def mean_squared_error_B(y, y_len, t, t_len):
     if y_len != t_len:
         return None
-    
+    #
     s = 0.0
     for i in range(y_len):
         s += abs(y[i]-t[i])
-
+    #
     return s
+    
 #
 # mostly, mean_absolute_error is used
 #
 def mean_absolute_error(y, y_len, t, t_len):
     if y_len != t_len:
         return None
-    
+    #
     s = 0.0
-    #sum = 0.0
-    
     for i in range(y_len):
-        #sum += y[i]
         s += abs(y[i]-t[i])
-    
-    #if sum<=0:
-    #    print "FUCK(%f)" % sum
-    
+    #
     return s/float(y_len)
-#    if sum>0.0:
-#       return s/y_len
-#    return 100.0
-#
-#
-#
+
 def img2List(img):
     pix = img.load()
     w = img.size[0]
     h = img.size[1]
-    
+    #
     ret = []
     for y in range(h):
         for x in range(w):
-            k = pix[x, y] #/ 255.0
+            k = pix[x, y]
             ret.append(k)
+        #
+    #
     return ret
-#
-#
-#
+
 def loadData(path):
     img = Image.open(path)
     img = img.convert("L")
     #img = img.resize((14,14))
     data = img2List(img)
     return data
-#
-#
-#
+
 def pickle_save(path, data):
     with open(path, mode='wb') as f:
         pickle.dump(data, f)
-#
-#
-#
+
 def pickle_load(path):
     try:
         with open(path, mode='rb') as f:
             data = pickle.load(f)
             return data
+        #
     except:
         return None
+    #
 #
 #
 #
@@ -157,12 +140,12 @@ def exportPng(r, num_of_processed):
     for con in connections:
         w = con.getWeightIndex()
         wlist.append(w)
-        
+        #
         lc = r.countLayers()
         bc = lc - 1
         width = 0
         height = 0
-    
+    #
     for i in range(bc):
         left = r.getLayerAt(i)
         left_nc = left.countNodes()
@@ -171,22 +154,23 @@ def exportPng(r, num_of_processed):
         width = width + right_nc*4
         if left_nc + right_nc > height:
             height = left_nc*4 + right_nc*4
-    
+        #
+    #
     img = Image.new("RGB", (width+100, height+10))
     pix = img.load()
     windex = 0
     w = 0
     h = 0
-    
+    #
     for i in range(bc):
         left = r.getLayerAt(i)
         left_nc = left.countNodes()
         right = r.getLayerAt(i+1)
         right_nc = right.countNodes()
-        
+        #
         start_w = left_nc*4*i + 10*i
         start_h = 0
-        
+        #
         for x in range(right_nc):
             w = start_w + x*4
             for y in range(left_nc):
@@ -204,21 +188,18 @@ def exportPng(r, num_of_processed):
                 pix[w+2, h+1] = v
                 pix[w+2, h+2] = v
                 windex = windex + 1
-
-    start_h = 0
-
+            #
+        #
+    #
     save_name = "./%05d.png" % (num_of_processed)
     img.save(save_name)
-#
-#
-#
+
 def list_to_csv(path, data_list):
     with open(path, 'wb') as file:
         wr = csv.writer(file, quoting=csv.QUOTE_ALL)
         wr.writerow(data_list)
-#
-#
-#
+    #
+    
 def csv_to_list(path):
     print("csv_to_list()")
     data_list = []
@@ -228,211 +209,82 @@ def csv_to_list(path):
             for row in reader:
                 for cell in row:
                     data_list.append(cell)
-
+                #
+            #
+        #
         return data_list
-
     except:
         return data_list
-
+    #
     return data_list
-#
-#
-#
+
+#def get_key_input(prompt):
+#    try:
+#        c = eval(input(prompt))
+#    except:
+#        c = -1
+#    return c
+
 def get_key_input(prompt):
+    c = -1
     try:
-        c = eval(input(prompt))
+        if sys.version_info[0]==2:
+            c = input(prompt) # Python2.7
+        else:
+            c = eval(input(prompt)) # Python3.x
+        #
     except:
         c = -1
-        
+    #
     return c
-#
-#
-#
-TRAIN_IMAGE_PATH = ["../ldnn_package/MNIST/train-images-idx3-ubyte",
-                    "../ldnn_package/cifar-10-batches-py/data_batch_1"]
-TRAIN_LABEL_PATH = ["../ldnn_package/MNIST/train-labels-idx1-ubyte",
-                    "../ldnn_config/cifar-10-batches-py/train_label_batch.pickle"]
-TRAIN_IMAGE_BATCH_PATH = ["../ldnn_config/MNIST/train_image_batch.pickle",
-                          "../ldnn_config/cifar-10-batches-py/train_image_batch.pickle"]
-TRAIN_LABEL_BATCH_PATH = ["../ldnn_config/MNIST/train_label_batch.pickle",
-                          "../ldnn_config/cifar-10-batches-py/train_label_batch.pickle"]
-TRAIN_BATCH_SIZE = [60000, 50000]
-TEST_BATCH_SIZE = [10000, 10000]
-TEST_IMAGE_PATH = ["../ldnn_package/MNIST/t10k-images-idx3-ubyte",
-                   "./"]
-TEST_LABEL_PATH = ["../ldnn_package/MNIST/t10k-labels-idx1-ubyte",
-                   "./"]
-TEST_IMAGE_BATCH_PATH = ["../ldnn_config/MNIST/test_image_batch.pickle",
-                         "../ldnn_config/cifar-10-batches-py/test_image_batch.pickle"]
-TEST_LABEL_BATCH_PATH = ["../ldnn_config/MNIST/test_label_batch.pickle",
-                         "../ldnn_config/cifar-10-batches-py/test_label_batch.pickle"]
 
-PACKAGE_NAME = ["MNIST", "cifar-10-batches-py"]
-PACKAGE_IMAGE_WIDTH = [28, 32]
-PACKAGE_IMAGE_HEIGHT = [28, 32]
-PACKAGE_IMAGE_SIZE = [784, 32*32*3]
-PACKAGE_NUM_CLASS = [10, 10]
+def check_weight_distribution(path):
+    w_list = csv_to_list(path)
+    w_total = len(w_list)
+    print(w_total)
+    if w_total<=0:
+        print("error")
+        return 0
+    #
 
-class Package:
-    def __init__(self, package_id=0):
-        self._package_id = package_id
-        self._image_size = PACKAGE_IMAGE_SIZE[package_id]
-        self._num_class = PACKAGE_NUM_CLASS[package_id]
-        self._train_batch_size = TRAIN_BATCH_SIZE[package_id]
-        self._test_batch_size = TEST_BATCH_SIZE[package_id]
-        #
-        self._name = PACKAGE_NAME[package_id]
-        self._wi_csv_path = "../ldnn_config/%s/wi.csv" % (PACKAGE_NAME[package_id])
-        #
-        self._train_image_path = TRAIN_IMAGE_PATH[package_id]
-        self._train_label_path = TRAIN_LABEL_PATH[package_id]
-        self._test_image_path = TEST_IMAGE_PATH[package_id]
-        self._test_label_path = TEST_LABEL_PATH[package_id]
-        #
-        self._train_image_batch_path = TRAIN_IMAGE_BATCH_PATH[package_id]
-        self._train_label_batch_path = TRAIN_LABEL_BATCH_PATH[package_id]
-        self._test_image_batch_path = TEST_IMAGE_BATCH_PATH[package_id]
-        self._test_label_batch_path = TEST_LABEL_BATCH_PATH[package_id]
-        #
-    def load_batch(self):
-        if os.path.isfile(self._train_image_batch_path):
-            #print "restore train image batch"
-            self._train_image_batch = pickle_load(self._train_image_batch_path)
-        else:
-            print("fatal error : no train image batch")
-        #
-        if os.path.isfile(self._train_label_batch_path):
-            #print "restore train label batch"
-            self._train_label_batch = pickle_load(self._train_label_batch_path)
-        else:
-            print("fatal error : no train label batch")
-        #
-        if os.path.isfile(self._test_image_batch_path):
-            #print "restore test image batch"
-            self._test_image_batch = pickle_load(self._test_image_batch_path)
-        else:
-            print("fatal error : no test image batch")
-        #
-        if os.path.isfile(self._test_label_batch_path) :
-            #print "restore test label batch"
-            self._test_label_batch = pickle_load(self._test_label_batch_path)
-        else:
-            print("fatal error : no test label batch")
-            print(self._test_label_batch_path)
-            
-    def setup_dnn(self, my_gpu, config=0):
-        r = core.Roster()
-        r.set_gpu(my_gpu)
-        #
-        if self._package_id==0: # MNIST
-            if config==0:
-                print("FC")
-                # 0 : input
-                c = r.countLayers()
-                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
-                r.layers.append(input)
-                # 1 : hidden : 28 x 28 x 1 = 784
-                c = r.countLayers()
-                hidden_1 = core.HiddenLayer(c, 784, 128, input, my_gpu)
-                #hidden_1.set_num_update(32)
-                r.layers.append(hidden_1)
-                # 2 : hidden : 64
-                c = r.countLayers()
-                hidden_2 = core.HiddenLayer(c, 128, 128, hidden_1, my_gpu)
-                #hidden_2.set_num_update(8)
-                r.layers.append(hidden_2)
-                # 3 : output
-                c = r.countLayers()
-                output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
-                #output.set_num_update(8)
-                r.layers.append(output)
-            elif config==1:
-                print("CNN")
-                # 0 : input 28 x 28 x 1 = 784
-                c = r.countLayers()
-                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
-                r.layers.append(input)
-                # 1 : CNN 28 x 28 x 1 > 28 x 28 x 4
-                c = r.countLayers()
-                cnn_1 = core.Conv_4_Layer(c, 28, 28, 1, 4, input, my_gpu)
-                r.layers.append(cnn_1)
-                # 2 : max
-                c = r.countLayers()
-                max_1 = core.MaxLayer(c, 4, 28, 28, cnn_1, my_gpu)
-                r.layers.append(max_1)
-                # 3 hidden : 14 x 14 x 4 = 784
-                c = r.countLayers()
-                hidden_1 = core.HiddenLayer(c, 784, 128, max_1, my_gpu)
-                r.layers.append(hidden_1)
-                # 4 hidden : 128
-                c = r.countLayers()
-                hidden_2 = core.HiddenLayer(c, 128, 128, hidden_1, my_gpu)
-                r.layers.append(hidden_2)
-                # 5 : output
-                c = r.countLayers()
-                output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
-                r.layers.append(output)
-            #
-        elif self._package_id==1: # cifa-10
-            if config==0:
-                # 0 : input : 3072
-                c = r.countLayers()
-                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
-                r.layers.append(input)
-                # 1 : hidden : 3072 x 128
-                c = r.countLayers()
-                hidden_1 = core.HiddenLayer(c, 3072, 128, input, my_gpu)
-                r.layers.append(hidden_1)
-                # 2 : hidden : 128 x 128
-                c = r.countLayers()
-                hidden_2 = core.HiddenLayer(c, 128, 128, hidden_1, my_gpu)
-                r.layers.append(hidden_2)
-                # 3 : output : 128 x 10
-                c = r.countLayers()
-                output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
-                r.layers.append(output)
-            elif config==1:
-                # 0 : input : 32 x 32 x 3 = 3072
-                c = r.countLayers()
-                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
-                r.layers.append(input)
-                # 1 : CNN 32 x 32 x 3 > 32 x 32 x 4
-                c = r.countLayers()
-                cnn_1 = core.Conv_4_Layer(c, 32, 32, 3, 4, input, my_gpu)
-                r.layers.append(cnn_1)
-                # 2 : max: 32 x 32 x 4 > 16 x 16 x 4 = 1024
-                c = r.countLayers()
-                max_1 = core.MaxLayer(c, 4, 32, 32, cnn_1, my_gpu)
-                r.layers.append(max_1)
-                # 5 hidden : (16 x 16 x 4) x 128
-                c = r.countLayers()
-                hidden_1 = core.HiddenLayer(c, 1024, 128, max_1, my_gpu)
-                r.layers.append(hidden_1)
-                # 6 hidden : 128
-                c = r.countLayers()
-                hidden_2 = core.HiddenLayer(c, 128, 128, hidden_1, my_gpu)
-                r.layers.append(hidden_2)
-                # 7 : output
-                c = r.countLayers()
-                output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
-                r.layers.append(output)
-            #
-        else:
-            print("package error")
-            return None
-        #
-        if os.path.isfile(self._wi_csv_path):
-            #print "restore weight index"
-            r.import_weight_index(self._wi_csv_path)
-        else:
-            #print "init weight index"
-            r.init_weight()
-            r.export_weight_index(self._wi_csv_path)
-        #
-        if my_gpu:
-            r.update_weight()
-        #
-        return r
+    v_list = []
+    num_list = []
+    total = 0.0
+    for i in range(core.WEIGHT_INDEX_SIZE):
+        key = str(i)
+        num =  w_list.count(key)
+        num_list.append(num)
+        v = float(num)/w_total*100.0
+        print("[%02d] %d : %f" % (i, num, v))
+        v_list.append(v)
+        total = total + v
+    #
 
+    ave = total / float(len(v_list))
+    print("average : %f" % (ave))
+
+    for i in range(core.WEIGHT_INDEX_SIZE):
+        dif = v_list[i] - ave
+        print("[%02d] %f" % (i, dif))
+
+    for i in range(core.WEIGHT_INDEX_SIZE):
+        print(num_list[i])
+    #
+    return 0
+    
 def echo(data):
     print(data)
+    
+def main():
+    argvs = sys.argv
+    argc = len(argvs)
+    print(argc)
+    #
+    print("test")
+
+if __name__=='__main__':
+    print(">> start")
+    sts = main()
+    print(">> end")
+    print("\007")
+    sys.exit(sts)

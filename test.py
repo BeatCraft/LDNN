@@ -23,6 +23,7 @@ import pickle
 # LDNN Modules
 import core
 import util
+import package
 import gpu
 #
 #
@@ -31,18 +32,18 @@ sys.setrecursionlimit(10000)
 #
 #
 #
-def test(r, package):
-    package.load_batch()
+def test(r, pack):
+    pack.load_batch()
     batch_size = 10#package._test_batch_size
-    data_size = package._image_size
-    num_class = package._num_class
+    data_size = pack._image_size
+    num_class = pack._num_class
     #
     data_array = np.zeros((batch_size, data_size), dtype=np.float32)
     class_array = np.zeros(batch_size, dtype=np.int32)
     #
     for i in range(batch_size):
-        data_array[i] = package._test_image_batch[i]
-        class_array[i] = package._test_label_batch[i]
+        data_array[i] = pack._test_image_batch[i]
+        class_array[i] = pack._test_label_batch[i]
     #
     r.prepare(batch_size, data_size, num_class)
     r.set_data(data_array, data_size, class_array, batch_size)
@@ -94,13 +95,13 @@ def test(r, package):
 #
 #
 #
-def unit_test(r, package):
+def unit_test(r, pack):
     print(">>unit_test()")
     #
-    package.load_batch()
-    data_size = package._image_size
-    num_class = package._num_class
-#    eval_size = package._test_batch_size
+    pack.load_batch()
+    data_size = pack._image_size
+    num_class = pack._num_class
+#    eval_size = pack._test_batch_size
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
@@ -111,8 +112,8 @@ def unit_test(r, package):
     class_array = np.zeros(n, dtype=np.int32)
     
     for j in range(n):
-        data_array[j] = package._train_image_batch[j]
-        class_array[j] = package._train_label_batch[+j]
+        data_array[j] = pack._train_image_batch[j]
+        class_array[j] = pack._train_label_batch[+j]
     #
     #print(data_array)
     #print(class_array)
@@ -125,11 +126,11 @@ def unit_test(r, package):
 #
 #
 #
-def test_n(r, package, n):
-    package.load_batch()
-    data_size = package._image_size
-    num_class = package._num_class
-    eval_size = package._test_batch_size
+def test_n(r, pack, n):
+    pack.load_batch()
+    data_size = pack._image_size
+    num_class = pack._num_class
+    eval_size = pack._test_batch_size
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
@@ -148,8 +149,8 @@ def test_n(r, package, n):
     for i in range(it):
         for j in range(n):
             #tmp = package._train_image_batch[i*n+j]
-            data_array[j] = package._train_image_batch[i*n+j]
-            class_array[j] = package._train_label_batch[i*n+j]
+            data_array[j] = pack._train_image_batch[i*n+j]
+            class_array[j] = pack._train_label_batch[i*n+j]
         #
         r.set_data(data_array, data_size, class_array, n)
         r.propagate(-1, -1, -1, -1, 0)
@@ -185,11 +186,11 @@ def test_n(r, package, n):
 #
 #
 #
-def test_single(r, package):
-    package.load_batch()
-    data_size = package._image_size
-    num_class = package._num_class
-    eval_size = package._test_batch_size #
+def test_single(r, pack):
+    pack.load_batch()
+    data_size = pack._image_size
+    num_class = pack._num_class
+    eval_size = pack._test_batch_size #
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
@@ -206,8 +207,8 @@ def test_single(r, package):
         if i%100==0:
             print(i)
         #i = 60
-        data_array[0] = package._test_image_batch[i]
-        answer = package._test_label_batch[i]
+        data_array[0] = pack._test_image_batch[i]
+        answer = pack._test_label_batch[i]
         class_array[0] = answer
         r.set_data(data_array, data_size, class_array, 1)
         r.propagate(-1, -1, -1, -1, 0)
@@ -252,11 +253,11 @@ def test_single(r, package):
 #
 #
 #
-def stat(r, package, path, debug):
-    package.load_batch()
-    data_size = package._image_size
-    num_class = package._num_class
-    eval_size = package._test_batch_size
+def stat(r, pack, path, debug):
+    pack.load_batch()
+    data_size = pack._image_size
+    num_class = pack._num_class
+    eval_size = pack._test_batch_size
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
@@ -276,8 +277,8 @@ def stat(r, package, path, debug):
     start_time = time.time()
     ca = 0
     for i in range(eval_size):
-        data_array[0] = package._test_image_batch[i]
-        answer = package._test_label_batch[i]
+        data_array[0] = pack._test_image_batch[i]
+        answer = pack._test_label_batch[i]
         class_array[0] = answer
         r.set_data(data_array, data_size, class_array)
         r.propagate(-1, -1, -1, -1, 0)
@@ -322,13 +323,13 @@ def stat(r, package, path, debug):
 #
 #
 #
-def cnn_test(r, package):
+def cnn_test(r, pack):
     print(">>cnn_test()")
     #
-    package.load_batch()
-    data_size = package._image_size
-    num_class = package._num_class
-#    eval_size = package._test_batch_size
+    pack.load_batch()
+    data_size = pack._image_size
+    num_class = pack._num_class
+#    eval_size = pack._test_batch_size
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
@@ -339,8 +340,8 @@ def cnn_test(r, package):
     class_array = np.zeros(n, dtype=np.int32)
     
     for j in range(n):
-        data_array[j] = package._train_image_batch[j]
-        class_array[j] = package._train_label_batch[+j]
+        data_array[j] = pack._train_image_batch[j]
+        class_array[j] = pack._train_label_batch[+j]
     #
     r.set_data(data_array, data_size, class_array, n)
     r.propagate(-1, -1, -1, -1, 0)

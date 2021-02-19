@@ -15,9 +15,6 @@ from PIL import Image
 # LDNN Modules
 import gpu
 import util
-
-#
-#
 #
 sys.setrecursionlimit(10000)
 #
@@ -237,9 +234,24 @@ class Layer(object):
     def init_weight_with_random_index(self):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                #wi = WEIGHT_INDEX_SIZE-1
                 wi = random.randrange(WEIGHT_INDEX_SIZE)
                 self.set_weight_index(ni, ii, wi)
+            #
+        #
+
+    def init_weight_with_random_float(self):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                self._weight_matrix[ni][ii] = random.normalvariate(0.0, 0.2)
+            #
+        #
+        #print self._weight_matrix[0][0]
+    
+    def import_weight_matrix(self, data):
+        return None
+      
+    def export_weight_matrix(self):
+        return None
 
     def export_weight_index(self):
         return self._weight_index_matrix.tolist()
@@ -309,7 +321,15 @@ class InputLayer(Layer):
         
     def get_weight_index(self, ni, ii):
         return 0
-    
+        
+    def export_weight_matrix(self):
+        print("InputLayer::export_weight_matrix()")
+        return None
+
+    def import_weight_matrix(self, wi_list):
+        print("InputLayer::InputLayer()")
+        return None
+        
     def export_weight_index(self):
         return None
 
@@ -321,6 +341,9 @@ class InputLayer(Layer):
         
     def count_weight(self):
         return 0
+        
+    def init_weight_with_random_float(self):
+        pass
 #
 #
 #
@@ -357,6 +380,15 @@ class HiddenLayer(Layer):
     
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
+        
+    def import_weight_matrix(self, data):
+        print("HiddenLayer::import_weight_matrix()")
+        self._weight_matrix = data
+        return 1
+      
+    def export_weight_matrix(self):
+        print("HiddenLayer::export_weight_matrix()")
+        return self._weight_matrix
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         stride_1 = self._num_node * self._num_input
@@ -451,6 +483,15 @@ class OutputLayer(Layer):
         
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
+
+    def import_weight_matrix(self, data):
+        print("OutputLayer::import_weight_matrix()")
+        self._weight_matrix = data
+        return 1
+      
+    def export_weight_matrix(self):
+        print("OutputLayer::export_weight_matrix()")
+        return self._weight_matrix
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         stride_1 = self._num_node * self._num_input
@@ -577,6 +618,12 @@ class MaxLayer(Layer):
     def get_weight_index(self, ni, ii):
         return 0
     
+    def export_weight_matrix(self):
+        return None
+
+    def import_weight_matrix(self, wi_list):
+        return 0
+        
     def export_weight_index(self):
         return None
 
@@ -610,6 +657,9 @@ class MaxLayer(Layer):
         pass
         
     def get_weight_mbid(self, ni, ii):
+        pass
+        
+    def init_weight_with_random_float(self):
         pass
 
 class Conv_4_Layer(Layer):
@@ -650,19 +700,18 @@ class Conv_4_Layer(Layer):
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
         #
         
-    def set_weight_index(self, ni, ii, wi):
-        self._weight_index_matrix[ni][ii] = wi
-        self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
+#    def set_weight_index(self, ni, ii, wi):
+#        self._weight_index_matrix[ni][ii] = wi
+#        self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
+#
+#    def init_weight_with_random_index(self):
+#        for ni in range(self._num_node):
+#            for ii in range(self._num_input):
+#                wi = random.randrange(len(WEIGHT_SET))
+#                self.set_weight_index(ni, ii, wi)
+#            #
+#        #
 
-    def init_weight_with_random_index(self):
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                wi = random.randrange(len(WEIGHT_SET))
-                #wi = 7 # 5:0.0, 7:0.5
-                self.set_weight_index(ni, ii, wi)
-            #
-        #
-        
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
         
@@ -724,12 +773,13 @@ class Conv_4_Layer(Layer):
 #
 #
 class Roster:
-    def __init__(self):
+    def __init__(self, mode=0):
         self._weight_list = []
         self._gpu = None
         self._remote = None
         self.layers = []
         self._batch_size = 1
+        self._mode = mode # 0 : quontized, 1 : float
         
     def set_gpu(self, gpu):
         self._gpu = gpu
@@ -764,13 +814,19 @@ class Roster:
         #
             
     def init_weight(self):
+        print("Roster : init_weight(%d)" % (self._mode))
         c = self.countLayers()
-        for i in range(1, c):
+        for i in range(c):
             layer = self.getLayerAt(i)
-            if layer.get_type()==LAYER_TYPE_MAX:
+            type = layer.get_type()
+            if type==LAYER_TYPE_MAX or type==LAYER_TYPE_INPUT:
                 pass
             else:
-                layer.init_weight_with_random_index()
+                if self._mode==0:
+                    layer.init_weight_with_random_index()
+                elif self._mode==1:
+                    layer.init_weight_with_random_float()
+                #
             #
         #
 
@@ -798,7 +854,6 @@ class Roster:
             cnt = cnt + layer.count_weight()
         #
         return cnt
-
 
     def reset_weight_mbid(self):
         c = self.countLayers()
@@ -924,34 +979,30 @@ class Roster:
         #
         return s
     
+    def export_weight(self, path):
+        print("Roster : export_weight(%s)" % path)
+        if self._mode==0:
+            self.export_weight_index(path)
+        elif self._mode==1:
+            self.export_weight_matrix(path)
+        #
     
     def export_weight_matrix(self, path):
+        print("Roster : export_weight_matrix(%s)" % path)
         ma_list = []
         c = self.countLayers()
         for i in range(c):
             layer = self.getLayerAt(i)
             ma = layer.export_weight_matrix()
-            if ma:
+            if ma is None:
+                pass
+            else:
                 ma_list.append(ma)
+                print(ma.shape)
             #
         #
-        util.pickle_save(path, data)
-        
-    def import_weight_matrix(self, path):
-        ma_list = util.pickle_load(path)
-        if ma_list==None:
-            return None
-        #
-        j = 0
-        for i in range(c):
-            ma = ma_list[j]
-            layer = self.getLayerAt(i)
-            ret = layer.import_weight_matrix()
-            if ret==None:
-                continue
-            #
-            j = j + 1
-        #
+#        print ma_list[0]
+        util.pickle_save(path, ma_list)
         
     def export_weight_index(self, path):
         print("Roster : export_weight_index(%s)" % path)
@@ -967,7 +1018,38 @@ class Roster:
                 #
             #
         #
-
+        
+    def import_weight(self, path):
+        print("Roster : import_weight(%s)" % path)
+        if self._mode==0:
+            self.import_weight_index(path)
+        elif self._mode==1:
+            self.import_weight_matrix(path)
+        #
+    
+    def import_weight_matrix(self, path):
+        print("Roster : import_weight_matrix(%s)" % path)
+        ma_list = util.pickle_load(path)
+        if ma_list==None:
+            return
+        #
+        print(len(ma_list))
+        j = 0
+        c = self.countLayers()
+        for i in range(c):
+            layer = self.getLayerAt(i)
+            type = layer.get_type()
+            if type==LAYER_TYPE_INPUT or type==LAYER_TYPE_MAX:
+                continue
+            #
+            ma = ma_list[j]
+            ret = layer.import_weight_matrix(ma)
+            if ret==0:
+                continue
+            #
+            j = j + 1
+        #
+        
     def import_weight_index(self, path):
         print("Roster : import_weight_index(%s)" % path)
         with open(path, "r") as f:
@@ -975,8 +1057,8 @@ class Roster:
             lc = self.countLayers()
             for i in range(1, lc):
                 layer = self.getLayerAt(i)
-                if layer.get_type()==LAYER_TYPE_MAX:
-                    #print "fuck"
+                type = layer.get_type()
+                if type==LAYER_TYPE_INPUT or type==LAYER_TYPE_MAX:
                     continue
                 #
                 nc  = layer._num_node

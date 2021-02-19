@@ -6,9 +6,6 @@
 # LDNN : lesser's Deep Neural Network
 #
 
-#
-#
-#
 import os, sys, time, math
 from stat import *
 import random
@@ -18,24 +15,20 @@ import multiprocessing as mp
 import numpy as np
 import struct
 import pickle
-#
-#import logging
-#logger = logging.getLogger(__name__)
-#
+
 # LDNN Modules
 import core
 import util
+import package
 import gpu
-#
-#
 #
 sys.setrecursionlimit(10000)
 #
 #
 #
 class Train:
-    def __init__(self, package, r):
-        self._package = package
+    def __init__(self, pack, r):
+        self._package = pack
         self._r = r
         #
         self._cnt_e = 0
@@ -297,7 +290,7 @@ class Train:
                 for m in range(self._loop): # 1, 2, 4, 8, 16
                     self._cnt_k = m
                     entropy, c_cnt = self.layer_loop()
-                    r.export_weight_index(package._wi_csv_path)
+                    r.export_weight(package.save_path())
                     #
                     if entropy<limit:
                         print("reach to the limit(%f), exit iterations" %(limit))
@@ -394,7 +387,7 @@ class Train:
                             print("[%d %d %d](%d/%d)[%d|%d|%d] %f" % (e, j, m, p, attack_num, li, ni, ii, entropy))
                         #
                     #
-                    r.export_weight_index(package._wi_csv_path)
+                    r.export_weight(package.save_path())
                     if entropy<limit:
                         print("reach to the limit(%f), exit iterations" %(limit))
                         return
@@ -461,7 +454,7 @@ class Train:
                             print("[%d %d %d](%d/%d)[%d|%d|%d] %f" % (e, j, m, p, attack_num, li, ni, ii, entropy))
                         #
                     #
-                    r.export_weight_index(package._wi_csv_path)
+                    r.export_weight(package.save_path())
                     if entropy<limit:
                         print("reach to the limit(%f), exit iterations" %(limit))
                         return
@@ -551,7 +544,7 @@ class Train:
                             print("[%d %d %d](%d/%d)[%d|%d|%d] %f" % (e, j, m, p, attack_num, li, ni, ii, entropy))
                         #
                     #
-                    r.export_weight_index(package._wi_csv_path)
+                    r.export_weight(package.save_path())
                     if entropy<limit:
                         print("reach to the limit(%f), exit iterations" %(limit))
                         return
@@ -589,7 +582,7 @@ class Train:
                             print("[%d %d %d](%d/%d)[%d|%d|%d] %f" % (e, j, m, p, attack_num, li, ni, ii, entropy))
                         #
                     #
-                    r.export_weight_index(package._wi_csv_path)
+                    r.export_weight(package.save_path())
                     if entropy<limit:
                         print("reach to the limit(%f), exit iterations" %(limit))
                         return
@@ -721,7 +714,7 @@ class Train:
                 cnt = cnt + k
                 print("[%d][%d] %f (%d) %d" %(i, attack_i, ce, k, cnt))
             #
-            r.export_weight_index(package._wi_csv_path)
+            r.export_weight(package.save_path())
         #
         return 0
 
@@ -760,7 +753,7 @@ class Train:
         hidden_2 = r.get_layer_at(c-3)
         rr = 0.0001
         
-        for k in range(20000):
+        for k in range(100):
             for ni in range(output_layer._num_node):
                 for ii in range(output_layer._num_input):
                     wi = output_layer.get_weight_index(ni, ii)
@@ -798,7 +791,7 @@ class Train:
             print("[%d] CE = %f, %f" % (k, ce_2, ce-ce_2))
             r.back_propagate(self._class_array, 0)
         #
-        #r.export_weight_index(package._wi_csv_path)
+        r.export_weight(package.save_path())
         return 0
         
     def loop_hb2(self):
@@ -885,7 +878,7 @@ class Train:
             r.back_propagate(self._class_array, 0)
         #
         print good
-        r.export_weight_index(package._wi_csv_path)
+        r.export_weight(package.save_path())
         return
 
 

@@ -202,13 +202,13 @@ class Train:
         return wi, wi_alt
 
 
-    def multi_attack(self, ce, mode=1):
+    def multi_attack(self, ce, mode=1, kt=0):
         r = self._r
         pack = self._package
         #
         loop_n = 20
         w_num = self.make_w_list()
-        attack_num = w_num/1000 # 0.1%
+        attack_num = int(w_num/100*kt) # 1%
         #
         attack_list = []
         for i in range(attack_num*10):
@@ -315,21 +315,36 @@ class Train:
         ce = r.get_cross_entropy()
         print("CE=%f" % (ce))
         #
+        #
+        #
         #self.single_attack(ce)
-        for j in range(10):
-            for i in range(500):
-                ce = self.multi_attack(ce, 1)
-                print("%d : H : %d : %f" % (j, i, ce))
+        #
+        #
+        #
+        it = 50
+        kt = [1, 0.1, 0.01, 0.001, 0.01, 0.1]
+        k = 0
+        for j in range(it):
+            for i in range(100):
+                ce = self.multi_attack(ce, 1, kt[k])
+                print("%d : H : %d : %f, %f" % (j, i, ce, kt[k]))
             #
-            for i in range(500):
-                ce = self.multi_attack(ce, 0)
-                print("%d : C : %d : %f" % (j, i, ce))
+            for i in range(100):
+                ce = self.multi_attack(ce, 0, kt[k])
+                print("%d : C : %d : %f, %f" % (j, i, ce, kt[k]))
             #
             r.export_weight(pack.save_path())
+            if k==len(kt)-1:
+                k = 0
+            else:
+                k = k+1
+            #
         #
         return 0
 
-
+#
+#
+#
     def loop_hb(self):
         #loop_n = 1
         r = self._r
@@ -488,7 +503,7 @@ class Train:
             ce = ce_alt
             r.back_propagate(self._class_array, 0)
         #
-        print good
+        #print good
         r.export_weight(package.save_path())
         return
 

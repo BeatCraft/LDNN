@@ -387,7 +387,7 @@ __kernel void multiple_x_by_w_alt(
     }
 };
 
-__kernel void k_test(const double in)
+__kernel void k_test(const float in)
 {
     int i = get_global_id(0);
     float out = 0.0;

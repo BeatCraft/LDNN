@@ -362,7 +362,7 @@ class HiddenLayer(Layer):
         #self.dy = np.zeros(self._num_node, dtype=np.float32)
         self.dx = np.zeros(self._num_input, dtype=np.float32)
         self.dw = np.zeros((self._num_node, self._num_input), dtype=np.float32)
-        self._scale = 0
+        self._scale = 1
         #self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
     
     def prepare(self, batch_size):
@@ -973,17 +973,14 @@ class Roster:
 #        self._gpu.k_cross_entropy(output._gpu_output, self._gpu_entropy,
 #                                  self._gpu_labels, self.num_class, self._batch_size)
         #
-        self._gpu.cross_entropy(output._gpu_output, self._gpu_labels_2, self._gpu_entropy,
-                                self.num_class, self._batch_size)
+        self._gpu.cross_entropy(output._gpu_output, self._gpu_labels_2, self._gpu_entropy, self.num_class, self._batch_size)
         #
         self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
-        print self._batch_cross_entropy
-        #
+        #print self._batch_cross_entropy
         s = np.sum(self._batch_cross_entropy)
         s = s/float(self._batch_size)
-        return s
         #
-        #
+        # debug
         #
         if np.isnan(s):
             for i in range(self._batch_size):
@@ -1000,7 +997,7 @@ class Roster:
                 #
             #
         #
-        print("bsize=%d, s=%f" % (self._batch_size, s))
+        #print("bsize=%d, s=%f" % (self._batch_size, s))
         return s
     
     def export_weight(self, path):

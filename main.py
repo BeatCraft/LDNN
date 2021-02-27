@@ -46,13 +46,13 @@ def main():
     package_id = int(argvs[3])
     config = int(argvs[4])
     mode = int(argvs[5])
-    size = int(argvs[6])
+    batch_size = int(argvs[6])
     print("platform_id=%d" % (platform_id))
     print("device_id=%d" % (device_id))
     print("package_id=%d" % (package_id))
     print("config=%d" % (config))
     print("mode=%d" % (mode))
-    print("mini_batch_size=%d" % (size))
+    print("batch_size=%d" % (batch_size))
     #
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
@@ -60,29 +60,12 @@ def main():
     r = pack.setup_dnn(my_gpu, config)
     #
     if mode==0: # train
-        mini_batch_size = size
-        print("package._train_batch_size=%d" % (pack._train_batch_size))
-        t = train.Train(pack, r)
-        t.set_mini_batch_size(mini_batch_size)
+        t = train.Train(pack, r, batch_size)
         t.loop()
     elif mode==1: # test
         test.test_n(r, pack, 500)
     elif mode==2: #
         test.unit_test(r, pack)
-    elif mode==3: #
-        test.cnn_test(r, pack)
-    elif mode==4: #
-        mini_batch_size = size
-        print("package._train_batch_size=%d" % (pack._train_batch_size))
-        t = train.Train(pack, r)
-        t.set_mini_batch_size(mini_batch_size)
-        t.loop_hb()
-    elif mode==5: #
-        mini_batch_size = size
-        print("package._train_batch_size=%d" % (pack._train_batch_size))
-        t = train.Train(pack, r)
-        t.set_mini_batch_size(mini_batch_size)
-        t.loop_hb2()
     else:
         print("mode error : %d" % (mode))
         return 0
@@ -93,7 +76,6 @@ def main():
 #
 if __name__=='__main__':
     print(">> start")
-#    logger.debug('hello')
     sts = main()
     print(">> end")
     print("\007")

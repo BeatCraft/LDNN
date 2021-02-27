@@ -188,6 +188,32 @@ __kernel void scale_layer(__global float* data, int size)
     }
 }
 
+__kernel void cross_entropy(__global const float* infs,
+                            __global const float* labels,
+                            __global float* output,
+                            int num)
+{
+    int bi = get_global_id(0); // batch index
+    //int ni = get_global_id(1); // node index
+    
+    float delta;
+    float k;
+    float t;
+    float sum;
+    
+    delta = 0.0000001;
+    sum = 0.0;
+    
+    for (int i=0;i<num;i++){
+        t = labels[bi*num + i];
+        k = infs[bi*num + i] + delta;
+        sum += t * log(k);
+    }
+    
+    output[bi] = (-1.0)*sum;
+    //printf(\"%f\\n\", output[bi]);
+}
+
 __kernel void k_cross_entropy(__global const float* infs,
                               __global float* output,
                               __global const int* labels,
@@ -216,6 +242,8 @@ __kernel void p_softmax(__global float* in, int num)
     for (int i=0;i<num;i++){
         sum += in[bi*num+i];
     }
+    //sum += 0.0000001;
+    //printf(\"%d : %f\\n\", bi, sum);
 
     for (int i=0;i<num;i++){
         in[bi*num+i] = in[bi*num+i]/sum;
@@ -358,6 +386,15 @@ __kernel void multiple_x_by_w_alt(
         y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * w[stride_2*j + i];
     }
 };
+
+__kernel void k_test(const double in)
+{
+    int i = get_global_id(0);
+    float out = 0.0;
+    out = exp(in);
+    printf(\"%d : exp(%If) = %If\\n\", i, in, out);
+};
+
 """
 #
 #
@@ -451,6 +488,11 @@ class Gpu:
     def softmax(self, data, size, num_batch):
         event = self.prg.p_softmax(self._queue, (num_batch,), None, data, np.int32(size))
         event.wait()
+        
+    def cross_entropy(self, infs, labels, output, num_node, num_batch):
+        event = self.prg.cross_entropy(self._queue, (num_batch,), None,
+                                       infs, labels, output, np.int32(num_node))
+        event.wait()
     
     def k_cross_entropy(self, infs, output, labels, size, num_batch):
         event = self.prg.k_cross_entropy(self._queue, (num_batch,), None,
@@ -473,6 +515,10 @@ class Gpu:
         event = self.prg.conv_4_roll_batch(self._queue, (batch_size, w, h), None,
                                            input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter))
         event.wait()
+    
+    def k_test(self, value):
+        event = self.prg.k_test(self._queue, (1,), None, np.float32(value))
+        event.wait()
 #
 #
 #
@@ -484,7 +530,7 @@ def main():
     data_y = np.array([[0.0, 0.0, 0.0, 0.0],
                        [0.0, 0.0, 0.0, 0.0]]).astype(np.float32)
     data_a = np.array([8, 16, 32, 64]).astype(np.int32)
-    data_b = np.array([0.0, 0.0, 0.0, 0.0]).astype(np.float32)
+    data_b = np.array([0.0, 0.0, 0.0, 0.0]).astype(np.float64)
 
     print(data_x)
     print(data_w)
@@ -493,42 +539,13 @@ def main():
     platform_id = 0
     device_id = 1
     g = Gpu(platform_id, device_id)
-    
-    g.dev_malloc(data_x) # 0
-    g.dev_malloc(data_w) # 1
-    g.dev_malloc(data_y) # 2
-    g.dev_malloc(data_a) # 3
-    g.dev_malloc(data_b) # 4
-    
     g.set_kernel_code()
-    bufs = g.get_buffer_list()
-
-    num_node = data_w.shape[0]
-    num_input =  data_w[0].shape[0]
-    
-    stride = num_input / 2
-    left = num_input % 2
-    
-    print("num=%d, stride=%d, left=%d" % (num_input, stride, left))
-    #g.k_sum(bufs[1], bufs[4], stride, left, 0, num_input, num_node)
-    g.k_sum(bufs[1], bufs[4], num_input, num_node, 0, 1)
-
-    #g.testp(bufs[0], num, bufs[4], num)
-    #g.k_sum(bufs[0], bufs[4], stride, left)
-    #g.multiple_x_by_w(bufs[0], bufs[1], bufs[2], num)
-    #g.read(data_y, bufs[2])
-    #print data_y
-    #data_y[0][0]=0.999
-    #print data_y
-    
-    #g.scale(bufs[3], bufs[4], 255.0, 4)
-    #g.read(data_x, bufs[4])
-    #print data_x
-    
-    #g.write(bufs[2], data_a)
     #
-    #for row in data_y:
-    #    print np.sum(row)
+    p = 0.0
+    for i in range(100):
+        g.k_test(p)
+        p = p + 1.0
+    #
     return 0
 #
 #

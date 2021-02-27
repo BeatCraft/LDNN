@@ -362,6 +362,7 @@ class HiddenLayer(Layer):
         #self.dy = np.zeros(self._num_node, dtype=np.float32)
         self.dx = np.zeros(self._num_input, dtype=np.float32)
         self.dw = np.zeros((self._num_node, self._num_input), dtype=np.float32)
+        self._scale = 0
         #self._error_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
     
     def prepare(self, batch_size):
@@ -405,7 +406,9 @@ class HiddenLayer(Layer):
         activation = 0 # 0 : relu, 1 : skip
         self._gpu.sum(self._gpu_product, self._gpu_output,
                         self._num_input, self._num_node, activation, self._batch_size)
-        self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
+        if self._scale:
+            self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
+        #
         
     def back_propagate(self, error_array, debug=0):
         if debug:
@@ -510,9 +513,10 @@ class OutputLayer(Layer):
         #
         self._gpu.softmax(self._gpu_output, self._num_node, self._batch_size)
         #
+        debug = 0
         if debug:
             self._gpu.copy(self._output_array, self._gpu_output)
-            print(self._output_array)
+            print(self._output_array[0])
         #
         
     def back_propagate(self, t_array, debug=0):
@@ -788,14 +792,20 @@ class Roster:
         self._remote = remote
 
     def prepare(self, batch_size, data_size, num_class):
+        print("Roster:prepare(%d, %d, %d)" %(batch_size, data_size, num_class))
         self.num_class = num_class
         self._batch_size = batch_size
         #
         if self._gpu:
-            self._batch_data = np.zeros((batch_size, data_size), dtype=np.float32)
+            self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.float32)
             self._gpu_input = self._gpu.dev_malloc(self._batch_data)
+            #
             self._batch_class = np.zeros(batch_size, dtype=np.int32)
             self._gpu_labels = self._gpu.dev_malloc(self._batch_class)
+            # ce test
+            self._labels_2 = np.zeros((batch_size, num_class), dtype=np.float32)
+            self._gpu_labels_2 = self._gpu.dev_malloc(self._labels_2)
+            #
             self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
             self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
         #
@@ -803,12 +813,18 @@ class Roster:
             layer.prepare(batch_size)
         #
         
-    def set_data(self, data, data_size, label, batch_size):
+    def set_data(self, data, data_size, label, batch_size, scale=0):
         self._gpu.copy(self._gpu_input, data)
-        self._gpu.copy(self._gpu_labels, label)
-        #
+        #print self._labels_2.shape
+        #print label.shape
+        #self._gpu.copy(self._gpu_labels, label)
+        self._gpu.copy(self._gpu_labels_2, label)
         layer = self.getLayerAt(0) # input layer
-        layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0), layer._num_node, batch_size, 0)
+        if scale:
+            #print("scale=%d" % (scale))
+            layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0), layer._num_node, batch_size, 0)
+        else:
+            self._gpu.copy(layer._gpu_output, data)
         #
             
     def init_weight(self):
@@ -954,12 +970,21 @@ class Roster:
     def get_cross_entropy(self):
         c = self.countLayers()
         output = self.getLayerAt(c-1)
-        self._gpu.k_cross_entropy(output._gpu_output, self._gpu_entropy,
-                                  self._gpu_labels, self.num_class, self._batch_size)
+#        self._gpu.k_cross_entropy(output._gpu_output, self._gpu_entropy,
+#                                  self._gpu_labels, self.num_class, self._batch_size)
+        #
+        self._gpu.cross_entropy(output._gpu_output, self._gpu_labels_2, self._gpu_entropy,
+                                self.num_class, self._batch_size)
+        #
         self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
+        print self._batch_cross_entropy
         #
         s = np.sum(self._batch_cross_entropy)
         s = s/float(self._batch_size)
+        return s
+        #
+        #
+        #
         if np.isnan(s):
             for i in range(self._batch_size):
                 li = c-1
@@ -975,6 +1000,7 @@ class Roster:
                 #
             #
         #
+        print("bsize=%d, s=%f" % (self._batch_size, s))
         return s
     
     def export_weight(self, path):

@@ -34,7 +34,7 @@ sys.setrecursionlimit(10000)
 #
 def test(r, pack):
     pack.load_batch()
-    batch_size = 10#package._test_batch_size
+    batch_size = package._test_batch_size
     data_size = pack._image_size
     num_class = pack._num_class
     #
@@ -110,15 +110,17 @@ def unit_test(r, pack):
     r.prepare(n, data_size, num_class)
     data_array = np.zeros((n, data_size), dtype=np.float32)
     class_array = np.zeros(n, dtype=np.int32)
-    
+    #
+    class_array_2 = np.zeros((n, data_size), dtype=np.float32)
     for j in range(n):
         data_array[j] = pack._train_image_batch[j]
-        class_array[j] = pack._train_label_batch[+j]
+        class_array[j] = pack._train_label_batch[j]
+        #
+        k = pack._train_label_batch[j]
+        class_array_2[j][k] = 1.0
     #
-    #print(data_array)
-    #print(class_array)
-    #
-    r.set_data(data_array, data_size, class_array, n)
+    #r.set_data(data_array, data_size, class_array, n)
+    r.set_data(data_array, data_size, class_array_2, n)
     r.propagate(-1, -1, -1, -1, 0)
     answes = r.get_answer()
     print(answes)
@@ -145,19 +147,31 @@ def test_n(r, pack, n):
     r.prepare(n, data_size, num_class)
     data_array = np.zeros((n, data_size), dtype=np.float32)
     class_array = np.zeros(n, dtype=np.int32)
+    class_array_2 = np.zeros((n, num_class), dtype=np.float32)
     #
     for i in range(it):
+        class_array_2 = class_array_2*0.0
         for j in range(n):
-            #tmp = package._train_image_batch[i*n+j]
             data_array[j] = pack._train_image_batch[i*n+j]
             class_array[j] = pack._train_label_batch[i*n+j]
+            k = pack._train_label_batch[i*n+j]
+            class_array_2[j][k] = 1.0
+            #print k
+            #print class_array_2[j]
         #
-        r.set_data(data_array, data_size, class_array, n)
-        r.propagate(-1, -1, -1, -1, 0)
+        scale = 1
+        r.set_data(data_array, data_size, class_array_2, n, scale)
+        r.propagate()
+        #ce = r.get_cross_entropy()
+        #print("CE = %f" % (ce))
+        #
         answes = r.get_answer()
-        for k in range(n):
-            ans = answes[k]
-            label = class_array[k]
+        for j in range(n):
+            ans = answes[j]
+            #print ans
+            #print class_array_2[j]
+            label = class_array[j]
+            #print label
             rets[ans] = rets[ans] + 1
             dist[label] = dist[label] + 1
             if ans == label:
@@ -181,8 +195,26 @@ def test_n(r, pack, n):
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
     print("time = %s" % (t))
-
-        
+    #
+    #r.propagate()
+    
+    c = r.countLayers()
+    layer = r.getLayerAt(c-1)
+    layer._gpu.copy(layer._output_array, layer._gpu_output)
+    print(layer._output_array[9])
+    
+    layer._gpu.copy(layer._pre._output_array, layer._pre._gpu_output)
+    print(layer._pre._output_array[9])
+    #print(layer._weight_matrix[5])
+    
+    layer._gpu.copy(layer._product_matrix, layer._gpu_product)
+    print(layer._product_matrix[9][5])
+    print sum(layer._product_matrix[9][5])
+                 
+    
+    
+#    ce = r.get_cross_entropy()
+#    print("CE = %f" % (ce))
 #
 #
 #

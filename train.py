@@ -309,8 +309,16 @@ class Train:
         data_size = pack._image_size
         num_class = pack._num_class
         r.prepare(mini_batch_size, data_size, num_class)
-        self.set_mini_batch(0)
-        r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
+        #
+        #self.set_mini_batch(mini_batch_size)
+        
+        labels = np.zeros((mini_batch_size, num_class), dtype=np.float32)
+        for j in range(mini_batch_size):
+            k = pack._train_label_batch[j]
+            labels[j][k] = 1.0
+        #
+        r.set_data(self._data_array, data_size, labels, mini_batch_size)
+        #r.set_data(self._data_array, data_size, self._class_array, mini_batch_size)
         r.propagate()
         ce = r.get_cross_entropy()
         print("CE=%f" % (ce))
@@ -323,6 +331,8 @@ class Train:
         #
         it = 50
         kt = [1, 0.1, 0.01, 0.001, 0.01, 0.1]
+        #kt = [1, 0.5, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.00390625, 0.001953125, 0.0009765625,]
+        # 1*2**(-k)
         k = 0
         for j in range(it):
             for i in range(100):

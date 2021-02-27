@@ -33,24 +33,6 @@ class Train:
         self._batch_size = size
         #
     
-    def get_weight_list_by_mbid(self, mbid):
-        w_list = []
-        r = self._r
-        #
-        c = r.countLayers()
-        for i in range(1, c):
-            layer = r.getLayerAt(i)
-            for ni in range(layer._num_node):
-                for ii in range(layer._num_input):
-                    id = layer.get_weight_mbid(ni, ii)
-                    if id==mbid:
-                        w_list.append((i, ni, ii))
-                    #
-                #
-            #
-        #
-        return w_list
-        
     def make_w_list(self):
         self._w_list  = []
         r = self._r

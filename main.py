@@ -64,8 +64,6 @@ def main():
         t.loop()
     elif mode==1: # test
         test.test_n(r, pack, 500)
-    elif mode==2: #
-        test.unit_test(r, pack)
     else:
         print("mode error : %d" % (mode))
         return 0

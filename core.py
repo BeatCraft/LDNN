@@ -118,44 +118,23 @@ class Layer(object):
         self._id = -1
         self._num_input = num_input
         self._num_node = num_node
-        #
-        self._node_marker = np.zeros( (self._num_node), dtype=np.int32)
-        #
-        self._num_update = 0
     
-    def count_locked_weight(self):
-        cnt = 0
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                if self._weight_lock[ni][ii]==1:
-                    cnt = cnt + 1
-                #
-            #
-        #
-        return cnt
+#    def count_locked_weight(self):
+#        cnt = 0
+#        for ni in range(self._num_node):
+#            for ii in range(self._num_input):
+#                if self._weight_lock[ni][ii]==1:
+#                    cnt = cnt + 1
+#                #
+#            #
+#        #
+#        return cnt
         
     def count_weight(self):
         return self._num_node*self._num_input
         
     def get_pre_layer(self):
         return self._pre
-        
-    def set_marker_pre(self, ni, v):
-        if self._pre:
-            self._pre.set_marker(ni, v)
-        #
-            
-    def set_marker(self, ni, v):
-        self._node_marker[ni] = v
-
-    def get_marker(self, ni):
-        return self._node_marker[ni]
-
-    def set_num_update(self, n):
-        self._num_update = n
-    
-    def get_num_update(self):
-        return self._num_update
         
     def prepare(self, batch_size):
         pass
@@ -179,51 +158,31 @@ class Layer(object):
     def get_weight_index(self, ni, ii):
         return self._weight_index_matrix[ni][ii]
     
-    def get_weight_property(self, ni, ii):
-        return self._weight_property[ni][ii]
-    
-    def set_weight_property(self, ni, ii, p):
-        self._weight_property[ni][ii] = p
-
-    def reset_weight_property_all(self):
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                self.set_weight_property(ni, ii, 0)
-            #
-        #
-
-    def get_weight_lock(self, ni, ii):
-        return self._weight_lock[ni][ii]
-    
-    def set_weight_lock(self, ni, ii, l):
-        self._weight_lock[ni][ii] = l
-  
-    def get_weight_mbid(self, ni, ii):
-        return self._weight_mbid[ni][ii]
-    
-    def set_weight_mbid(self, ni, ii, mbid):
-        self._weight_mbid[ni][ii] = mbid
-    
-    def reset_weight_mbid(self):
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                self.set_weight_mbid(ni, ii, 0)
-            #
-        #
-    
-    def assign_weight_mbid_random(self, max):
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                mbid = random.randrange(max)
-                self.set_weight_mbid(ni, ii, mbid)
-            #
-        #
-    def unlock_weight_all(self):
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                self.set_weight_lock(ni, ii, 0)
-            #
-        #
+#    def get_weight_property(self, ni, ii):
+#        return self._weight_property[ni][ii]
+#
+#    def set_weight_property(self, ni, ii, p):
+#        self._weight_property[ni][ii] = p
+#
+#    def reset_weight_property_all(self):
+#        for ni in range(self._num_node):
+#            for ii in range(self._num_input):
+#                self.set_weight_property(ni, ii, 0)
+#            #
+#        #
+#
+#    def get_weight_lock(self, ni, ii):
+#        return self._weight_lock[ni][ii]
+#
+#    def set_weight_lock(self, ni, ii, l):
+#        self._weight_lock[ni][ii] = l
+#
+#    def unlock_weight_all(self):
+#        for ni in range(self._num_node):
+#            for ii in range(self._num_input):
+#                self.set_weight_lock(ni, ii, 0)
+#            #
+#        #
     
     def set_weight_index(self, ni, ii, wi): # wi : weight index
         self._weight_index_matrix[ni][ii] = wi
@@ -237,13 +196,13 @@ class Layer(object):
             #
         #
 
-    def init_weight_with_random_float(self):
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                self._weight_matrix[ni][ii] = random.normalvariate(0.0, 0.2)
-            #
-        #
-        #print self._weight_matrix[0][0]
+#    def init_weight_with_random_float(self):
+#        for ni in range(self._num_node):
+#            for ii in range(self._num_input):
+#                self._weight_matrix[ni][ii] = random.normalvariate(0.0, 0.2)
+#            #
+#        #
+#        #print self._weight_matrix[0][0]
     
     def import_weight_matrix(self, data):
         return None
@@ -279,8 +238,8 @@ class InputLayer(Layer):
         print("InputLayer::__init__()")
         super(InputLayer, self).__init__(i, LAYER_TYPE_INPUT, num_input, num_node, pre, gpu)
         
-    def count_locked_weight(self):
-        return 0
+ #   def count_locked_weight(self):
+ #       return 0
         
     def prepare(self, batch_size):
         self._batch_size = batch_size
@@ -292,27 +251,24 @@ class InputLayer(Layer):
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         pass
-    
-    def get_num_update(self):
-        return 0
 
-    def get_weight_property(self, ni, ii):
-        return 0
-        
-    def set_weight_property(self, ni, ii, wi):
-        pass
-    
-    def reset_weight_property_all(self):
-        pass
-            
-    def get_weight_lock(self, ni, ii):
-        return 0
-
-    def set_weight_lock(self, ni, ii, lock):
-        pass
-        
-    def unlock_weight_all(self):
-        pass
+#    def get_weight_property(self, ni, ii):
+#        return 0
+#
+#    def set_weight_property(self, ni, ii, wi):
+#        pass
+#
+#    def reset_weight_property_all(self):
+#        pass
+#
+#    def get_weight_lock(self, ni, ii):
+#        return 0
+#
+#    def set_weight_lock(self, ni, ii, lock):
+#        pass
+#
+#    def unlock_weight_all(self):
+#        pass
     
     def set_weight_index(self, ni, ii, wi):
         pass
@@ -330,18 +286,13 @@ class InputLayer(Layer):
         
     def export_weight_index(self):
         return None
-
-    def set_weight_mbid(self, ni, ii, mbid):
-        pass
-        
-    def get_weight_mbid(self, ni, ii):
-        pass
         
     def count_weight(self):
         return 0
         
-    def init_weight_with_random_float(self):
-        pass
+#    def init_weight_with_random_float(self):
+#        pass
+
 #
 #
 #
@@ -351,9 +302,9 @@ class HiddenLayer(Layer):
         super(HiddenLayer, self).__init__(i, LAYER_TYPE_HIDDEN, num_input, num_node, pre, gpu)
         #
         self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_mbid = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+#        self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+#        self._weight_mbid = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+#        self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
         #
         if gpu:
@@ -455,9 +406,9 @@ class OutputLayer(Layer):
         super(OutputLayer, self).__init__(i, LAYER_TYPE_OUTPUT, num_input, num_node, pre, gpu)
         #
         self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_mbid = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+#        self._weight_lock = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+#        self._weight_mbid = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+#        self._weight_property = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
         #
         if gpu:
@@ -593,26 +544,26 @@ class MaxLayer(Layer):
         super(MaxLayer, self).__init__(i, LAYER_TYPE_MAX, num_input, num_node, pre, gpu)
         #
 
-    def get_num_update(self):
-        return 0
+#    def get_num_update(self):
+#        return 0
 
-    def get_weight_property(self, ni, ii):
-        return 0
-        
-    def set_weight_property(self, ni, ii, wi):
-        pass
-    
-    def reset_weight_property_all(self):
-        pass
-    
-    def get_weight_lock(self, ni, ii):
-        return 0
-        
-    def set_weight_lock(self, ni, ii, lock):
-        pass
-    
-    def unlock_weight_all(self):
-        pass
+#    def get_weight_property(self, ni, ii):
+#        return 0
+#
+#    def set_weight_property(self, ni, ii, wi):
+#        pass
+#
+#    def reset_weight_property_all(self):
+#        pass
+#
+#    def get_weight_lock(self, ni, ii):
+#        return 0
+#
+#    def set_weight_lock(self, ni, ii, lock):
+#        pass
+#
+#    def unlock_weight_all(self):
+#        pass
     
     def set_weight_index(self, ni, ii, wi):
         pass
@@ -635,8 +586,8 @@ class MaxLayer(Layer):
     def count_weight(self):
         return 0
     
-    def count_locked_weight(self):
-        return 0
+#    def count_locked_weight(self):
+#        return 0
         
     def prepare(self, batch_size):
         print("MaxLayer::prepare()")
@@ -655,14 +606,15 @@ class MaxLayer(Layer):
         #
 #        self._gpu.copy(self._output_array, self._gpu_output)
 #        print self._output_array
-    def set_weight_mbid(self, ni, ii, mbid):
-        pass
+
+#    def set_weight_mbid(self, ni, ii, mbid):
+#        pass
         
-    def get_weight_mbid(self, ni, ii):
-        pass
+#    def get_weight_mbid(self, ni, ii):
+#        pass
         
-    def init_weight_with_random_float(self):
-        pass
+#    def init_weight_with_random_float(self):
+#        pass
 
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
@@ -679,9 +631,9 @@ class Conv_4_Layer(Layer):
 
         # mems for weights
         self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_lock = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_mbid = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_property = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+#        self._weight_lock = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+#        self._weight_mbid = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+#        self._weight_property = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
         self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
         #
         if self._gpu:
@@ -778,7 +730,7 @@ class Roster:
     def __init__(self, mode=0):
         self._weight_list = []
         self._gpu = None
-        self._remote = None
+#        self._remote = None
         self.layers = []
         self._batch_size = 1
         self._mode = mode # 0 : quontized, 1 : float
@@ -787,9 +739,9 @@ class Roster:
         self._gpu = gpu
         self._remote = None
         
-    def set_remote(self, remote):
-        self._gpu = None
-        self._remote = remote
+ #   def set_remote(self, remote):
+ #       self._gpu = None
+ #       self._remote = remote
 
     def prepare(self, batch_size, data_size, num_class):
         print("Roster:prepare(%d, %d, %d)" %(batch_size, data_size, num_class))
@@ -819,7 +771,7 @@ class Roster:
         #print label.shape
         #self._gpu.copy(self._gpu_labels, label)
         self._gpu.copy(self._gpu_labels_2, label)
-        layer = self.getLayerAt(0) # input layer
+        layer = self.get_layer_at(0) # input layer
         if scale:
             #print("scale=%d" % (scale))
             layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0), layer._num_node, batch_size, 0)
@@ -829,9 +781,9 @@ class Roster:
             
     def init_weight(self):
         print("Roster : init_weight(%d)" % (self._mode))
-        c = self.countLayers()
+        c = self.count_layers()
         for i in range(c):
-            layer = self.getLayerAt(i)
+            layer = self.get_layer_at(i)
             type = layer.get_type()
             if type==LAYER_TYPE_MAX or type==LAYER_TYPE_INPUT:
                 pass
@@ -845,51 +797,51 @@ class Roster:
         #
 
     def reset_weight_property(self, p=0):
-        c = self.countLayers()
+        c = self.count_layers()
         for i in range(1, c):
-            layer = self.getLayerAt(i)
+            layer = self.get_layer_at(i)
             layer.reset_weight_property_all()
         #
 
-    def count_locked_weight(self):
-        cnt = 0
-        c = self.countLayers()
-        for i in range(1, c):
-            layer = self.getLayerAt(i)
-            cnt = cnt + layer.count_locked_weight()
-        #
-        return cnt
+#    def count_locked_weight(self):
+#        cnt = 0
+#        c = self.count_layers()
+#        for i in range(1, c):
+#            layer = self.get_layer_at(i)
+#            cnt = cnt + layer.count_locked_weight()
+#        #
+#        return cnt
     
     def count_weight(self):
         cnt = 0
-        c = self.countLayers()
+        c = self.count_layers()
         for i in range(1, c):
-            layer = self.getLayerAt(i)
+            layer = self.get_layer_at(i)
             cnt = cnt + layer.count_weight()
         #
         return cnt
 
-    def reset_weight_mbid(self):
-        c = self.countLayers()
-        for i in range(1, c):
-            layer = self.getLayerAt(i)
-            layer.reset_weight_mbid()
-        #
+#    def reset_weight_mbid(self):
+#        c = self.count_layers()
+#        for i in range(1, c):
+#            layer = self.get_layer_at(i)
+#            layer.reset_weight_mbid()
+#        #
     #
-    def assign_weight_mbid(self, mbsize):
-        c = self.countLayers()
-        for i in range(1, c):
-            layer = self.getLayerAt(i)
-            layer.assign_weight_mbid_random(mbsize)
-        #
+#    def assign_weight_mbid(self, mbsize):
+#        c = self.count_layers()
+#        for i in range(1, c):
+#            layer = self.get_layer_at(i)
+#            layer.assign_weight_mbid_random(mbsize)
+#        #
     #
 
-    def unlock_weight_all(self):
-        c = self.countLayers()
-        for i in range(1, c):
-            layer = self.getLayerAt(i)
-            layer.unlock_weight_all()
-        #
+#    def unlock_weight_all(self):
+#        c = self.count_layers()
+#        for i in range(1, c):
+#            layer = self.get_layer_at(i)
+#            layer.unlock_weight_all()
+#        #
 
     def update_weight(self):
         for layer in self.layers:
@@ -900,28 +852,28 @@ class Roster:
         return len(self.layers)
 
     # this should be obsolute
-    def countLayers(self):
-        return len(self.layers)
+#    def count_layers(self):
+#        return len(self.layers)
 
     def get_layers(self):
-        if self.countLayers() == 0:
+        if self.count_layers() == 0:
             return 0
         #
         return self.layers
 
-    def getLayerAt(self, i):
-        return self.get_layer_at(i)
+#    def getLayerAt(self, i):
+#        return self.get_layer_at(i)
     
     def get_layer_at(self, i):
-        c = self.countLayers()
+        c = self.count_layers()
         if i>=c:
-            print("error : Roster : getLayerAt")
+            print("error : Roster : get_layer_at")
             return None
         #
         return self.layers[i]
 
     def add_layer(self, type, num_input, num_node):
-        c = self.countLayers()
+        c = self.count_layers()
         if type==LAYER_TYPE_INPUT:
             layer = InputLayer(c, num_input, num_node, self._gpu)
             self.layers.append(layer)
@@ -942,15 +894,15 @@ class Roster:
             return
  
     def get_inference(self):
-        c = self.countLayers()
-        output = self.getLayerAt(c-1)
+        c = self.count_layers()
+        output = self.get_layer_at(c-1)
         output._gpu.copy(output._output_array, output._gpu_output)
         return output._output_array
 
     def get_answer(self):
         ret = []
-        c = self.countLayers()
-        output = self.getLayerAt(c-1)
+        c = self.count_layers()
+        output = self.get_layer_at(c-1)
         output._gpu.copy(output._output_array, output._gpu_output)
         #
         for i in range(self._batch_size):
@@ -968,8 +920,8 @@ class Roster:
         return ret
     
     def get_cross_entropy(self):
-        c = self.countLayers()
-        output = self.getLayerAt(c-1)
+        c = self.count_layers()
+        output = self.get_layer_at(c-1)
 #        self._gpu.k_cross_entropy(output._gpu_output, self._gpu_entropy,
 #                                  self._gpu_labels, self.num_class, self._batch_size)
         #
@@ -988,7 +940,7 @@ class Roster:
                 if np.isnan(self._batch_cross_entropy[i]):
                     print("NaN : %d" % (i))
                     for li in range(c):
-                        output = self.getLayerAt(li)
+                        output = self.get_layer_at(li)
                         self._gpu.copy(output._output_array, output._gpu_output)
                         print("layer : %d" % (li))
                         print(output._output_array[i].shape)
@@ -1011,9 +963,9 @@ class Roster:
     def export_weight_matrix(self, path):
         print("Roster : export_weight_matrix(%s)" % path)
         ma_list = []
-        c = self.countLayers()
+        c = self.count_layers()
         for i in range(c):
-            layer = self.getLayerAt(i)
+            layer = self.get_layer_at(i)
             ma = layer.export_weight_matrix()
             if ma is None:
                 pass
@@ -1029,9 +981,9 @@ class Roster:
         print("Roster : export_weight_index(%s)" % path)
         with open(path, "w") as f:
             writer = csv.writer(f, lineterminator='\n')
-            c = self.countLayers()
+            c = self.count_layers()
             for i in range(1, c):
-                layer = self.getLayerAt(i)
+                layer = self.get_layer_at(i)
                 #print "%d : %d" % (i, layer.get_type())
                 data = layer.export_weight_index()
                 if data:
@@ -1056,9 +1008,9 @@ class Roster:
         #
         print(len(ma_list))
         j = 0
-        c = self.countLayers()
+        c = self.count_layers()
         for i in range(c):
-            layer = self.getLayerAt(i)
+            layer = self.get_layer_at(i)
             type = layer.get_type()
             if type==LAYER_TYPE_INPUT or type==LAYER_TYPE_MAX:
                 continue
@@ -1075,9 +1027,9 @@ class Roster:
         print("Roster : import_weight_index(%s)" % path)
         with open(path, "r") as f:
             reader = csv.reader(f)
-            lc = self.countLayers()
+            lc = self.count_layers()
             for i in range(1, lc):
-                layer = self.getLayerAt(i)
+                layer = self.get_layer_at(i)
                 type = layer.get_type()
                 if type==LAYER_TYPE_INPUT or type==LAYER_TYPE_MAX:
                     continue
@@ -1099,10 +1051,10 @@ class Roster:
         # with
 
     def propagate(self, li=-1, ni=-1, ii=-1, wi=-1, debug=0):
-        c = self.countLayers()
-        pre = self.getLayerAt(0)
+        c = self.count_layers()
+        pre = self.get_layer_at(0)
         for i in range(1, c):
-            layer = self.getLayerAt(i)
+            layer = self.get_layer_at(i)
             if i==li: # alt
                 layer.propagate(pre._gpu_output, ni, ii, wi, debug)
             else: # propagation
@@ -1112,17 +1064,17 @@ class Roster:
         #
         
     def back_propagate(self, t_array, debug=0):
-        c = self.countLayers()
+        c = self.count_layers()
         for i in reversed(range(c)):
-            layer = self.getLayerAt(i)
+            layer = self.get_layer_at(i)
             layer.back_propagate(t_array, debug)
         #
         return
         
-        output = self.getLayerAt(c-1)
+        output = self.get_layer_at(c-1)
         output.back_propagate(t_array, debug)
         #
-        layer = self.getLayerAt(c-2)
+        layer = self.get_layer_at(c-2)
         layer.back_propagate(t_array, debug)
 #
 #

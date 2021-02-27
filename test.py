@@ -27,8 +27,7 @@ sys.setrecursionlimit(10000)
 #
 #
 #
-
-def print_result(ca, eval_size, class_num, dist, rets, oks):
+def print_result(ca, eval_size, num_class, dist, rets, oks):
     print("---------------------------------")
     print("result : %d / %d" % (ca, eval_size))
     accuracy = float(ca) / float(eval_size)
@@ -36,7 +35,7 @@ def print_result(ca, eval_size, class_num, dist, rets, oks):
     print("---------------------------------")
     print("class\t|dist\t|infs\t|ok")
     print("---------------------------------")
-    for i in range(10):
+    for i in range(num_class):
         print("%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i]))
     #
     print("---------------------------------")
@@ -69,8 +68,6 @@ def test_n(r, pack, n):
             class_array[j] = pack._train_label_batch[i*n+j]
             k = pack._train_label_batch[i*n+j]
             class_array_2[j][k] = 1.0
-            #print k
-            #print class_array_2[j]
         #
         scale = 1
         r.set_data(data_array, data_size, class_array_2, n, scale)
@@ -88,17 +85,7 @@ def test_n(r, pack, n):
         #
     #
     ca = sum(oks)
-    print("---------------------------------")
-    print("result : %d / %d" % (ca, eval_size))
-    accuracy = float(ca) / float(eval_size)
-    print("accuracy : %f" % (accuracy))
-    print("---------------------------------")
-    print("class\t|dist\t|infs\t|ok")
-    print("---------------------------------")
-    for i in range(num_class):
-        print("%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i]))
-    #
-    print("---------------------------------")
+    print_result(ca, eval_size, num_class, dist, rets, oks)
     #
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
@@ -107,73 +94,7 @@ def test_n(r, pack, n):
     #r.propagate()
     ce = r.get_cross_entropy()
     print("CE = %f" % (ce))
-#
-#
-#
-def test_single(r, pack, bi):
-    pack.load_batch()
-    data_size = pack._image_size
-    num_class = pack._num_class
-    eval_size = pack._test_batch_size #
-    dist = np.zeros(num_class, dtype=np.int32)
-    rets = np.zeros(num_class, dtype=np.int32)
-    oks = np.zeros(num_class, dtype=np.int32)
-    print(">>batch test mode (%d)" % (eval_size))
-    #
-    data_array = np.zeros((1, data_size), dtype=np.float32)
-    class_array = np.zeros(1, dtype=np.int32)
-    batch_size = 1
-    r.prepare(batch_size, data_size, num_class)
-    #
-    start_time = time.time()
-    ca = 0
-    for i in range(eval_size):
-        if i%100==0:
-            print(i)
-        #i = 60
-        data_array[0] = pack._test_image_batch[i]
-        answer = pack._test_label_batch[i]
-        class_array[0] = answer
-        r.set_data(data_array, data_size, class_array, 1)
-        r.propagate(-1, -1, -1, -1, 0)
-        infs = r.get_inference()
-        dist[answer] = dist[answer] + 1
-        inf = infs[0]
-        #print inf
-        #
-        index = -1
-        mx = max(inf)
-        if mx>0.0:
-            for k in range(10):
-                if inf[k] == mx:
-                    index = k
-                #
-            #
-        #
-        #if index>0:
-        #    print i
-        #
-        rets[index] = rets[index] + 1
-        if index==answer:
-            oks[index] = oks[index] +1
-            ca = ca + 1
-        #
-    #
-    print("---------------------------------")
-    print("result : %d / %d" % (ca, eval_size))
-    accuracy = float(ca) / float(eval_size)
-    print("accuracy : %f" % (accuracy))
-    print("---------------------------------")
-    print("class\t|dist\t|infs\t|ok")
-    print("---------------------------------")
-    for i in range(10):
-        print("%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i]))
-    #
-    print("---------------------------------")
-    #
-    elapsed_time = time.time() - start_time
-    t = format(elapsed_time, "0")
-    print("time = %s" % (t))
+
     
 
 

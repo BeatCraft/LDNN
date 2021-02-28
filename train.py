@@ -36,9 +36,9 @@ class Train:
     def make_w_list(self):
         self._w_list  = []
         r = self._r
-        c = r.countLayers()
+        c = r.count_layers()
         for li in range(1, c):
-            layer = r.getLayerAt(li)
+            layer = r.get_layer_at(li)
             type = layer.get_type()
             if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT or type==core.LAYER_TYPE_CONV_4:
                 for ni in range(layer._num_node):
@@ -57,7 +57,7 @@ class Train:
         ii = w[2]
         #
         r = self._r
-        layer = r.getLayerAt(li)
+        layer = r.get_layer_at(li)
         wi = layer.get_weight_index(ni, ii)
         wi_alt = wi
         maximum = core.WEIGHT_INDEX_MAX
@@ -110,7 +110,7 @@ class Train:
             layer.set_weight_index(ni, ii, wi_alt)
         #
         
-        c =r.countLayers()
+        c =r.count_layers()
         for li in range(c):
             layer = r.get_layer_at(li)
             layer.update_weight()

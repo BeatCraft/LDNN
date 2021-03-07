@@ -74,13 +74,11 @@ class Train:
         #
         return wi, wi_alt
 
-    def multi_attack(self, ce, mode=1, kt=0):
-        r = self._r
-        pack = self._package
-        #
-        loop_n = 20
-        w_num = self.make_w_list()
-        attack_num = int(w_num/100*kt) # 1%
+    def make_attack_list(self, div, mode):
+        w_num = len(self._w_list)
+        attack_num = int(w_num/100*div) # 1% min
+        if attack_num<1:
+            attack_num = 0
         #
         attack_list = []
         for i in range(attack_num*10):
@@ -97,6 +95,36 @@ class Train:
                 attack_list.append((attack_i, wi, wi_alt))
             #
         #
+        return attack_list
+
+    def undo_attack(self, attack_list):
+        r = self._r
+        for wt in attack_list:
+            attack_i = wt[0]
+            wi = wt[1]
+            wi_alt = wt[2]
+            w = self._w_list[attack_i]
+            li = w[0]
+            ni = w[1]
+            ii = w[2]
+            #
+            layer = r.get_layer_at(li)
+            layer.set_weight_index(ni, ii, wi)
+        #
+        c = r.count_layers()
+        for li in range(c):
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+        
+    def multi_attack(self, ce, mode=1, kt=0):
+        r = self._r
+        pack = self._package
+        #
+        loop_n = 20
+        #w_num = self.make_w_list()
+        attack_list = self.make_attack_list(kt, mode)
+        #
         for wt in attack_list:
             attack_i = wt[0]
             wi = wt[1]
@@ -110,34 +138,21 @@ class Train:
             layer.set_weight_index(ni, ii, wi_alt)
         #
         
-        c =r.count_layers()
+        c = r.count_layers()
         for li in range(c):
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
         r.propagate()
         ce_alt = r.get_cross_entropy()
+        ret = 0
         if ce_alt<ce:
             ce = ce_alt
+            ret = 1
         else:
-            for wt in attack_list:
-                attack_i = wt[0]
-                wi = wt[1]
-                wi_alt = wt[2]
-                w = self._w_list[attack_i]
-                li = w[0]
-                ni = w[1]
-                ii = w[2]
-                #
-                layer = r.get_layer_at(li)
-                layer.set_weight_index(ni, ii, wi)
-            #
-            for li in range(c):
-                layer = r.get_layer_at(li)
-                layer.update_weight()
-            #
+            self.undo_attack(attack_list)
         #
-        return ce
+        return ce, ret
 
     def loop(self):
         r = self._r
@@ -162,26 +177,53 @@ class Train:
         ce = r.get_cross_entropy()
         print("CE=%f" % (ce))
         #
+        #
+        #
         it = 50
-        kt = [1, 0.1, 0.01, 0.001, 0.01, 0.1]
+        w_num = self.make_w_list()
+        level = 0
+        l_max = int(math.log2(w_num/100)) + 1
+        l_cnts = [0] * l_max
+        step = 1
+#        kt = [1, 0.1, 0.01, 0.001, 0.01, 0.1]
         #kt = [1, 0.5, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.00390625, 0.001953125, 0.0009765625,]
         # 1*2**(-k)
-        k = 0
+        
         for j in range(it):
+            div = 1.0/float(2**(level))
+            cnt = 0
             for i in range(100):
-                ce = self.multi_attack(ce, 1, kt[k])
-                print("%d : H : %d : %f, %f" % (j, i, ce, kt[k]))
+                ce, ret = self.multi_attack(ce, 1, div)
+                cnt = cnt + ret
+                print("%d : H : %d : %f, %f" % (j, i, ce, div)
             #
             for i in range(100):
-                ce = self.multi_attack(ce, 0, kt[k])
-                print("%d : C : %d : %f, %f" % (j, i, ce, kt[k]))
+                ce, ret = self.multi_attack(ce, 0, div)
+                cnt = cnt + ret
+                print("%d : C : %d : %f, %f" % (j, i, ce, div)
             #
+#            if step:
+#                if level==l_max-1:
+#                    step
+            
+            
+            
+            
+
+#            for i in range(100):
+#                ce = self.multi_attack(ce, 1, kt[k])
+#                print("%d : H : %d : %f, %f" % (j, i, ce, kt[k]))
+#            #
+#            for i in range(100):
+#                ce = self.multi_attack(ce, 0, kt[k])
+#                print("%d : C : %d : %f, %f" % (j, i, ce, kt[k]))
+#            #
+#            if k==len(kt)-1:
+#                k = 0
+#            else:
+#                k = k+1
+#            #
             r.export_weight(pack.save_path())
-            if k==len(kt)-1:
-                k = 0
-            else:
-                k = k+1
-            #
         #
         return 0
 

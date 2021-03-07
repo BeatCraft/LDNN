@@ -298,17 +298,16 @@ class HiddenLayer(Layer):
             print("dy")
             print((dy.shape))
         #
-        #
+        
         # dw
-        #
         x = sum(self._pre._output_array) / float(self._num_input)
         for ni in range(self._num_node):
             for ii in range(self._num_input):
                 self.dw[ni][ii] = x[ii] * dy[ni]
             #
         #
+        
         # dx
-        #
         dx_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
         ww = sum(self._weight_matrix) / float(self._num_input)
         for ni in range(self._num_node):
@@ -316,6 +315,7 @@ class HiddenLayer(Layer):
                 dx_matrix[ni][ii] = ww[ii] * dy[ni]
             #
         #
+        
         self.dx = sum(dx_matrix) / float(self._num_node)
         if debug:
             print("dx")
@@ -529,7 +529,6 @@ class Conv_4_Layer(Layer):
 
         # output
         self._output_array = np.zeros((self._batch_size, self._filter, self._w*self._h), dtype=np.float32)
-        #
         if self._gpu:
             self._gpu_padded = self._gpu.dev_malloc(self._padded_array)
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
@@ -615,10 +614,6 @@ class Roster:
         if self._gpu:
             self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.float32)
             self._gpu_input = self._gpu.dev_malloc(self._batch_data)
-            #
-#            self._batch_class = np.zeros(batch_size, dtype=np.int32)
-#            self._gpu_labels = self._gpu.dev_malloc(self._batch_class)
-            # ce test
             self._labels = np.zeros((batch_size, num_class), dtype=np.float32)
             self._gpu_labels = self._gpu.dev_malloc(self._labels)
             #

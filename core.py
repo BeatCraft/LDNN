@@ -185,6 +185,9 @@ class Layer(object):
     
     def get_type(self):
         return self._type
+        
+    def reset(self):
+        pass
 #
 #
 #
@@ -520,6 +523,7 @@ class Conv_4_Layer(Layer):
         if self._gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
         #
+        self._cache = 0
         
     def prepare(self, batch_size):
         print("Conv_4_Layer::prepare(%d)" %(batch_size))
@@ -536,16 +540,19 @@ class Conv_4_Layer(Layer):
 
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
+       
+    def reset(self):
+        self._cache = 0
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
 #        print("Conv_4_Layer::propagate()")
-#        if self._cache:
-#            pass
-#        else:
-#            self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-#            self._cache = 1
+        if self._cache:
+            pass
+        else:
+            self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
+            self._cache = 1
         #
-        self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
+#        self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
         
         # ni : filetr index, 0 to num of filter -1
         # ii : index of matrix, 0 to 3*3*ch-1
@@ -624,9 +631,18 @@ class Roster:
             layer.prepare(batch_size)
         #
         
-    def set_data(self, data, data_size, label, batch_size, scale=0):
-        self._gpu.copy(self._gpu_input, data)
+        
+    def reset(self):
+        c = self.count_layers()
+        for i in range(c):
+            layer = self.get_layer_at(i)
+            layer.reset()
         #
+        
+    def set_data(self, data, data_size, label, batch_size, scale=0):
+        self.reset()
+        #
+        self._gpu.copy(self._gpu_input, data)
         self._gpu.copy(self._gpu_labels, label)
         layer = self.get_layer_at(0) # input layer
         if scale:

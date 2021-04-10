@@ -20,6 +20,7 @@ from mpi4py import MPI
 #
 import core
 import util
+import package
 import gpu
 import train
 import test
@@ -39,7 +40,7 @@ MINI_BATCH_START = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 100
 def get_host_id_by_name(name):
     return HOST_NAMES.index(name)
 
-def get_package_by_host_id(h):
+def get_platform_by_host_id(h):
     return PACKAGE_IDS[h]
     
 def get_device_by_host_id(h):
@@ -54,21 +55,19 @@ class worker(object):
         self._rank = self._com.Get_rank()
         self._size = self._com.Get_size()
         self._host_id = get_host_id_by_name(self._processor_name)
-        self._platform_id = get_package_by_host_id(self._host_id)
+        self._platform_id = get_platform_by_host_id(self._host_id)
         self._device_id = get_device_by_host_id(self._host_id)
         #
         self._gpu = gpu.Gpu(self._platform_id, self._device_id)
         self._gpu.set_kernel_code()
-        #
-        self._package = util.Package(package_id)
+        self._package = package.Package(package_id)
         self._roster = self._package.setup_dnn(self._gpu, config_id)
+        #
         self._package.load_batch()
         self._data_size = self._package._image_size
         self._num_class = self._package._num_class
-        #
         self._batch_size = MINI_BATCH_SIZE[self._rank]
         self._batch_start = MINI_BATCH_START[self._rank]
-        #
         self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
         self._class_array = np.zeros(self._batch_size , dtype=np.int32)
         self._roster.prepare(self._batch_size, self._data_size, self._num_class)

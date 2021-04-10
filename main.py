@@ -47,6 +47,7 @@ def main():
     config = int(argvs[4])
     mode = int(argvs[5])
     batch_size = int(argvs[6])
+    #
     print("platform_id=%d" % (platform_id))
     print("device_id=%d" % (device_id))
     print("package_id=%d" % (package_id))

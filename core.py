@@ -523,7 +523,7 @@ class Conv_4_Layer(Layer):
         if self._gpu:
             self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
         #
-        self._cache = 0
+        self._cache = 0 # cache for padding
         
     def prepare(self, batch_size):
         print("Conv_4_Layer::prepare(%d)" %(batch_size))
@@ -550,7 +550,7 @@ class Conv_4_Layer(Layer):
             pass
         else:
             self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-            self._cache = 1
+            self._cache = 1 # cache for padding
         #
 #        self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
         
@@ -630,14 +630,20 @@ class Roster:
         for layer in self.layers:
             layer.prepare(batch_size)
         #
-        
-        
-    def reset(self):
-        c = self.count_layers()
-        for i in range(c):
-            layer = self.get_layer_at(i)
-            layer.reset()
+    
+    def set_batch(self, pack, size, offset):
+        pack.load_batch()
+        data_array = np.zeros((size, pack._image_size), dtype=np.float32)
+        labels = np.zeros((size, pack._num_class), dtype=np.float32)
         #
+        self.prepare(size, pack._image_size, pack._num_class)
+        #
+        for j in range(size):
+            data_array[j] = pack._train_image_batch[offset+j]
+            k = pack._train_label_batch[offset+j]
+            labels[j][k] = 1.0
+        #
+        self.set_data(data_array, pack._image_size, labels, size, 1)
         
     def set_data(self, data, data_size, label, batch_size, scale=0):
         self.reset()
@@ -669,6 +675,14 @@ class Roster:
             #
         #
 
+    def reset(self):
+    # flush a batch depending cache when switching batches
+        c = self.count_layers()
+        for i in range(c):
+            layer = self.get_layer_at(i)
+            layer.reset()
+        #
+        
     def reset_weight_property(self, p=0):
         c = self.count_layers()
         for i in range(1, c):

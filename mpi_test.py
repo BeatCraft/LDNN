@@ -63,14 +63,23 @@ class worker(object):
         self._package = package.Package(package_id)
         self._roster = self._package.setup_dnn(self._gpu, config_id)
         #
-        self._package.load_batch()
-        self._data_size = self._package._image_size
-        self._num_class = self._package._num_class
         self._batch_size = MINI_BATCH_SIZE[self._rank]
         self._batch_start = MINI_BATCH_START[self._rank]
-        self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
-        self._class_array = np.zeros(self._batch_size , dtype=np.int32)
-        self._roster.prepare(self._batch_size, self._data_size, self._num_class)
+        self._roster.set_batch(self._package , self._batch_size, self._batch_start)
+        #
+        #
+        #
+        #
+#        self._package.load_batch()
+#        self._data_size = self._package._image_size
+#        self._num_class = self._package._num_class
+#        self._batch_size = MINI_BATCH_SIZE[self._rank]
+#        self._batch_start = MINI_BATCH_START[self._rank]
+#        self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
+#        self._class_array = np.zeros(self._batch_size , dtype=np.int32)
+#        self._roster.prepare(self._batch_size, self._data_size, self._num_class)
+        #
+        #
         #
         if self._rank==0:
             self._w_list = []
@@ -84,13 +93,13 @@ class worker(object):
         print("rank=%d" % (self._rank ))
         print("size=%d" % (self._size ))
 
-    def set_batch(self):
-        print("[%d] bsize = %d, start = %d" % (self._rank, self._batch_size, self._batch_start))
-        for i in range(self._batch_size):
-            self._data_array[i] = self._package._train_image_batch[self._batch_start + i]
-            self._class_array[i] = self._package._train_label_batch[self._batch_start + i]
-        #
-        self._roster.set_data(self._data_array, self._data_size, self._class_array, self._batch_size)
+#    def set_batch(self):
+#        print("[%d] bsize = %d, start = %d" % (self._rank, self._batch_size, self._batch_start))
+#        for i in range(self._batch_size):
+#            self._data_array[i] = self._package._train_image_batch[self._batch_start + i]
+#            self._class_array[i] = self._package._train_label_batch[self._batch_start + i]
+#        #
+#        self._roster.set_data(self._data_array, self._data_size, self._class_array, self._batch_size)
 
     def evaluate(self):
         self._roster.propagate()
@@ -269,8 +278,13 @@ def main():
     #
     #
     wk = worker(com, package_id, config_id)
-    wk.set_batch()
+#    wk.set_batch()
     ce = wk.evaluate()
+    print("CE : %d : %f" % (rank, ce))
+    return 0
+#
+#
+#
     w_num = wk.make_w_list()
     attack_num = int(w_num/10*3)
     if rank==0:

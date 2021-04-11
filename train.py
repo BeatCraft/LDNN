@@ -27,10 +27,10 @@ sys.setrecursionlimit(10000)
 #
 #
 class Train:
-    def __init__(self, pack, r, size):
+    def __init__(self, pack, r):
         self._package = pack
         self._r = r
-        self._batch_size = size
+        #self._batch_size = size
         #
     
     def make_w_list(self):
@@ -119,7 +119,7 @@ class Train:
         
     def multi_attack(self, ce, mode=1, kt=0):
         r = self._r
-        pack = self._package
+        #pack = self._package
         #
         loop_n = 20
         #w_num = self.make_w_list()
@@ -157,29 +157,16 @@ class Train:
     def loop(self):
         r = self._r
         pack = self._package
-        data_size = pack._image_size
-        num_class = pack._num_class
-        #batch_size = self._batch_size
-        #print("batch_size=%d" % (batch_size))
+        #data_size = pack._image_size
+        #num_class = pack._num_class
         #
-        offset = 100
-        size = self._batch_size
-        print("batch : size = %d, offset = %d" % (size, offset))
+        #offset = 0
+        #size = self._batch_size
+        #print("batch : size = %d, offset = %d" % (size, offset))
+        #r.set_batch(pack, size, offset)
         #
-#
-#        pack.load_batch()
-#        data_array = np.zeros((self._batch_size, self._package._image_size), dtype=np.float32)
-#        labels = np.zeros((batch_size, num_class), dtype=np.float32)
-#        r.prepare(batch_size, data_size, num_class)
-#        #
-#        for j in range(batch_size):
-#            data_array[j] = self._package._train_image_batch[j]
-#            k = pack._train_label_batch[j]
-#            labels[j][k] = 1.0
-#        #
-#        r.set_data(data_array, data_size, labels, batch_size, 1)
-
-        r.set_batch(pack, size, offset)
+        #
+        #
         r.propagate()
         ce = r.get_cross_entropy()
         print("CE=%f" % (ce))

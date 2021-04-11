@@ -47,6 +47,7 @@ def main():
     config = int(argvs[4])
     mode = int(argvs[5])
     batch_size = int(argvs[6])
+    batch_offset = 0
     #
     print("platform_id=%d" % (platform_id))
     print("device_id=%d" % (device_id))
@@ -61,7 +62,10 @@ def main():
     r = pack.setup_dnn(my_gpu, config)
     #
     if mode==0: # train
-        t = train.Train(pack, r, batch_size)
+        print("batch_offset=%d" % (batch_offset))
+        r.set_batch(pack, batch_size, batch_offset)
+        #
+        t = train.Train(pack, r)
         t.loop()
     elif mode==1: # test
         test.test_n(r, pack, 500)

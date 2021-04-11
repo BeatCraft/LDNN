@@ -165,9 +165,7 @@ class worker(object):
         for li in range(1, c):
             layer = r.getLayerAt(li)
             type = layer.get_type()
-            if type==core.LAYER_TYPE_HIDDEN or
-                    type==core.LAYER_TYPE_OUTPUT or
-                    type==core.LAYER_TYPE_CONV_4:
+            if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT or type==core.LAYER_TYPE_CONV_4:
                 for ni in range(layer._num_node):
                     for ii in range(layer._num_input):
                         self._w_list.append((li, ni, ii))

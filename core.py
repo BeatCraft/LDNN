@@ -632,6 +632,7 @@ class Roster:
         #
     
     def set_batch(self, pack, size, offset):
+        print("Roster::set_batch(%d, %d)" % (size, offset))
         pack.load_batch()
         data_array = np.zeros((size, pack._image_size), dtype=np.float32)
         labels = np.zeros((size, pack._num_class), dtype=np.float32)

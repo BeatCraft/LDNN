@@ -276,6 +276,7 @@ def main():
     for n in range(loop_n):
         div = 1.0/float(2**(level))
         cnt = 0
+        ret = 0
         for i in range(100):
             #ce, ret = wk._train.multi_attack(ce, 1, div)
             cnt = cnt + ret

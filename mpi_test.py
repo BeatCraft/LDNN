@@ -67,20 +67,6 @@ class worker(object):
         self._batch_start = MINI_BATCH_START[self._rank]
         self._roster.set_batch(self._package , self._batch_size, self._batch_start)
         #
-        #
-        #
-        #
-#        self._package.load_batch()
-#        self._data_size = self._package._image_size
-#        self._num_class = self._package._num_class
-#        self._batch_size = MINI_BATCH_SIZE[self._rank]
-#        self._batch_start = MINI_BATCH_START[self._rank]
-#        self._data_array = np.zeros((self._batch_size , self._data_size), dtype=np.float32)
-#        self._class_array = np.zeros(self._batch_size , dtype=np.int32)
-#        self._roster.prepare(self._batch_size, self._data_size, self._num_class)
-        #
-        #
-        #
         if self._rank==0:
             self._w_list = []
             self._attack_num = 0
@@ -92,14 +78,6 @@ class worker(object):
         print("host_id=%d" % (self._host_id))
         print("rank=%d" % (self._rank ))
         print("size=%d" % (self._size ))
-
-#    def set_batch(self):
-#        print("[%d] bsize = %d, start = %d" % (self._rank, self._batch_size, self._batch_start))
-#        for i in range(self._batch_size):
-#            self._data_array[i] = self._package._train_image_batch[self._batch_start + i]
-#            self._class_array[i] = self._package._train_label_batch[self._batch_start + i]
-#        #
-#        self._roster.set_data(self._data_array, self._data_size, self._class_array, self._batch_size)
 
     def evaluate(self):
         self._roster.propagate()
@@ -273,13 +251,9 @@ def main():
     config_id = 0   # 0 : FC, 1 : CNN
     loop_n = 3*10
     #
-    #
-    #
     wk = worker(com, package_id, config_id)
-#    wk.set_batch()
     ce = wk.evaluate()
     print("CE : %d : %f" % (rank, ce))
-    return 0
 #
 #
 #
@@ -290,6 +264,10 @@ def main():
         print("%d : num=%d" % (rank, w_num))
     #
     #
+    return 0
+#
+#
+#
     cnt = 0
     for n in range(loop_n):
         # reset

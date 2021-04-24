@@ -292,12 +292,12 @@ class Train:
             div = 1.0/float(2**(level))
             cnt = 0
             for i in range(100):
-                ce, ret = self.mpi_multi_attack(ce, 1, div)
+                ce, ret = self.mpi_multi_attack(com, rank, size, ce, 1, div)
                 cnt = cnt + ret
                 print("%d : H : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, l_min, l_max, cnt))
             #
             for i in range(100):
-                ce, ret = self.mpi_multi_attack(ce, 0, div)
+                ce, ret = self.mpi_multi_attack(com, rank, size, ce, 0, div)
                 cnt = cnt + ret
                 print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, l_min, l_max, cnt))
             #

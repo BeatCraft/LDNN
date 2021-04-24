@@ -63,6 +63,8 @@ class worker(object):
         self._package = package.Package(package_id)
         self._roster = self._package.setup_dnn(self._gpu, config_id)
         #
+        self._train = train.Train(self._package, self._roster)
+        #
         self._batch_size = MINI_BATCH_SIZE[self._rank]
         self._batch_start = MINI_BATCH_START[self._rank]
         self._roster.set_batch(self._package , self._batch_size, self._batch_start)
@@ -254,6 +256,10 @@ def main():
     wk = worker(com, package_id, config_id)
     ce = wk.evaluate()
     print("CE : %d : %f" % (rank, ce))
+    
+    w_num = wk._train.make_w_list()
+    print("Rank=%d, ce=%f, w=%d" % (rank, ce, w_num))    
+    return 0
 #
 #
 #

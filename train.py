@@ -288,8 +288,10 @@ class Train:
         #
         self._w_list = com.bcast(self._w_list, root=0)
         w_num = len(self._w_list)
-        print("rank=%d, w_num=%f" % (rank, w_num))
+        print("rank=%d, w_num=%d" % (rank, w_num))
         return 0
+        #
+        #
         #
         level = 0
         l_min = 0

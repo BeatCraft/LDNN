@@ -255,10 +255,8 @@ def main():
     #
     wk = worker(com, package_id, config_id)
     ce = wk.evaluate()
-    print("CE : %d : %f" % (rank, ce))
-    
     w_num = wk._train.make_w_list()
-    print("Rank=%d, ce=%f, w=%d" % (rank, ce, w_num))    
+    print("Rank=%d, ce=%f, w=%d" % (rank, ce, w_num))
     return 0
 #
 #
@@ -269,6 +267,46 @@ def main():
         print("CE : %d : %f" % (rank, ce))
         print("%d : num=%d" % (rank, w_num))
     #
+    level = 0
+    l_min = 0
+    l_max = int(math.log(w_num/100, 2)) + 1
+    l_cnts = [1] * l_max
+    mode = 1
+    #
+    cnt = 0
+    for n in range(loop_n):
+        div = 1.0/float(2**(level))
+        cnt = 0
+        for i in range(100):
+            #ce, ret = wk._train.multi_attack(ce, 1, div)
+            cnt = cnt + ret
+            print("%d : H : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, l_min, l_max, cnt))
+        #
+        for i in range(100):
+            #ce, ret = wk._train.multi_attack(ce, 0, div)
+            cnt = cnt + ret
+            print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, l_min, l_max, cnt))
+        #
+        l_cnts[level] = cnt
+        if level == l_max-1:
+            mode = -1
+        elif level == l_min:
+            if cnt==0:
+                if l_min==l_max-2:
+                    pass
+                else:
+                    l_min = l_min + 1
+                #
+            #
+            mode = 1
+        #
+        level = level + mode
+        if rank==0:
+            package = wk._package
+            wk._roster.export_weight(package.save_path())
+        else:
+            pass
+        #
     #
     return 0
 #

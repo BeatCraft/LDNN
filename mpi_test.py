@@ -258,7 +258,7 @@ def main():
     else:
         a_list = []
     #
-    a_list = comm.bcast(a_list, root=0)
+    a_list = com.bcast(a_list, root=0)
     print("[%d] %d, %d, %d, %d" % (rank, a_list[0], a_list[1], a_list[2], a_list[3]))
     return 0
     #

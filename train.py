@@ -295,7 +295,7 @@ class Train:
                 ce, ret = self.mpi_multi_attack(com, rank, size, ce, 1, div)
                 cnt = cnt + ret
                 if rank==0:
-                    print("H [%d:%d] ce=%f, div=%d, Lv=%d(%d, %d) %d" % (j, i, ce, div, level, l_min, l_max, cnt))
+                    print("H [%d:%d] ce=%f, div=%f, Lv=%d(%d, %d) %d" % (j, i, ce, div, level, l_min, l_max, cnt))
                 else:
                     pass
                 #
@@ -304,7 +304,7 @@ class Train:
                 ce, ret = self.mpi_multi_attack(com, rank, size, ce, 0, div)
                 cnt = cnt + ret
                 if rank==0:
-                    print("C [%d:%d] ce=%f, div=%d, Lv=%d(%d, %d) %d" % (j, i, ce, div, level, l_min, l_max, cnt))
+                    print("C [%d:%d] ce=%f, div=%f, Lv=%d(%d, %d) %d" % (j, i, ce, div, level, l_min, l_max, cnt))
                 else:
                     pass
                 #

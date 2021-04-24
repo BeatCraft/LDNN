@@ -36,7 +36,7 @@ class Train:
     def mpi_evaluate(self, com, rank, size):
         self._r.propagate()
         ce = self._r.get_cross_entropy()
-        print("[%d] ce_avg = %f" % (rank, ce))
+        #print("[%d] ce_avg = %f" % (rank, ce))
         ce_list = com.gather(ce, root=0)
         sum = 0.0
         if rank==0:
@@ -44,7 +44,6 @@ class Train:
                 sum = sum + i
             #
             avg = sum/float(size)
-            #ce_avg = avg
         #
         if rank==0:
             ce_avg_list = [avg]*size

@@ -187,7 +187,7 @@ class Train:
         #
         attack_list = com.bcast(attack_list, root=0)
         w_num = len(self._w_list)
-        print("rank=%d, w_num=%d" % (rank, w_num))
+        #print("rank=%d, w_num=%d" % (rank, w_num))
         #
         for wt in attack_list:
             attack_i = wt[0]
@@ -294,12 +294,20 @@ class Train:
             for i in range(100):
                 ce, ret = self.mpi_multi_attack(com, rank, size, ce, 1, div)
                 cnt = cnt + ret
-                print("%d : H : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, l_min, l_max, cnt))
+                if rank==0:
+                    print("H [%d:%d] ce=%f, div=%d, Lv=%d(%d, %d) %d" % (j, i, ce, div, level, l_min, l_max, cnt))
+                else:
+                    pass
+                #
             #
             for i in range(100):
                 ce, ret = self.mpi_multi_attack(com, rank, size, ce, 0, div)
                 cnt = cnt + ret
-                print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, l_min, l_max, cnt))
+                if rank==0:
+                    print("C [%d:%d] ce=%f, div=%d, Lv=%d(%d, %d) %d" % (j, i, ce, div, level, l_min, l_max, cnt))
+                else:
+                    pass
+                #
             #
             l_cnts[level] = cnt
             if level == l_max-1:

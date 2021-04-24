@@ -273,7 +273,7 @@ def main():
     mode = 1
     #
     cnt = 0
-    for n in range(loop_n):
+    for j in range(loop_n):
         div = 1.0/float(2**(level))
         cnt = 0
         ret = 0

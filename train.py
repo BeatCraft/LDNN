@@ -273,7 +273,7 @@ class Train:
         #
         return 0
 
-    def mpi_loop(self, cpm, rank, size):
+    def mpi_loop(self, com, rank, size):
         r = self._r
         pack = self._package
         #

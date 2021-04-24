@@ -55,7 +55,8 @@ class Train:
         return self._ce_avg
         
     def make_w_list(self):
-        self._w_list  = []
+        #self._w_list  = []
+        w_list  = []
         r = self._r
         c = r.count_layers()
         for li in range(1, c):
@@ -64,12 +65,12 @@ class Train:
             if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT or type==core.LAYER_TYPE_CONV_4:
                 for ni in range(layer._num_node):
                     for ii in range(layer._num_input):
-                        self._w_list.append((li, ni, ii))
+                        w_list.append((li, ni, ii))
                     #
                 #
             #
         #
-        return len(self._w_list)
+        return w_list
 
     def weight_ops(self, attack_i, mode):
         w = self._w_list[attack_i]
@@ -181,7 +182,6 @@ class Train:
         
         if rank==0:
             attack_list = self.make_attack_list(kt, mode)
-            
         else:
             pass
             
@@ -232,7 +232,10 @@ class Train:
         #
         #
         it = 50
-        w_num = self.make_w_list()
+#        w_num = self.make_w_list()
+        self._w_list = self.make_w_list()
+        w_num = len(self._w_list)
+        #
         level = 0
         l_min = 0
         #l_max = int(math.log2(w_num/100)) + 1
@@ -270,3 +273,56 @@ class Train:
         #
         return 0
 
+    def mpi_loop(self, cpm, rank, size):
+        r = self._r
+        pack = self._package
+        #
+        ce = self.mpi_evaluate(com, rank, size)
+        print("ce=%f" % (ce))
+        it = 50
+        #
+        if rank==0:
+            self._w_list = self.make_w_list()
+        else:
+            self._w_list = []
+        #
+        self._w_list = com.bcast(self._w_list, root=0)
+        w_num = len(self._w_list)
+        print("rank=%d, w_num=%f" % (rank, w_num))
+        return 0
+        #
+        level = 0
+        l_min = 0
+        l_max = int(math.log(w_num/100, 2)) + 1
+        l_cnts = [1] * l_max
+        mode = 1
+        for j in range(it):
+            div = 1.0/float(2**(level))
+            cnt = 0
+            for i in range(100):
+                ce, ret = self.multi_attack(ce, 1, div)
+                cnt = cnt + ret
+                print("%d : H : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, l_min, l_max, cnt))
+            #
+            for i in range(100):
+                ce, ret = self.multi_attack(ce, 0, div)
+                cnt = cnt + ret
+                print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, l_min, l_max, cnt))
+            #
+            l_cnts[level] = cnt
+            if level == l_max-1:
+                mode = -1
+            elif level == l_min:
+                if cnt==0:
+                    if l_min==l_max-2:
+                        pass
+                    else:
+                        l_min = l_min + 1
+                    #
+                #
+                mode = 1
+            #
+            level = level + mode
+            r.export_weight(pack.save_path())
+        #
+        return 0

@@ -252,14 +252,8 @@ def main():
     package_id = 0  # 0 : MNIST, 1 : Cifar-10
     config_id = 0   # 0 : FC, 1 : CNN
     loop_n = 3*10
-    
-    if rank==0:
-        a_list = [0,1,2,3]
-    else:
-        a_list = []
     #
-    a_list = com.bcast(a_list, root=0)
-    print("[%d] %d, %d, %d, %d" % (rank, a_list[0], a_list[1], a_list[2], a_list[3]))
+    mpi_loop(self, cpm, rank, size)
     return 0
     #
     wk = worker(com, package_id, config_id)

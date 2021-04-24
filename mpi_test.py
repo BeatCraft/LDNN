@@ -253,12 +253,13 @@ def main():
     config_id = 0   # 0 : FC, 1 : CNN
     loop_n = 3*10
     #
-    mpi_loop(self, cpm, rank, size)
+    wk = worker(com, package_id, config_id)
+    wk._train.mpi_loop(cpm, rank, size)
     return 0
     #
-    wk = worker(com, package_id, config_id)
-    ce = wk._train.mpi_evaluate(com, rank, size)
-    print("rank=%d, ce=%f" % (rank, ce))
+    
+#    ce = wk._train.mpi_evaluate(com, rank, size)
+#    print("rank=%d, ce=%f" % (rank, ce))
 #
 #
 #

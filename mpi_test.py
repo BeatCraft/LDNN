@@ -254,7 +254,7 @@ def main():
     loop_n = 3*10
     #
     wk = worker(com, package_id, config_id)
-    wk._train.mpi_loop(cpm, rank, size)
+    wk._train.mpi_loop(com, rank, size)
     return 0
     #
     

@@ -252,15 +252,17 @@ def main():
     package_id = 0  # 0 : MNIST, 1 : Cifar-10
     config_id = 0   # 0 : FC, 1 : CNN
     loop_n = 3*10
+    
+    if rank==0:
+        k = 666
+    #
+    tmp = com.scatter(k, root=0)
+    print("[%d] tmp=%d" % (rank, tmp))
+    return 0
     #
     wk = worker(com, package_id, config_id)
-    #ce = wk.evaluate()
-    #w_num = wk._train.make_w_list()
-    #print("Rank=%d, ce=%f, w=%d" % (rank, ce, w_num))
-    
     ce = wk._train.mpi_evaluate(com, rank, size)
-    print("Rank=%d, ce=%f" % (rank, ce))
-    return 0
+    print("rank=%d, ce=%f" % (rank, ce))
 #
 #
 #

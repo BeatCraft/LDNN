@@ -53,7 +53,7 @@ class Train:
         ce_avg_list = com.scatter(ce_avg_list, root=0)
         self._ce_avg = ce_avg_list
         return self._ce_avg
-    
+        
     def make_w_list(self):
         self._w_list  = []
         r = self._r
@@ -137,7 +137,7 @@ class Train:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
-        
+    
     def multi_attack(self, ce, mode=1, kt=0):
         r = self._r
         #pack = self._package
@@ -174,7 +174,44 @@ class Train:
             self.undo_attack(attack_list)
         #
         return ce, ret
-
+        
+    def mpi_multi_attack(self, com, rank, size, ce, mode=1, kt=0):
+        r = self._r
+        loop_n = 20
+        
+        if rank==0:
+            attack_list = self.make_attack_list(kt, mode)
+            
+        else:
+            pass
+            
+        for wt in attack_list:
+            attack_i = wt[0]
+            wi = wt[1]
+            wi_alt = wt[2]
+            w = self._w_list[attack_i]
+            li = w[0]
+            ni = w[1]
+            ii = w[2]
+            layer = r.get_layer_at(li)
+            layer.set_weight_index(ni, ii, wi_alt)
+        #
+        c = r.count_layers()
+        for li in range(c):
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+        r.propagate()
+        ce_alt = r.get_cross_entropy()
+        ret = 0
+        if ce_alt<ce:
+            ce = ce_alt
+            ret = 1
+        else:
+            self.undo_attack(attack_list)
+        #
+        return ce, ret
+        
     def loop(self):
         r = self._r
         pack = self._package

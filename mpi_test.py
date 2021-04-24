@@ -254,10 +254,12 @@ def main():
     loop_n = 3*10
     
     if rank==0:
-        k = 666
+        a_list = [0,1,2,3]
+    else:
+        a_list = []
     #
-    tmp = com.scatter(k, root=0)
-    print("[%d] tmp=%d" % (rank, tmp))
+    a_list = comm.bcast(a_list, root=0)
+    print("[%d] %d, %d, %d, %d" % (rank, a_list[0], a_list[1], a_list[2], a_list[3]))
     return 0
     #
     wk = worker(com, package_id, config_id)

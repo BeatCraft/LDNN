@@ -139,7 +139,7 @@ class worker(object):
     def make_w_list(self):
         self._w_list  = []
         r = self._roster
-        c = r.countLayers()
+        c = r.count_layers()
         for li in range(1, c):
             layer = r.getLayerAt(li)
             type = layer.get_type()

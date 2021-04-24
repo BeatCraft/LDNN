@@ -315,6 +315,10 @@ class Train:
                 mode = 1
             #
             level = level + mode
-            r.export_weight(pack.save_path())
+            if rank==0:
+                r.export_weight(pack.save_path())
+            else:
+                pass
+            #
         #
         return 0

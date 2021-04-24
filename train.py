@@ -37,7 +37,7 @@ class Train:
     def mpi_evaluate(self, com, rank, size):
         self._r.propagate()
         ce = self._r.get_cross_entropy()
-        ce_list = self._com.gather(ce, root=0)
+        ce_list = com.gather(ce, root=0)
         sum = 0.0
         if rank==0:
             for i in ce_list:
@@ -51,7 +51,7 @@ class Train:
         else:
             ce_avg_list = None
         #
-        ce_avg_list = self._com.scatter(ce_avg_list, root=0)
+        ce_avg_list = com.scatter(ce_avg_list, root=0)
         self._ce_avg = ce_avg_list
         #print("[%d] ce_avg = %f" % (self._rank, self._ce_avg))
         return self._ce_avg

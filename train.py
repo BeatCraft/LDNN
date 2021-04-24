@@ -139,13 +139,13 @@ class Train:
             layer.update_weight()
         #
     
-    def multi_attack(self, ce, mode=1, kt=0):
+    def multi_attack(self, ce, mode=1, div=0):
         r = self._r
         #pack = self._package
         #
         loop_n = 20
         #w_num = self.make_w_list()
-        attack_list = self.make_attack_list(kt, mode)
+        attack_list = self.make_attack_list(div, mode)
         #
         for wt in attack_list:
             attack_i = wt[0]
@@ -176,15 +176,19 @@ class Train:
         #
         return ce, ret
         
-    def mpi_multi_attack(self, com, rank, size, ce, mode=1, kt=0):
+    def mpi_multi_attack(self, com, rank, size, ce, mode=1, div=0):
         r = self._r
         loop_n = 20
-        
+        #
         if rank==0:
-            attack_list = self.make_attack_list(kt, mode)
+            attack_list = self.make_attack_list(div, mode)
         else:
-            pass
-            
+            attack_list = []
+        #
+        attack_list = com.bcast(attack_list, root=0)
+        w_num = len(self._w_list)
+        print("rank=%d, w_num=%d" % (rank, w_num))
+        #
         for wt in attack_list:
             attack_i = wt[0]
             wi = wt[1]
@@ -201,8 +205,10 @@ class Train:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
-        r.propagate()
-        ce_alt = r.get_cross_entropy()
+        ce_alt = self.mpi_evaluate(com, rank, size)
+#        r.propagate()
+#        ce_alt = r.get_cross_entropy()
+        #
         ret = 0
         if ce_alt<ce:
             ce = ce_alt
@@ -215,30 +221,17 @@ class Train:
     def loop(self):
         r = self._r
         pack = self._package
-        #data_size = pack._image_size
-        #num_class = pack._num_class
-        #
-        #offset = 0
-        #size = self._batch_size
-        #print("batch : size = %d, offset = %d" % (size, offset))
-        #r.set_batch(pack, size, offset)
-        #
-        #
         #
         r.propagate()
         ce = r.get_cross_entropy()
         print("CE=%f" % (ce))
         #
-        #
-        #
         it = 50
-#        w_num = self.make_w_list()
         self._w_list = self.make_w_list()
         w_num = len(self._w_list)
         #
         level = 0
         l_min = 0
-        #l_max = int(math.log2(w_num/100)) + 1
         l_max = int(math.log(w_num/100, 2)) + 1
         l_cnts = [1] * l_max
         mode = 1
@@ -289,9 +282,6 @@ class Train:
         self._w_list = com.bcast(self._w_list, root=0)
         w_num = len(self._w_list)
         print("rank=%d, w_num=%d" % (rank, w_num))
-        return 0
-        #
-        #
         #
         level = 0
         l_min = 0
@@ -302,12 +292,12 @@ class Train:
             div = 1.0/float(2**(level))
             cnt = 0
             for i in range(100):
-                ce, ret = self.multi_attack(ce, 1, div)
+                ce, ret = self.mpi_multi_attack(ce, 1, div)
                 cnt = cnt + ret
                 print("%d : H : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, l_min, l_max, cnt))
             #
             for i in range(100):
-                ce, ret = self.multi_attack(ce, 0, div)
+                ce, ret = self.mpi_multi_attack(ce, 0, div)
                 cnt = cnt + ret
                 print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, l_min, l_max, cnt))
             #

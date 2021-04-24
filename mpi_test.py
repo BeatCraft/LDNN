@@ -257,7 +257,6 @@ def main():
     ce = wk.evaluate()
     w_num = wk._train.make_w_list()
     print("Rank=%d, ce=%f, w=%d" % (rank, ce, w_num))
-    return 0
 #
 #
 #

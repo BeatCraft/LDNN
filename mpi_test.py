@@ -259,7 +259,7 @@ def main():
     #print("Rank=%d, ce=%f, w=%d" % (rank, ce, w_num))
     
     ce = wk._train.mpi_evaluate(com, rank, size)
-    print("Rank=%d, ce=%f, w=%d" % (rank, ce, w_num))
+    print("Rank=%d, ce=%f" % (rank, ce))
     return 0
 #
 #

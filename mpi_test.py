@@ -126,13 +126,13 @@ class worker(object):
         return self._ce_avg
         
     def update_weight(self, li, ni, ii, wi):
-        layer = self._roster.getLayerAt(li)
+        layer = self._roster.get_layer_at(li)
         layer.set_weight_index(ni, ii, wi)
         layer.update_weight()
         
     # this is probably used only rank_0
     def get_weight_index(self, li, ni, ii):
-        layer = self._roster.getLayerAt(li)
+        layer = self._roster.get_layer_at(li)
         wi = layer.get_weight_index(ni, ii)
         return wi
         
@@ -141,7 +141,7 @@ class worker(object):
         r = self._roster
         c = r.count_layers()
         for li in range(1, c):
-            layer = r.getLayerAt(li)
+            layer = r.get_layer_at(li)
             type = layer.get_type()
             if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT or type==core.LAYER_TYPE_CONV_4:
                 for ni in range(layer._num_node):
@@ -172,7 +172,7 @@ def weight_shift(i, com, rank, wk, entropy, attack_i):
     ni = w[1]
     ii = w[2]
     r = wk._roster
-    layer = r.getLayerAt(li)
+    layer = r.get_layer_at(li)
     lock = layer.get_weight_lock(ni, ii)   # default : 0
     if lock>0:
         if rank==0:

@@ -86,7 +86,6 @@ class worker(object):
         self._ce = self._roster.get_cross_entropy()
         ce_list = self._com.gather(self._ce, root=0)
         #
-        #print(ce_list)
         sum = 0.0
         if self._rank==0:
             for i in ce_list:
@@ -249,9 +248,8 @@ def main():
     my_size = my_self.group.Get_size()
     print("%d, %d, %d, %d" % (rank, size, my_rank, my_size))
     #
-    package_id = 0  # 0 : MNIST, 1 : Cifar-10
+    package_id = 1  # 0 : MNIST, 1 : Cifar-10
     config_id = 0   # 0 : FC, 1 : CNN
-    loop_n = 3*10
     #
     wk = worker(com, package_id, config_id)
     wk._train.mpi_loop(com, rank, size)
@@ -263,6 +261,7 @@ def main():
 #
 #
 #
+    loop_n = 3*10
     w_num = wk.make_w_list()
     attack_num = int(w_num/10*3)
     if rank==0:

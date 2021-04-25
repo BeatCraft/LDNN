@@ -2,7 +2,7 @@
 
 platform_id=1   # Thraed Ripper
 device_id=0     #
-package_id=0    # MNIST
+package_id=1    # MNIST
 config=0        # FC
 mode=1          # test
 size=5000       # size of batch

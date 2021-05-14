@@ -66,7 +66,11 @@ def main():
         r.set_batch(pack, batch_size, batch_offset)
         #
         t = train.Train(pack, r)
-        t.loop()
+        if config==0: # fc
+            t.loop()
+        else:
+            t.cnn_loop()
+        #
     elif mode==1: # test
         test.test_n(r, pack, 500)
     else:

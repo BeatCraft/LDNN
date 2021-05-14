@@ -379,8 +379,8 @@ __kernel void multiple_x_by_w_alt(
 {
     int i = get_global_id(0); // num_input
     int j = get_global_id(1); // num_node
-
-    if (j==alt_ni && i==alt_ii){
+    //
+    if (i==alt_ii && j==alt_ni){
         y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * alt_w;
     }else{
         y[stride_1*bi + stride_2*j + i] = x[stride_2*bi + i] * w[stride_2*j + i];

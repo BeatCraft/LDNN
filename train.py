@@ -363,7 +363,7 @@ class Train:
         fc_lv_max = int(math.log(fc_w_num/100, 2)) + 1
         #fc_cnts = [0]*(fc_lv_max+1)
         #
-        for h = in range(20):
+        for h in range(20):
             mode = 1
             for j in range(50):
                 div = 1.0/float(2**(level))

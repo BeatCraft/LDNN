@@ -363,64 +363,65 @@ class Train:
         fc_lv_max = int(math.log(fc_w_num/100, 2)) + 1
         #fc_cnts = [0]*(fc_lv_max+1)
         #
-        mode = 1
-        for j in range(50):
-            div = 1.0/float(2**(level))
-            cnt = 0
-            for i in range(100):
-                ce, ret = self.multi_attack(ce, 1, div, self._fc_w_list)
-                cnt = cnt + ret
-                print("%d : H : %d : %f, %d (%d, %d) %d" %
+        for h = in range(20):
+            mode = 1
+            for j in range(50):
+                div = 1.0/float(2**(level))
+                cnt = 0
+                for i in range(100):
+                    ce, ret = self.multi_attack(ce, 1, div, self._fc_w_list)
+                    cnt = cnt + ret
+                    print("%d : H : %d : %f, %d (%d, %d) %d" %
                         (j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
-            #
-            for i in range(100):
-                ce, ret = self.multi_attack(ce, 0, div, self._fc_w_list)
-                cnt = cnt + ret
-                print("%d : C : %d : %f, %d (%d, %d) %d" %
-                        (j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
-            #
-            if mode==1:
-                if level==fc_lv_max:
-                    if level==fc_lv_min:
-                        mode = 0
-                    else:
-                        mode = -1
-                elif level<fc_lv_max-1:
-                    if cnt==0:
-                        if level==fc_lv_min:
-                            fc_lv_min = fc_lv_min + 1
-                        #
-                    #
                 #
-                level = level + mode
-            elif mode==-1:
-                if level==fc_lv_min:
+                for i in range(100):
+                    ce, ret = self.multi_attack(ce, 0, div, self._fc_w_list)
+                    cnt = cnt + ret
+                    print("%d : C : %d : %f, %d (%d, %d) %d" %
+                        (j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
+                #
+                if mode==1:
                     if level==fc_lv_max:
-                        mode = 0
-                    else:
-                        mode = 1
+                        if level==fc_lv_min:
+                            mode = 0
+                        else:
+                            mode = -1
+                    elif level<fc_lv_max-1:
                         if cnt==0:
-                            fc_lv_min = fc_lv_min + 1
+                            if level==fc_lv_min:
+                                fc_lv_min = fc_lv_min + 1
+                            #
                         #
                     #
+                    level = level + mode
+                elif mode==-1:
+                    if level==fc_lv_min:
+                        if level==fc_lv_max:
+                            mode = 0
+                        else:
+                            mode = 1
+                            if cnt==0:
+                                fc_lv_min = fc_lv_min + 1
+                            #
+                        #
+                    #
+                    level = level + mode
                 #
-                level = level + mode
             #
-        #
-        for j in range(10):
-            div = 0
-            cnn_cnt = 0
-            for i in range(cnn_w_num):
-                ce, ret = self.multi_attack(ce, 1, div, self._cnn_w_list)
-                cnn_cnt = cnn_cnt + ret
-                print("%d : H : %d : %f, %d" % (j, i, ce, cnn_cnt))
+            for j in range(10):
+                div = 0
+                cnn_cnt = 0
+                for i in range(cnn_w_num):
+                    ce, ret = self.multi_attack(ce, 1, div, self._cnn_w_list)
+                    cnn_cnt = cnn_cnt + ret
+                    print("%d : H : %d : %f, %d" % (j, i, ce, cnn_cnt))
+                #
+                for i in range(cnn_w_num):
+                    ce, ret = self.multi_attack(ce, 0, div, self._cnn_w_list)
+                    cnn_cnt = cnn_cnt + ret
+                    print("%d : C : %d : %f, %d" % (j, i, ce, cnn_cnt))
+                #
             #
-            for i in range(cnn_w_num):
-                ce, ret = self.multi_attack(ce, 0, div, self._cnn_w_list)
-                cnn_cnt = cnn_cnt + ret
-                print("%d : C : %d : %f, %d" % (j, i, ce, cnn_cnt))
-            #
-
             r.export_weight(pack.save_path())
         #
         return 0

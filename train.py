@@ -371,14 +371,14 @@ class Train:
                 for i in range(100):
                     ce, ret = self.multi_attack(ce, 1, div, self._fc_w_list)
                     cnt = cnt + ret
-                    print("%d : H : %d : %f, %d (%d, %d) %d" %
-                        (j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
+                    print("%d-%d : H : %d : %f, %d (%d, %d) %d" %
+                        (h, j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
                 #
                 for i in range(100):
                     ce, ret = self.multi_attack(ce, 0, div, self._fc_w_list)
                     cnt = cnt + ret
-                    print("%d : C : %d : %f, %d (%d, %d) %d" %
-                        (j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
+                    print("%d-%d : C : %d : %f, %d (%d, %d) %d" %
+                        (h, j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
                 #
                 if mode==1:
                     if level==fc_lv_max:
@@ -414,12 +414,12 @@ class Train:
                 for i in range(cnn_w_num):
                     ce, ret = self.multi_attack(ce, 1, div, self._cnn_w_list)
                     cnn_cnt = cnn_cnt + ret
-                    print("%d : H : %d : %f, %d" % (j, i, ce, cnn_cnt))
+                    print("%d-%d : H : %d : %f, %d" % (h, j, i, ce, cnn_cnt))
                 #
                 for i in range(cnn_w_num):
                     ce, ret = self.multi_attack(ce, 0, div, self._cnn_w_list)
                     cnn_cnt = cnn_cnt + ret
-                    print("%d : C : %d : %f, %d" % (j, i, ce, cnn_cnt))
+                    print("%d-%d : C : %d : %f, %d" % (h, j, i, ce, cnn_cnt))
                 #
             #
             r.export_weight(pack.save_path())

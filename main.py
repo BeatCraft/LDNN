@@ -69,7 +69,8 @@ def main():
         if config==0: # fc
             t.loop()
         else:
-            t.cnn_loop()
+            #t.cnn_loop()
+            t.mpi_cnn_loop()
         #
     elif mode==1: # test
         test.test_n(r, pack, 500)

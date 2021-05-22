@@ -105,9 +105,9 @@ class Train:
         #
         return wi, wi_alt
 
-    def make_attack_list(self, div, mode, w_list=None):
-        if w_list is None:
-            w_list = self._w_list
+    def make_attack_list(self, div, mode, w_list):
+        #if w_list is None:
+        #    w_list = self._w_list
         #
         w_num = len(w_list)
         attack_num = int(w_num/100*div) # 1% min
@@ -131,9 +131,9 @@ class Train:
         #
         return attack_list
 
-    def undo_attack(self, attack_list, w_list=None):
-        if w_list is None:
-            w_list = self._w_list
+    def undo_attack(self, attack_list, w_list):
+        #if w_list is None:
+        #    w_list = self._w_list
         #
         r = self._r
         for wt in attack_list:
@@ -190,24 +190,29 @@ class Train:
         #
         return ce, ret
         
-    def mpi_multi_attack(self, com, rank, size, ce, mode=1, div=0):
+        #def mpi_multi_attack(self, com, rank, size, ce, mode=1, div=0):
+    def mpi_multi_attack(self, ce, w_list, mode=1, div=0, mpi=0, com=None, rank=0, size=0):
         r = self._r
-        loop_n = 20
         #
-        if rank==0:
-            attack_list = self.make_attack_list(div, mode)
+        if mpi:
+            if rank==0:
+                attack_list = self.make_attack_list(div, mode, w_list)
+            else:
+                attack_list = []
+            #
+            attack_list = com.bcast(attack_list, root=0)
         else:
-            attack_list = []
+            attack_list = self.make_attack_list(div, mode, w_list)
         #
-        attack_list = com.bcast(attack_list, root=0)
-        w_num = len(self._w_list)
+        w_num = len(w_list)
         #print("rank=%d, w_num=%d" % (rank, w_num))
         #
         for wt in attack_list:
             attack_i = wt[0]
             wi = wt[1]
             wi_alt = wt[2]
-            w = self._w_list[attack_i]
+            #w = self._w_list[attack_i]
+            w = w_list[attack_i]
             li = w[0]
             ni = w[1]
             ii = w[2]
@@ -219,16 +224,18 @@ class Train:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
-        ce_alt = self.mpi_evaluate(com, rank, size)
-#        r.propagate()
-#        ce_alt = r.get_cross_entropy()
+        if mpi:
+            ce_alt = self.mpi_evaluate(com, rank, size)
+        else:
+            r.propagate()
+            ce_alt = r.get_cross_entropy()
         #
         ret = 0
         if ce_alt<ce:
             ce = ce_alt
             ret = 1
         else:
-            self.undo_attack(attack_list)
+            self.undo_attack(attack_list, w_list)
         #
         return ce, ret
         
@@ -427,57 +434,67 @@ class Train:
         return 0
     
     
-    def mpi_cnn_loop(self, com, rank, size):
+    def mpi_cnn_loop(self, mpi=0, com=None, rank=0, size=0):
         r = self._r
+        ce = 0.0
+        ret = 0
         pack = self._package
-        ce = self.mpi_evaluate(com, rank, size)
-        print("ce=%f" % (ce))
+        if mpi:
+            ce = self.mpi_evaluate(com, rank, size)
+            print("ce=%f" % (ce))
+        else:
+            r.propagate()
+            ce = r.get_cross_entropy()
+            print("CE=%f" % (ce))
         #
         it = 50
         #
-        if rank==0:
+        if mpi:
+            if rank==0:
+                self._fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+                self._cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
+            else:
+                self._fc_w_list = []
+                self._cnn_w_list = []
+            #
+            self._fc_w_list = com.bcast(self._w_list, root=0)
+            fc_w_num = len(self._fc_w_list)
+            print("rank=%d, w_num=%d" % (rank, w_num))
+            self._cnn_w_list = com.bcast(self._cnn_w_list, root=0)
+        else:
             self._fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
             self._cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
-        else:
-            self._fc_w_list = []
-            self._cnn_w_list = []
-        #
-        self._fc_w_list = com.bcast(self._w_list, root=0)
-        fc_w_num = len(self._fc_w_list)
-        print("rank=%d, w_num=%d" % (rank, w_num))
-        
-        self._cnn_w_list = com.bcast(self._cnn_w_list, root=0)
-        cnn_w_num = len(self._cnn_w_list)
         #
         fc_w_num = len(self._fc_w_list)
         cnn_w_num = len(self._cnn_w_list)
         level = 0
         fc_lv_min = 0
         fc_lv_max = int(math.log(fc_w_num/100, 2)) + 1
-        return 0
-#
-#
-#
+
         mode = 1
         for j in range(50):
             div = 1.0/float(2**(level))
             cnt = 0
             for i in range(100):
-                ce, ret = self.multi_attack(ce, 1, div, self._fc_w_list)
+                ce, ret = self.mpi_multi_attack(ce, self._fc_w_list, 1, div, mpi, com, rank, size)
                 cnt = cnt + ret
-                if rank==0:
-                    print("%d : H : %d : %f, %d (%d, %d) %d" %(j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
+                if mpi:
+                    if rank==0:
+                        print("%d : H : %d : %f, %d (%d, %d) %d" %(j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
+                    #
                 else:
-                    pass
+                    print("%d : H : %d : %f, %d (%d, %d) %d" %(j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
                 #
             #
             for i in range(100):
-                ce, ret = self.multi_attack(ce, 0, div, self._fc_w_list)
+                ce, ret = self.mpi_multi_attack(ce, self._fc_w_list, 0, div, mpi, com, rank, size)
                 cnt = cnt + ret
-                if rank==0:
-                    print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
+                if mpi:
+                    if rank==0:
+                        print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
+                    #
                 else:
-                    pass
+                    print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
                 #
             #
             if mode==1:
@@ -512,30 +529,33 @@ class Train:
             div = 0
             cnn_cnt = 0
             for i in range(cnn_w_num):
-                ce, ret = self.multi_attack(ce, 1, div, self._cnn_w_list)
-                cnn_cnt = cnn_cnt + ret
-                if rank==0:
-                    print("%d : H : %d : %f, %d" % (j, i, ce, cnn_cnt))
+                ce, ret = self.mpi_multi_attack(ce, self._cnn_w_list, 1, div, mpi, com, rank, size)
+                cnt = cnt + ret
+                if mpi:
+                    if rank==0:
+                        print("%d : H : %d : %f, %d" % (j, i, ce, cnn_cnt))
+                    #
                 else:
-                    pass
+                    print("%d : H : %d : %f, %d" % (j, i, ce, cnn_cnt))
                 #
             #
             for i in range(cnn_w_num):
-                ce, ret = self.multi_attack(ce, 0, div, self._cnn_w_list)
+                ce, ret = self.mpi_multi_attack(ce, self._cnn_w_list, 0, div, mpi, com, rank, size)
                 cnn_cnt = cnn_cnt + ret
-                if rank==0:
-                    print("%d : C : %d : %f, %d" % (j, i, ce, cnn_cnt))
+                if mpi:
+                    if rank==0:
+                        print("%d : C : %d : %f, %d" % (j, i, ce, cnn_cnt))
+                    #
                 else:
-                    pass
+                    print("%d : C : %d : %f, %d" % (j, i, ce, cnn_cnt))
                 #
             #
-#
-#
-#
-            if rank==0:
-                r.export_weight(pack.save_path())
+            if mpi:
+                if rank==0:
+                    r.export_weight(pack.save_path())
+                #
             else:
-                pass
+                r.export_weight(pack.save_path())
             #
         #
         return 0

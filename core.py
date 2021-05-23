@@ -769,7 +769,7 @@ class Roster:
         #
         return ret
     
-    def get_cross_entropy(self):
+    def get_cross_entropy(self, debug=0):
         c = self.count_layers()
         output = self.get_layer_at(c-1)
 #        self._gpu.k_cross_entropy(output._gpu_output, self._gpu_entropy,
@@ -784,7 +784,7 @@ class Roster:
         #
         # debug
         #
-        if np.isnan(s):
+        if debug and np.isnan(s):
             for i in range(self._batch_size):
                 li = c-1
                 if np.isnan(self._batch_cross_entropy[i]):

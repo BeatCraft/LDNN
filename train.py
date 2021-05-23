@@ -33,10 +33,13 @@ class Train:
         #self._batch_size = size
         #
     
-    def mpi_evaluate(self, com, rank, size):
+    def mpi_evaluate(self, mpi=0, com=None, rank=0, size=0):
         self._r.propagate()
         ce = self._r.get_cross_entropy()
         #print("[%d] ce_avg = %f" % (rank, ce))
+        if mpi==0:
+            return ce
+        #
         ce_list = com.gather(ce, root=0)
         sum = 0.0
         if rank==0:
@@ -78,10 +81,7 @@ class Train:
         #
         return w_list
 
-    def weight_ops(self, attack_i, mode, w_list=None):
-        if w_list is None:
-            w_list = self._w_list
-        #
+    def weight_ops(self, attack_i, mode, w_list):
         w = w_list[attack_i]
         li = w[0]
         ni = w[1]
@@ -106,9 +106,6 @@ class Train:
         return wi, wi_alt
 
     def make_attack_list(self, div, mode, w_list):
-        #if w_list is None:
-        #    w_list = self._w_list
-        #
         w_num = len(w_list)
         attack_num = int(w_num/100*div) # 1% min
         if attack_num<1:
@@ -132,9 +129,6 @@ class Train:
         return attack_list
 
     def undo_attack(self, attack_list, w_list):
-        #if w_list is None:
-        #    w_list = self._w_list
-        #
         r = self._r
         for wt in attack_list:
             attack_i = wt[0]
@@ -224,11 +218,12 @@ class Train:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
-        if mpi:
-            ce_alt = self.mpi_evaluate(com, rank, size)
-        else:
-            r.propagate()
-            ce_alt = r.get_cross_entropy()
+        ce_alt = self.mpi_evaluate(mpi, com, rank, size)
+#        if mpi:
+#            ce_alt = self.mpi_evaluate(com, rank, size)
+#        else:
+#            r.propagate()
+#            ce_alt = r.get_cross_entropy()
         #
         ret = 0
         if ce_alt<ce:
@@ -435,48 +430,46 @@ class Train:
     
     
     def mpi_cnn_loop(self, mpi=0, com=None, rank=0, size=0):
-        r = self._r
+        fc_w_list = None
+        cnn_w_list = None
         ce = 0.0
         ret = 0
+        r = self._r
         pack = self._package
-        if mpi:
-            ce = self.mpi_evaluate(com, rank, size)
-            print("ce=%f" % (ce))
-        else:
-            r.propagate()
-            ce = r.get_cross_entropy()
-            print("CE=%f" % (ce))
-        #
-        it = 50
+        ce = self.mpi_evaluate(mpi, com, rank, size)
+        #it = 50
         #
         if mpi:
             if rank==0:
-                self._fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-                self._cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
+                #self._fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+                #self._cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
+                fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+                cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
             else:
-                self._fc_w_list = []
-                self._cnn_w_list = []
+                fc_w_list = []
+                cnn_w_list = []
             #
-            self._fc_w_list = com.bcast(self._w_list, root=0)
-            fc_w_num = len(self._fc_w_list)
-            print("rank=%d, w_num=%d" % (rank, w_num))
-            self._cnn_w_list = com.bcast(self._cnn_w_list, root=0)
+            fc_w_list = com.bcast(fc_w_list, root=0)
+            cnn_w_list = com.bcast(cnn_w_list, root=0)
+            fc_w_num = len(fc_w_list)
+            cnn_w_num = len(cnn_w_list)
+            print("rank=%d, fc=%d, cnn=%d" % (rank, w_num, cnn_w_num))
         else:
-            self._fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-            self._cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
+            fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+            cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
+            fc_w_num = len(fc_w_list)
+            cnn_w_num = len(cnn_w_list)
         #
-        fc_w_num = len(self._fc_w_list)
-        cnn_w_num = len(self._cnn_w_list)
         level = 0
         fc_lv_min = 0
         fc_lv_max = int(math.log(fc_w_num/100, 2)) + 1
-
+        #
         mode = 1
         for j in range(50):
             div = 1.0/float(2**(level))
             cnt = 0
             for i in range(100):
-                ce, ret = self.mpi_multi_attack(ce, self._fc_w_list, 1, div, mpi, com, rank, size)
+                ce, ret = self.mpi_multi_attack(ce, fc_w_list, 1, div, mpi, com, rank, size)
                 cnt = cnt + ret
                 if mpi:
                     if rank==0:
@@ -487,7 +480,7 @@ class Train:
                 #
             #
             for i in range(100):
-                ce, ret = self.mpi_multi_attack(ce, self._fc_w_list, 0, div, mpi, com, rank, size)
+                ce, ret = self.mpi_multi_attack(ce, fc_w_list, 0, div, mpi, com, rank, size)
                 cnt = cnt + ret
                 if mpi:
                     if rank==0:
@@ -529,7 +522,7 @@ class Train:
             div = 0
             cnn_cnt = 0
             for i in range(cnn_w_num):
-                ce, ret = self.mpi_multi_attack(ce, self._cnn_w_list, 1, div, mpi, com, rank, size)
+                ce, ret = self.mpi_multi_attack(ce, cnn_w_list, 1, div, mpi, com, rank, size)
                 cnt = cnt + ret
                 if mpi:
                     if rank==0:
@@ -540,7 +533,7 @@ class Train:
                 #
             #
             for i in range(cnn_w_num):
-                ce, ret = self.mpi_multi_attack(ce, self._cnn_w_list, 0, div, mpi, com, rank, size)
+                ce, ret = self.mpi_multi_attack(ce, cnn_w_list, 0, div, mpi, com, rank, size)
                 cnn_cnt = cnn_cnt + ret
                 if mpi:
                     if rank==0:

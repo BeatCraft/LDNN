@@ -429,6 +429,64 @@ class Train:
         return 0
     
     
+    def mpi_w_loop(self, ce, w_list, lv_min, lv_max, mpi=0, com=None, rank=0, size=0):
+        level = 0
+        mode = 1
+        for j in range(50):
+            div = 1.0/float(2**(level))
+            cnt = 0
+            for i in range(100):
+                ce, ret = self.mpi_multi_attack(ce, w_list, 1, div, mpi, com, rank, size)
+                cnt = cnt + ret
+                if mpi:
+                    if rank==0:
+                        print("%d : H : %d : %f, %d (%d, %d) %d" %(j, i, ce, level, lv_min, lv_max, cnt))
+                    #
+                else:
+                    print("%d : H : %d : %f, %d (%d, %d) %d" %(j, i, ce, level, lv_min, lv_max, cnt))
+                #
+            #
+            for i in range(100):
+                ce, ret = self.mpi_multi_attack(ce, w_list, 0, div, mpi, com, rank, size)
+                cnt = cnt + ret
+                if mpi:
+                    if rank==0:
+                        print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, lv_min, lv_max, cnt))
+                    #
+                else:
+                    print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, lv_min, lv_max, cnt))
+                #
+            #
+            if mode==1:
+                if level==lv_max:
+                    if level==lv_min:
+                        mode = 0
+                    else:
+                        mode = -1
+                elif level<lv_max-1:
+                    if cnt==0:
+                        if level==lv_min:
+                            lv_min = lv_min + 1
+                        #
+                    #
+                #
+                level = level + mode
+            elif mode==-1:
+                if level==lv_min:
+                    if level==lv_max:
+                        mode = 0
+                    else:
+                        mode = 1
+                        if cnt==0:
+                            lv_min = lv_min + 1
+                        #
+                    #
+                #
+                level = level + mode
+            #
+        #
+        return ce, lv_min, lv_max
+    
     def mpi_cnn_loop(self, mpi=0, com=None, rank=0, size=0):
         fc_w_list = None
         cnn_w_list = None
@@ -437,7 +495,6 @@ class Train:
         r = self._r
         pack = self._package
         ce = self.mpi_evaluate(mpi, com, rank, size)
-        #it = 50
         #
         if mpi:
             if rank==0:
@@ -464,59 +521,7 @@ class Train:
         fc_lv_min = 0
         fc_lv_max = int(math.log(fc_w_num/100, 2)) + 1
         #
-        mode = 1
-        for j in range(50):
-            div = 1.0/float(2**(level))
-            cnt = 0
-            for i in range(100):
-                ce, ret = self.mpi_multi_attack(ce, fc_w_list, 1, div, mpi, com, rank, size)
-                cnt = cnt + ret
-                if mpi:
-                    if rank==0:
-                        print("%d : H : %d : %f, %d (%d, %d) %d" %(j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
-                    #
-                else:
-                    print("%d : H : %d : %f, %d (%d, %d) %d" %(j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
-                #
-            #
-            for i in range(100):
-                ce, ret = self.mpi_multi_attack(ce, fc_w_list, 0, div, mpi, com, rank, size)
-                cnt = cnt + ret
-                if mpi:
-                    if rank==0:
-                        print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
-                    #
-                else:
-                    print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, fc_lv_min, fc_lv_max, cnt))
-                #
-            #
-            if mode==1:
-                if level==fc_lv_max:
-                    if level==fc_lv_min:
-                        mode = 0
-                    else:
-                        mode = -1
-                elif level<fc_lv_max-1:
-                    if cnt==0:
-                        if level==fc_lv_min:
-                            fc_lv_min = fc_lv_min + 1
-                        #
-                    #
-                #
-                level = level + mode
-            elif mode==-1:
-                if level==fc_lv_min:
-                    if level==fc_lv_max:
-                        mode = 0
-                    else:
-                        mode = 1
-                        if cnt==0:
-                            fc_lv_min = fc_lv_min + 1
-                        #
-                    #
-                #
-                level = level + mode
-            #
+        ce, fc_lv_min, fc_lv_min = self.mpi_w_loop(ce, fc_w_list, fc_lv_min, fc_lv_max, mpi, com, rank, size)
         #
         for j in range(10):
             div = 0

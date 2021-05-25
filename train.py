@@ -429,10 +429,10 @@ class Train:
         return 0
     
     
-    def mpi_w_loop(self, ce, w_list, lv_min, lv_max, mpi=0, com=None, rank=0, size=0):
-        level = 0
+    def mpi_w_loop(self, n, ce, w_list, lv_min, lv_max, label, mpi=0, com=None, rank=0, size=0):
+        level = lv_min
         mode = 1
-        for j in range(50):
+        for j in range(n):
             div = 1.0/float(2**(level))
             cnt = 0
             for i in range(100):
@@ -440,10 +440,10 @@ class Train:
                 cnt = cnt + ret
                 if mpi:
                     if rank==0:
-                        print("%d : H : %d : %f, %d (%d, %d) %d" %(j, i, ce, level, lv_min, lv_max, cnt))
+                        print("[%s] %d : H : %d : %f, %d (%d, %d) %d" %(label, j, i, ce, level, lv_min, lv_max, cnt))
                     #
                 else:
-                    print("%d : H : %d : %f, %d (%d, %d) %d" %(j, i, ce, level, lv_min, lv_max, cnt))
+                    print("[%s] %d : H : %d : %f, %d (%d, %d) %d" %(label, j, i, ce, level, lv_min, lv_max, cnt))
                 #
             #
             for i in range(100):
@@ -451,10 +451,10 @@ class Train:
                 cnt = cnt + ret
                 if mpi:
                     if rank==0:
-                        print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, lv_min, lv_max, cnt))
+                        print("[%s] %d : C : %d : %f, %d (%d, %d) %d" % (label, j, i, ce, level, lv_min, lv_max, cnt))
                     #
                 else:
-                    print("%d : C : %d : %f, %d (%d, %d) %d" % (j, i, ce, level, lv_min, lv_max, cnt))
+                    print("[%s] %d : C : %d : %f, %d (%d, %d) %d" % (label, j, i, ce, level, lv_min, lv_max, cnt))
                 #
             #
             if mode==1:
@@ -487,7 +487,7 @@ class Train:
         #
         return ce, lv_min, lv_max
     
-    def mpi_cnn_loop(self, mpi=0, com=None, rank=0, size=0):
+    def mpi_cnn_loop(self, n=1, mpi=0, com=None, rank=0, size=0):
         fc_w_list = None
         cnn_w_list = None
         ce = 0.0
@@ -498,8 +498,6 @@ class Train:
         #
         if mpi:
             if rank==0:
-                #self._fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-                #self._cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
                 fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
                 cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
             else:
@@ -517,43 +515,24 @@ class Train:
             fc_w_num = len(fc_w_list)
             cnn_w_num = len(cnn_w_list)
         #
-        level = 0
         fc_lv_min = 0
         fc_lv_max = int(math.log(fc_w_num/100, 2)) + 1
+        cnn_lv_min = 0
+        cnn_lv_max = int(math.log(cnn_w_num, 2)) + 1
         #
-        ce, fc_lv_min, fc_lv_min = self.mpi_w_loop(ce, fc_w_list, fc_lv_min, fc_lv_max, mpi, com, rank, size)
-        #
-        for j in range(10):
-            div = 0
-            cnn_cnt = 0
-            for i in range(cnn_w_num):
-                ce, ret = self.mpi_multi_attack(ce, cnn_w_list, 1, div, mpi, com, rank, size)
-                cnt = cnt + ret
-                if mpi:
-                    if rank==0:
-                        print("%d : H : %d : %f, %d" % (j, i, ce, cnn_cnt))
-                    #
-                else:
-                    print("%d : H : %d : %f, %d" % (j, i, ce, cnn_cnt))
-                #
+        for i in range(n):
+            ce, fc_lv_min, fc_lv_min = self.mpi_w_loop(50, ce, fc_w_list, fc_lv_min, fc_lv_max, "fc", mpi, com, rank, size)
             #
-            for i in range(cnn_w_num):
-                ce, ret = self.mpi_multi_attack(ce, cnn_w_list, 0, div, mpi, com, rank, size)
-                cnn_cnt = cnn_cnt + ret
-                if mpi:
-                    if rank==0:
-                        print("%d : C : %d : %f, %d" % (j, i, ce, cnn_cnt))
-                    #
-                else:
-                    print("%d : C : %d : %f, %d" % (j, i, ce, cnn_cnt))
-                #
-            #
+            ce, cnn_lv_min, cnn_lv_max = self.mpi_w_loop(10, ce, cnn_w_list, cnn_lv_min, cnn_lv_max, "cnn" mpi, com, rank, size)
             if mpi:
                 if rank==0:
                     r.export_weight(pack.save_path())
+                else:
+                    pass
                 #
             else:
                 r.export_weight(pack.save_path())
             #
         #
         return 0
+        

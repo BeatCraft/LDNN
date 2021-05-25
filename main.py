@@ -70,7 +70,7 @@ def main():
             t.loop()
         else:
             #t.cnn_loop()
-            t.mpi_cnn_loop()
+            t.mpi_cnn_loop(10)
         #
     elif mode==1: # test
         test.test_n(r, pack, 500)

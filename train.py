@@ -514,7 +514,7 @@ class Train:
             cnn_w_list = com.bcast(cnn_w_list, root=0)
             fc_w_num = len(fc_w_list)
             cnn_w_num = len(cnn_w_list)
-            print("rank=%d, fc=%d, cnn=%d" % (rank, w_num, cnn_w_num))
+            print("rank=%d, fc=%d, cnn=%d" % (rank, fc_w_num, cnn_w_num))
         else:
             fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
             cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])

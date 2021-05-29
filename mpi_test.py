@@ -94,7 +94,7 @@ def main():
     #
     wk = worker(com, package_id, config_id)
 #    wk._train.mpi_loop(com, rank, size)
-    wk._train.mpi_cnn_loop(20, 1, com, rank, size)
+    wk._train.mpi_cnn_loop(1, 1, com, rank, size)
     return 0
 #
 #

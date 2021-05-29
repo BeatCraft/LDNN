@@ -529,8 +529,17 @@ class Train:
         cnn_lv_max = int(math.log(cnn_w_num/cnn_d, 2)) + 1
         #
         for i in range(n):
-            ce, fc_lv_min, fc_lv_min = self.mpi_w_loop(i, 50, fc_d, ce, fc_w_list, fc_lv_min, fc_lv_max, "fc", mpi, com, rank, size)
-            ce, cnn_lv_min, cnn_lv_max = self.mpi_w_loop(i, 10, cnn_d, ce, cnn_w_list, cnn_lv_min, cnn_lv_max, "cnn", mpi, com, rank, size)
+            ce, fc_lv_min, fc_lv_min = self.mpi_w_loop(i, 1000, fc_d, ce, fc_w_list, fc_lv_min, fc_lv_max, "fc", mpi, com, rank, size)
+            if mpi:
+                if rank==0:
+                    r.export_weight(pack.save_path())
+                else:
+                    pass
+                #
+            else:
+                r.export_weight(pack.save_path())
+            #
+            ce, cnn_lv_min, cnn_lv_max = self.mpi_w_loop(i, 200, cnn_d, ce, cnn_w_list, cnn_lv_min, cnn_lv_max, "cnn", mpi, com, rank, size)
             if mpi:
                 if rank==0:
                     r.export_weight(pack.save_path())

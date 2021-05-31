@@ -493,6 +493,18 @@ class Train:
         #
         return ce, lv_min, lv_max
     
+    
+    def mpi_save(self, path, mpi=0, com=None, rank=0, size=0):
+        if mpi:
+            if rank==0:
+                r.export_weight(path)
+            else:
+                pass
+            #
+        else:
+            r.export_weight(path())
+        #
+    
     def mpi_cnn_loop(self, n=1, mpi=0, com=None, rank=0, size=0):
         fc_w_list = None
         cnn_w_list = None
@@ -529,26 +541,11 @@ class Train:
         cnn_lv_max = int(math.log(cnn_w_num/cnn_d, 2)) + 1
         #
         for i in range(n):
-            ce, fc_lv_min, fc_lv_min = self.mpi_w_loop(i, 1000, fc_d, ce, fc_w_list, fc_lv_min, fc_lv_max, "fc", mpi, com, rank, size)
-            if mpi:
-                if rank==0:
-                    r.export_weight(pack.save_path())
-                else:
-                    pass
-                #
-            else:
-                r.export_weight(pack.save_path())
+            ce, fc_lv_min, fc_lv_min = self.mpi_w_loop(i, 500, fc_d, ce, fc_w_list, fc_lv_min, fc_lv_max, "fc", mpi, com, rank, size)
+            self.mpi_save(pack.save_path(), mpi, com, rank, size)
             #
-            ce, cnn_lv_min, cnn_lv_max = self.mpi_w_loop(i, 200, cnn_d, ce, cnn_w_list, cnn_lv_min, cnn_lv_max, "cnn", mpi, com, rank, size)
-            if mpi:
-                if rank==0:
-                    r.export_weight(pack.save_path())
-                else:
-                    pass
-                #
-            else:
-                r.export_weight(pack.save_path())
-            #
+            ce, cnn_lv_min, cnn_lv_max = self.mpi_w_loop(i, 100, cnn_d, ce, cnn_w_list, cnn_lv_min, cnn_lv_max, "cnn", mpi, com, rank, size)
+            self.mpi_save(pack.save_path(), mpi, com, rank, size)
         #
         return 0
         

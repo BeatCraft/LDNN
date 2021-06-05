@@ -495,6 +495,7 @@ class Train:
     
     
     def mpi_save(self, path, mpi=0, com=None, rank=0, size=0):
+        r = self._r
         if mpi:
             if rank==0:
                 r.export_weight(path)
@@ -504,7 +505,7 @@ class Train:
         else:
             r.export_weight(path())
         #
-    
+        
     def mpi_cnn_loop(self, n=1, mpi=0, com=None, rank=0, size=0):
         fc_w_list = None
         cnn_w_list = None

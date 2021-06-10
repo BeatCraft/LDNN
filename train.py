@@ -56,7 +56,44 @@ class Train:
         ce_avg_list = com.scatter(ce_avg_list, root=0)
         self._ce_avg = ce_avg_list
         return self._ce_avg
+
+    def find_layer_by_type(self, type_list=None):
+        if type_list is None:
+            type_list = [core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT, core.LAYER_TYPE_CONV_4]
+        #
+        l_list  = []
+        #
+        r = self._r
+        c = r.count_layers()
+        for li in range(1, c):
+            layer = r.get_layer_at(li)
+            type = layer.get_type()
+            for t in type_list:
+                if type!=t:
+                    continue
+                else:
+                    l_list.append((li))
+                #
+            #
+        #
+        return l_list
         
+    def find_cnn_layer(self):
+        l_list  = []
+        r = self._r
+        c = r.count_layers()
+        for li in range(1, c):
+            layer = r.get_layer_at(li)
+            type = layer.get_type()
+            if type==core.LAYER_TYPE_CONV_4:
+                nc = layer.get_num_node()   # number of filters
+                ic = layer.get_num_input()  # size of a filter
+                l_list.append((li, nc, ic))
+            #
+        #
+        return l_list
+        
+
     def make_w_list(self, type_list=None):
         if type_list is None:
             type_list = [core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT, core.LAYER_TYPE_CONV_4]
@@ -105,6 +142,25 @@ class Train:
         #
         return wi, wi_alt
 
+    def make_attack_cnn_list(self, w_list, attack_num):
+        w_num = len(w_list)
+        n_num = w_num/attack_num
+        attack_list = []
+        attack_i = random.randrange(n_num)
+        w = w_list[attack_i]
+        li = w[0]
+        ni = w[1]
+        #
+        r = self._r
+        layer = r.get_layer_at(li)
+        #
+        for ii in range(attack_num):
+            wi = layer.get_weight_index(ni, ii)
+            wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
+            attack_list.append((attack_i+i, wi, wi_alt))
+        #
+        return attack_list
+
     def make_attack_list(self, div, mode, w_list):
         w_num = len(w_list)
         attack_num = int(w_num/div)
@@ -123,21 +179,21 @@ class Train:
             ii = w[2]
             wi, wi_alt = self.weight_ops(attack_i, mode, w_list)
             if wi!=wi_alt:
-                attack_list.append((attack_i, wi, wi_alt))
+                #attack_list.append((attack_i, wi, wi_alt))
+                attack_list.append((li, ni, ii, wi, wi_alt))
             #
         #
         return attack_list
 
-    def undo_attack(self, attack_list, w_list):
+    #def undo_attack(self, attack_list, w_list):
+    def undo_attack(self, attack_list):
         r = self._r
         for wt in attack_list:
-            attack_i = wt[0]
-            wi = wt[1]
-            wi_alt = wt[2]
-            w = w_list[attack_i]
-            li = w[0]
-            ni = w[1]
-            ii = w[2]
+            li = wt[0]
+            ni = wt[1]
+            ii = wt[2]
+            wi = wt[3]
+            wi_alt = wt[4]
             #
             layer = r.get_layer_at(li)
             layer.set_weight_index(ni, ii, wi)
@@ -165,14 +221,14 @@ class Train:
         #print("rank=%d, w_num=%d" % (rank, w_num))
         #
         for wt in attack_list:
-            attack_i = wt[0]
-            wi = wt[1]
-            wi_alt = wt[2]
+            #attack_i = wt[0]
             #w = self._w_list[attack_i]
-            w = w_list[attack_i]
-            li = w[0]
-            ni = w[1]
-            ii = w[2]
+            #w = w_list[attack_i]
+            li = wt[0]
+            ni = wt[1]
+            ii = wt[2]
+            wi = wt[3]
+            wi_alt = wt[4]
             layer = r.get_layer_at(li)
             layer.set_weight_index(ni, ii, wi_alt)
         #
@@ -193,18 +249,16 @@ class Train:
             ce = ce_alt
             ret = 1
         else:
-            self.undo_attack(attack_list, w_list)
+            self.undo_attack(attack_list)
         #
         return ce, ret
-        
-
-
-
-    
     
     def mpi_w_loop(self, c, n, d, ce, w_list, lv_min, lv_max, label, mpi=0, com=None, rank=0, size=0):
         level = lv_min
         mode = 1
+        r = self._r
+        pack = self._package
+        #
         for j in range(n):
             #
             div = float(d)*float(2**(level))
@@ -263,6 +317,7 @@ class Train:
                 #
                 level = level + mode
             #
+            self.mpi_save(pack.save_path(), mpi, com, rank, size)
         #
         return ce, lv_min, lv_max
     
@@ -276,8 +331,134 @@ class Train:
                 pass
             #
         else:
-            r.export_weight(path())
+            r.export_weight(path)
         #
+
+    def mpi_loop(self, n=1, mpi=0, com=None, rank=0, size=0):
+        w_list = None
+        ce = 0.0
+        ret = 0
+        r = self._r
+        pack = self._package
+        ce = self.mpi_evaluate(mpi, com, rank, size)
+        #
+        if mpi:
+            if rank==0:
+                w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+            else:
+                w_list = []
+            #
+            w_list = com.bcast(w_list, root=0)
+            w_num = len(w_list)
+            print("rank=%d, w=%d" % (rank, w_num))
+        else:
+            w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+            w_num = len(w_list)
+        #
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        #
+        for i in range(n):
+            ce, lv_min, lv_min = self.mpi_w_loop(i, 500, d, ce, w_list, lv_min, lv_max, "all", mpi, com, rank, size)
+            #self.mpi_save(pack.save_path(), mpi, com, rank, size)
+            #
+        #
+        return 0
+        
+    def mpi_cnn_filter_loop(self, n=1, mpi=0, com=None, rank=0, size=0):
+        fc_w_list = None
+        cnn_w_list = None
+        ce = 0.0
+        ret = 0
+        r = self._r
+        pack = self._package
+        ce = self.mpi_evaluate(mpi, com, rank, size)
+        #
+        if mpi:
+            if rank==0:
+                cnn_layers = self.find_cnn_layer()
+                cnn_l_num = len(cnn_layers)
+                print(cnn_layers)
+            else:
+                pass
+            #
+        else:
+            cnn_layers = self.find_cnn_layer()
+            cnn_l_num = len(cnn_layers)
+            print(cnn_layers)
+            k = random.randrange(cnn_l_num) # for multi cnn
+            li = cnn_layers[k][0]
+            nc = cnn_layers[k][1] # num of filters
+            ic = cnn_layers[k][2] # size of a filter
+            layer = r.get_layer_at(li)
+            ni = random.randrange(nc)
+            print("li=%d, ni=%d" % (li, ni))
+        #
+        
+        for i in range(n):
+            if mpi:
+                if rank==0:
+                    li = random.randrange(cnn_l_num) # for multi cnn
+                    layer = r.get_layer_at(li)
+                    nc = cnn_layers[li][1] # num of filters
+                    ic = cnn_layers[li][2] # size of a filter
+                    ni = random.randrange(nc)
+                    attack_list = []
+                    for ii in range(ic):
+                        wi = layer.get_weight_index(ni, ii)
+                        wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
+                        attack_list.append((li, ni, ii, wi, wi_alt))
+                    #
+                else:
+                    attack_list = []
+                #
+                attack_list = com.bcast(attack_list, root=0)
+                for wt in attack_list:
+                    li = wt[0]
+                    ni = wt[1]
+                    ii = wt[2]
+                    wi = wt[3]
+                    wi_alt = wt[4]
+                    layer.set_weight_index(ni, ii, wi_alt)
+                #
+                c = r.count_layers()
+                for li in range(c):
+                    layer = r.get_layer_at(li)
+                    layer.update_weight()
+                #
+                ce_alt = self.mpi_evaluate(mpi, com, rank, size)
+                if ce_alt<ce:
+                    ce = ce_alt
+                else:
+                    self.undo_attack(attack_list)
+                #
+            else:
+#                li = random.randrange(cnn_l_num) # for multi cnn
+#                layer = r.get_layer_at(li)
+#                nc = cnn_layers[li][1] # num of filters
+#                ic = cnn_layers[li][2] # size of a filter
+#                ni = random.randrange(nc)
+                attack_list = []
+                for ii in range(ic):
+                    wi = layer.get_weight_index(ni, ii)
+                    wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
+                    attack_list.append((li, ni, ii, wi, wi_alt))
+                    layer.set_weight_index(ni, ii, wi_alt)
+                #
+                #
+                layer.update_weight()
+                ce_alt = self.mpi_evaluate(mpi, com, rank, size)
+                print("%d : %f > %f" % (i, ce, ce_alt))
+                if ce_alt<ce:
+                    ce = ce_alt
+                else:
+                    self.undo_attack(attack_list)
+                #
+            #
+        # for
+        self.mpi_save(pack.save_path(), mpi, com, rank, size)
+        return 0
         
     def mpi_cnn_loop(self, n=1, mpi=0, com=None, rank=0, size=0):
         fc_w_list = None
@@ -303,9 +484,10 @@ class Train:
             print("rank=%d, fc=%d, cnn=%d" % (rank, fc_w_num, cnn_w_num))
         else:
             fc_w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-            cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
             fc_w_num = len(fc_w_list)
+            cnn_w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
             cnn_w_num = len(cnn_w_list)
+            print("fc=%d, cnn=%d" % (fc_w_num, cnn_w_num))
         #
         fc_d = 100
         fc_lv_min = 0
@@ -322,4 +504,3 @@ class Train:
             self.mpi_save(pack.save_path(), mpi, com, rank, size)
         #
         return 0
-        

@@ -67,10 +67,11 @@ def main():
         #
         t = train.Train(pack, r)
         if config==0: # fc
-            t.loop()
+            t.mpi_loop(1)
         else:
-            #t.cnn_loop()
-            t.mpi_cnn_loop(1)
+            t.mpi_loop(1)
+            #t.mpi_cnn_loop(1)
+            #t.mpi_cnn_filter_loop(1000)
         #
     elif mode==1: # test
         test.test_n(r, pack, 500)

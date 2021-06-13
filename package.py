@@ -171,9 +171,18 @@ class Package:
                 c = r.count_layers()
                 hidden_2 = core.HiddenLayer(c, 128, 128, hidden_1, my_gpu)
                 r.layers.append(hidden_2)
+                
+                c = r.count_layers()
+                hidden_3 = core.HiddenLayer(c, 128, 128, hidden_2, my_gpu)
+                r.layers.append(hidden_2)
+                
+                c = r.count_layers()
+                hidden_4 = core.HiddenLayer(c, 128, 128, hidden_3, my_gpu)
+                r.layers.append(hidden_2)
+                
                 # 3 : output : 128 x 10
                 c = r.count_layers()
-                output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
+                output = core.OutputLayer(c, 128, 10, hidden_4, my_gpu)
                 r.layers.append(output)
             elif config==1:
                 # 0 : input : 32 x 32 x 3 = 3072

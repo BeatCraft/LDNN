@@ -141,8 +141,8 @@ class Layer(object):
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         pass
     
-    def back_propagate(self, error_array, debug=0):
-        pass
+#    def back_propagate(self, error_array, debug=0):
+#        pass
     
     def get_weight_index(self, ni, ii):
         return self._weight_index_matrix[ni][ii]
@@ -290,42 +290,43 @@ class HiddenLayer(Layer):
             self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
         #
         
-    def back_propagate(self, error_array, debug=0):
-        if debug:
-            print("HiddenLayer::back_propagate()")
-            print(self._index)
-        #
-        next = self._next
-        dy = next.dx
-        if debug:
-            print("dy")
-            print((dy.shape))
-        #
-        
-        # dw
-        x = sum(self._pre._output_array) / float(self._num_input)
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                self.dw[ni][ii] = x[ii] * dy[ni]
-            #
-        #
-        
-        # dx
-        dx_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
-        ww = sum(self._weight_matrix) / float(self._num_input)
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                dx_matrix[ni][ii] = ww[ii] * dy[ni]
-            #
-        #
-        
-        self.dx = sum(dx_matrix) / float(self._num_node)
-        if debug:
-            print("dx")
-            print(self.dx.shape)
-        #
-        self._pre.dy = self.dx
-        return
+#    def back_propagate(self, error_array, debug=0):
+#        if debug:
+#            print("HiddenLayer::back_propagate()")
+#            print(self._index)
+#        #
+#        next = self._next
+#        dy = next.dx
+#        if debug:
+#            print("dy")
+#            print((dy.shape))
+#        #
+#
+#        # dw
+#        x = sum(self._pre._output_array) / float(self._num_input)
+#        for ni in range(self._num_node):
+#            for ii in range(self._num_input):
+#                self.dw[ni][ii] = x[ii] * dy[ni]
+#            #
+#        #
+#
+#        # dx
+#        dx_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+#        ww = sum(self._weight_matrix) / float(self._num_input)
+#        for ni in range(self._num_node):
+#            for ii in range(self._num_input):
+#                dx_matrix[ni][ii] = ww[ii] * dy[ni]
+#            #
+#        #
+#
+#        self.dx = sum(dx_matrix) / float(self._num_node)
+#        if debug:
+#            print("dx")
+#            print(self.dx.shape)
+#        #
+#        self._pre.dy = self.dx
+#        return
+
 #
 #
 #
@@ -394,64 +395,64 @@ class OutputLayer(Layer):
             print(self._output_array[0])
         #
         
-    def back_propagate(self, t_array, debug=0):
-        if debug:
-            print("OutputLayer::back_propagate()")
-            print(self._index)
-        #
-        self._gpu.copy(self._output_array, self._gpu_output)
-        if debug:
-            print(self._output_array.shape)
-        #
-        self._gpu.copy(self._pre._output_array, self._pre._gpu_output)
-        if debug:
-            print(self._pre._output_array.shape) # x (16, 128)
-        #
-        size = t_array.shape[0] # batch size
-        if debug:
-            print("batch size=%d" % (size))
-        #
-        for i in range(size):
-            label = t_array[i]
-            for j in range(self._num_node):
-                if j==label:
-                    self.dy[j] = self.dy[j] + self._output_array[i][j] - 1.0
-                else:
-                    self.dy[j] = self.dy[j] + self._output_array[i][j]
-                #
-            #
-        #
-        self.dy = self.dy / float(size)
-        if debug:
-            print(self.dy) # (10,) for MNIST and cifar-10
-        #
-        # dw
-        x = sum(self._pre._output_array) / float(self._num_input)
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                self.dw[ni][ii] = x[ii] * self.dy[ni]
-            #
-        #
-        if debug:
-            print("dw")
-            print(self.dw.shape)
-        #
-        # dx
-        dx_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
-        ww = sum(self._weight_matrix) / float(self._num_input)
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                dx_matrix[ni][ii] = ww[ii] * self.dy[ni]
-            #
-        #
-        self.dx = sum(dx_matrix) / float(self._num_node)
-        if debug:
-            print("dx")
-            print(self.dx.shape)
-        #
-        self._pre.dy = self.dx
-        return
-        #return self.dx, self.dw
+#    def back_propagate(self, t_array, debug=0):
+#        if debug:
+#            print("OutputLayer::back_propagate()")
+#            print(self._index)
+#        #
+#        self._gpu.copy(self._output_array, self._gpu_output)
+#        if debug:
+#            print(self._output_array.shape)
+#        #
+#        self._gpu.copy(self._pre._output_array, self._pre._gpu_output)
+#        if debug:
+#            print(self._pre._output_array.shape) # x (16, 128)
+#        #
+#        size = t_array.shape[0] # batch size
+#        if debug:
+#            print("batch size=%d" % (size))
+#        #
+#        for i in range(size):
+#            label = t_array[i]
+#            for j in range(self._num_node):
+#                if j==label:
+#                    self.dy[j] = self.dy[j] + self._output_array[i][j] - 1.0
+#                else:
+#                    self.dy[j] = self.dy[j] + self._output_array[i][j]
+#                #
+#            #
+#        #
+#        self.dy = self.dy / float(size)
+#        if debug:
+#            print(self.dy) # (10,) for MNIST and cifar-10
+#        #
+#        # dw
+#        x = sum(self._pre._output_array) / float(self._num_input)
+#        for ni in range(self._num_node):
+#            for ii in range(self._num_input):
+#                self.dw[ni][ii] = x[ii] * self.dy[ni]
+#            #
+#        #
+#        if debug:
+#            print("dw")
+#            print(self.dw.shape)
+#        #
+#        # dx
+#        dx_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+#        ww = sum(self._weight_matrix) / float(self._num_input)
+#        for ni in range(self._num_node):
+#            for ii in range(self._num_input):
+#                dx_matrix[ni][ii] = ww[ii] * self.dy[ni]
+#            #
+#        #
+#        self.dx = sum(dx_matrix) / float(self._num_node)
+#        if debug:
+#            print("dx")
+#            print(self.dx.shape)
+#        #
+#        self._pre.dy = self.dx
+#        return
+#        #return self.dx, self.dw
 
 #
 # 2 x 2 simple max filter for 2D image data
@@ -912,20 +913,21 @@ class Roster:
             #
             pre = layer
         #
-        
-    def back_propagate(self, t_array, debug=0):
-        c = self.count_layers()
-        for i in reversed(range(c)):
-            layer = self.get_layer_at(i)
-            layer.back_propagate(t_array, debug)
-        #
-        return
-        
-        output = self.get_layer_at(c-1)
-        output.back_propagate(t_array, debug)
-        #
-        layer = self.get_layer_at(c-2)
-        layer.back_propagate(t_array, debug)
+
+#    def back_propagate(self, t_array, debug=0):
+#        c = self.count_layers()
+#        for i in reversed(range(c)):
+#            layer = self.get_layer_at(i)
+#            layer.back_propagate(t_array, debug)
+#        #
+#        return
+#
+#        output = self.get_layer_at(c-1)
+#        output.back_propagate(t_array, debug)
+#        #
+#        layer = self.get_layer_at(c-2)
+#        layer.back_propagate(t_array, debug)
+
 #
 #
 #

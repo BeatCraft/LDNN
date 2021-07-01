@@ -165,7 +165,7 @@ class Package:
                 r.layers.append(input)
                 # 1 : hidden : 3072 x 128
                 c = r.count_layers()
-                hidden_1 = core.HiddenLayer(c, 3072, 128, input, my_gpu)
+                hidden_1 = core.HiddenLayer(c, 3072, 64, input, my_gpu)
                 r.layers.append(hidden_1)
                 # 2 : hidden : 128 x 128
                 c = r.count_layers()

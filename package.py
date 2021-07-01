@@ -174,11 +174,11 @@ class Package:
                 # 3
                 c = r.count_layers()
                 hidden_3 = core.HiddenLayer(c, 64, 64, hidden_2, my_gpu)
-                r.layers.append(hidden_2)
+                r.layers.append(hidden_3)
                 # 4
                 c = r.count_layers()
                 hidden_4 = core.HiddenLayer(c, 64, 64, hidden_3, my_gpu)
-                r.layers.append(hidden_2)
+                r.layers.append(hidden_4)
                 # 5 : output : 64 x 10
                 c = r.count_layers()
                 output = core.OutputLayer(c, 64, 10, hidden_4, my_gpu)

@@ -352,7 +352,7 @@ class Train:
             w_num = len(w_list)
             print("rank=%d, w=%d" % (rank, w_num))
         else:
-            w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+            w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
             w_num = len(w_list)
         #
         d = 100

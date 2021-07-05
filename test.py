@@ -94,6 +94,9 @@ def test_n(r, pack, n):
     #r.propagate()
     ce = r.get_cross_entropy()
     print("CE = %f" % (ce))
+    #
+  
+    #self.mpi_save(pack.save_path(), mpi, com, rank, size)
 
     
 

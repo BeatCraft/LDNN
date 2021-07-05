@@ -75,6 +75,7 @@ def main():
         #
     elif mode==1: # test
         test.test_n(r, pack, 500)
+        #r.export_weight(pack.save_path())
     else:
         print("mode error : %d" % (mode))
         return 0

@@ -156,12 +156,6 @@ class Layer(object):
             #
         #
     
-#    def import_weight_matrix(self, data):
-#        return None
-#
-#    def export_weight_matrix(self):
-#        return None
-
     def export_weight_index(self):
         return self._weight_index_matrix.tolist()
     
@@ -211,14 +205,6 @@ class InputLayer(Layer):
     def get_weight_index(self, ni, ii):
         return 0
         
-#    def export_weight_matrix(self):
-#        print("InputLayer::export_weight_matrix()")
-#        return None
-
-#    def import_weight_matrix(self, wi_list):
-#        print("InputLayer::InputLayer()")
-#        return None
-        
     def export_weight_index(self):
         return None
         
@@ -255,15 +241,6 @@ class HiddenLayer(Layer):
     
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
-
-#    def import_weight_matrix(self, data):
-#        print("HiddenLayer::import_weight_matrix()")
-#        self._weight_matrix = data
-#        return 1
-#
-#    def export_weight_matrix(self):
-#        print("HiddenLayer::export_weight_matrix()")
-#        return self._weight_matrix
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         stride_1 = self._num_node * self._num_input
@@ -315,15 +292,6 @@ class OutputLayer(Layer):
         
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
-
-#    def import_weight_matrix(self, data):
-#        print("OutputLayer::import_weight_matrix()")
-#        self._weight_matrix = data
-#        return 1
-      
-#    def export_weight_matrix(self):
-#        print("OutputLayer::export_weight_matrix()")
-#        return self._weight_matrix
         
     def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
         stride_1 = self._num_node * self._num_input
@@ -370,12 +338,6 @@ class MaxLayer(Layer):
         
     def get_weight_index(self, ni, ii):
         return 0
-    
-#    def export_weight_matrix(self):
-#        return None
-#
-#    def import_weight_matrix(self, wi_list):
-#        return 0
         
     def export_weight_index(self):
         return None
@@ -702,28 +664,6 @@ class Roster:
     def export_weight(self, path):
         print("Roster : export_weight(%s)" % path)
         self.export_weight_index(path)
-#        if self._mode==0:
-#            self.export_weight_index(path)
-#        elif self._mode==1:
-#            self.export_weight_matrix(path)
-#        #
-    
-#    def export_weight_matrix(self, path):
-#        print("Roster : export_weight_matrix(%s)" % path)
-#        ma_list = []
-#        c = self.count_layers()
-#        for i in range(c):
-#            layer = self.get_layer_at(i)
-#            ma = layer.export_weight_matrix()
-#            if ma is None:
-#                pass
-#            else:
-#                ma_list.append(ma)
-#                print(ma.shape)
-#            #
-#        #
-#        print ma_list[0]
-#        util.pickle_save(path, ma_list)
         
     def export_weight_index(self, path):
         print("Roster : export_weight_index(%s)" % path)
@@ -743,34 +683,6 @@ class Roster:
     def import_weight(self, path):
         print("Roster : import_weight(%s)" % path)
         self.import_weight_index(path)
-#        if self._mode==0:
-#            self.import_weight_index(path)
-#        elif self._mode==1:
-#            self.import_weight_matrix(path)
-#        #
-    
-#    def import_weight_matrix(self, path):
-#        print("Roster : import_weight_matrix(%s)" % path)
-#        ma_list = util.pickle_load(path)
-#        if ma_list==None:
-#            return
-#        #
-#        print(len(ma_list))
-#        j = 0
-#        c = self.count_layers()
-#        for i in range(c):
-#            layer = self.get_layer_at(i)
-#            type = layer.get_type()
-#            if type==LAYER_TYPE_INPUT or type==LAYER_TYPE_MAX:
-#                continue
-#            #
-#            ma = ma_list[j]
-#            ret = layer.import_weight_matrix(ma)
-#            if ret==0:
-#                continue
-#            #
-#            j = j + 1
-#        #
         
     def import_weight_index(self, path):
         print("Roster : import_weight_index(%s)" % path)

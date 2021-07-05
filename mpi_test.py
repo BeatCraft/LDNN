@@ -92,7 +92,7 @@ def main():
     print("%d, %d, %d, %d" % (rank, size, my_rank, my_size))
     #
     package_id = 1  # 0 : MNIST, 1 : Cifar-10
-    config_id = 0   # 0 : FC, 1 : CNN
+    config_id = 1   # 0 : FC, 1 : CNN
     #
     wk = worker(com, package_id, config_id)
     wk._train.mpi_loop(1, 1, com, rank, size)

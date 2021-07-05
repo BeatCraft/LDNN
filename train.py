@@ -304,6 +304,7 @@ class Train:
                 #
                 level = level + mode
             #
+            print("[%d] wi saved as CE=%f" % (rank, ce))
             self.mpi_save(pack.save_path(), mpi, com, rank, size)
         #
         return ce, lv_min, lv_max

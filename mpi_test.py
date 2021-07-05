@@ -79,8 +79,8 @@ class worker(object):
         #    self._attack_num = 0
         #    self._attack_cnt = 0
         #
+        ce = self._train.mpi_evaluate(1, com, rank, size)
         if rank==0:
-            ce = self._train.mpi_evaluate(1, com, rank, size)
             print("[%d] CE starts with %f" % rank, ce)
         #
 #

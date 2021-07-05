@@ -36,7 +36,7 @@ class Train:
     def mpi_evaluate(self, mpi=0, com=None, rank=0, size=0):
         self._r.propagate()
         ce = self._r.get_cross_entropy()
-        #print("[%d] ce_avg = %f" % (rank, ce))
+        print("[%d] ce_avg = %f" % (rank, ce))
         if mpi==0:
             return ce
         #

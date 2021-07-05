@@ -81,7 +81,7 @@ class worker(object):
         #
         ce = self._train.mpi_evaluate(1, com, rank, size)
         if rank==0:
-            print("[%d] CE starts with %f" % rank, ce)
+            print("[%d] CE starts with %f" % (rank, ce))
         #
 #
 #

@@ -36,7 +36,7 @@ class Train:
     def mpi_evaluate(self, mpi=0, com=None, rank=0, size=0):
         self._r.propagate()
         ce = self._r.get_cross_entropy()
-        print("[%d] ce_avg = %f" % (rank, ce))
+        #print("[%d] ce_avg = %f" % (rank, ce))
         if mpi==0:
             return ce
         #
@@ -343,6 +343,10 @@ class Train:
         pack = self._package
         ce = self.mpi_evaluate(mpi, com, rank, size)
         print("CE starts with %f" % ce)
+        #
+        self.mpi_save(pack.save_path(), mpi, com, rank, size)
+        return 0
+        
         #
         if mpi:
             if rank==0:

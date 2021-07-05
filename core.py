@@ -676,8 +676,8 @@ class Roster:
                 data = layer.export_weight_index()
                 if data:
                     type = layer.get_type()
-                    if type==LAYER_TYPE_CONV_4:
-                        print(data[0])
+                    if 1==1 and type==LAYER_TYPE_CONV_4:
+                        print(data)
                     #
                     writer.writerows(data)
                 #
@@ -712,8 +712,8 @@ class Roster:
                     #
                 #
                 type = layer.get_type()
-                if type==LAYER_TYPE_CONV_4:
-                    print(block[0])
+                if if 1==1 and type==LAYER_TYPE_CONV_4:
+                    print(block)
                 #
                 layer.import_weight_index(block)
             # for

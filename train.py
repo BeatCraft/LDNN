@@ -326,6 +326,7 @@ class Train:
         r = self._r
         if mpi:
             if rank==0:
+                print("mpi_save(%s) : mpi=%d, rank=%d" % (path, mpi, rank))
                 r.export_weight(path)
             else:
                 pass

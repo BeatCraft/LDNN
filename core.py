@@ -712,7 +712,7 @@ class Roster:
                     #
                 #
                 type = layer.get_type()
-                if if 1==1 and type==LAYER_TYPE_CONV_4:
+                if 1==1 and type==LAYER_TYPE_CONV_4:
                     print(block)
                 #
                 layer.import_weight_index(block)

@@ -179,13 +179,11 @@ class Train:
             ii = w[2]
             wi, wi_alt = self.weight_ops(attack_i, mode, w_list)
             if wi!=wi_alt:
-                #attack_list.append((attack_i, wi, wi_alt))
                 attack_list.append((li, ni, ii, wi, wi_alt))
             #
         #
         return attack_list
 
-    #def undo_attack(self, attack_list, w_list):
     def undo_attack(self, attack_list):
         r = self._r
         for wt in attack_list:
@@ -218,12 +216,7 @@ class Train:
             attack_list = self.make_attack_list(div, mode, w_list)
         #
         w_num = len(w_list)
-        #print("rank=%d, w_num=%d" % (rank, w_num))
-        #
         for wt in attack_list:
-            #attack_i = wt[0]
-            #w = self._w_list[attack_i]
-            #w = w_list[attack_i]
             li = wt[0]
             ni = wt[1]
             ii = wt[2]
@@ -238,12 +231,6 @@ class Train:
             layer.update_weight()
         #
         ce_alt = self.mpi_evaluate(mpi, com, rank, size)
-#        if mpi:
-#            ce_alt = self.mpi_evaluate(com, rank, size)
-#        else:
-#            r.propagate()
-#            ce_alt = r.get_cross_entropy()
-        #
         ret = 0
         if ce_alt<ce:
             ce = ce_alt
@@ -344,8 +331,8 @@ class Train:
         ce = self.mpi_evaluate(mpi, com, rank, size)
         print("CE starts with %f" % ce)
         #
-        self.mpi_save(pack.save_path(), mpi, com, rank, size)
-        return 0
+#        self.mpi_save(pack.save_path(), mpi, com, rank, size)
+#        return 0
         
         #
         if mpi:

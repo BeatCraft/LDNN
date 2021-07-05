@@ -342,8 +342,7 @@ class Train:
         r = self._r
         pack = self._package
         ce = self.mpi_evaluate(mpi, com, rank, size)
-        
-        
+        print("CE starts with %f" % ce)
         #
         if mpi:
             if rank==0:

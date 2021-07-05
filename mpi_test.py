@@ -49,9 +49,12 @@ def get_device_by_host_id(h):
     return DEVICE_IDS[h]
 
 class worker(object):
-    def __init__(self, com, package_id, config_id):
+    def __init__(self, com, rank, size, package_id, config_id):
         self._com = com
         self._gpu = gpu
+        #
+        #self._rank = rank
+        #self._size = size
         #
         self._processor_name = MPI.Get_processor_name()
         self._rank = self._com.Get_rank()
@@ -71,10 +74,14 @@ class worker(object):
         self._batch_start = MINI_BATCH_START[self._rank]
         self._roster.set_batch(self._package , self._batch_size, self._batch_start)
         #
-        if self._rank==0:
-            self._w_list = []
-            self._attack_num = 0
-            self._attack_cnt = 0
+        #if self._rank==0:
+        #    self._w_list = []
+        #    self._attack_num = 0
+        #    self._attack_cnt = 0
+        #
+        if rank==0:
+            ce = self._train.mpi_evaluate(1, com, rank, size)
+            print("CE starts with %f" % ce)
         #
 #
 #
@@ -94,7 +101,9 @@ def main():
     package_id = 1  # 0 : MNIST, 1 : Cifar-10
     config_id = 1   # 0 : FC, 1 : CNN
     #
-    wk = worker(com, package_id, config_id)
+    wk = worker(com, rank, size, package_id, config_id)
+    return 0
+    #
     wk._train.mpi_loop(1, 1, com, rank, size)
     return 0
 #

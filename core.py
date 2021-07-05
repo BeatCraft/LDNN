@@ -373,7 +373,9 @@ class Conv_4_Layer(Layer):
         self._filter_size = 3 * 3 * ch # width and height of filter are fixed to 3
         num_input = self._filter_size
         num_node = self._filter
+        #
         super(Conv_4_Layer, self).__init__(i, LAYER_TYPE_CONV_4, num_input, num_node, pre, gpu)
+        #
 
         # mems for weights
         self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
@@ -411,7 +413,6 @@ class Conv_4_Layer(Layer):
             self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
             self._cache = 1 # cache for padding
         #
-#        self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
         
         # ni : filetr index, 0 to num of filter -1
         # ii : index of matrix, 0 to 3*3*ch-1
@@ -677,7 +678,7 @@ class Roster:
                 if data:
                     type = layer.get_type()
                     if i==1 and type==LAYER_TYPE_CONV_4:
-                        print(data)
+                        print(data[0])
                     #
                     writer.writerows(data)
                 #
@@ -713,7 +714,7 @@ class Roster:
                 #
                 type = layer.get_type()
                 if i==1 and type==LAYER_TYPE_CONV_4:
-                    print(block)
+                    print(block[0])
                 #
                 layer.import_weight_index(block)
             # for

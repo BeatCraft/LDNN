@@ -79,9 +79,10 @@ class worker(object):
         #    self._attack_num = 0
         #    self._attack_cnt = 0
         #
-        if rank==0:
-            ce = self._train.mpi_evaluate(1, com, rank, size)
-            print("CE starts with %f" % ce)
+        #if rank==0:
+        print("rank=%d" % (rank))
+        ce = self._train.mpi_evaluate(1, com, rank, size)
+        print("CE starts with %f" % ce)
         #
 #
 #
@@ -102,6 +103,7 @@ def main():
     config_id = 1   # 0 : FC, 1 : CNN
     #
     wk = worker(com, rank, size, package_id, config_id)
+    print("exit of rank=%d" % (rank))
     return 0
     #
     wk._train.mpi_loop(1, 1, com, rank, size)

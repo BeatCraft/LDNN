@@ -342,6 +342,8 @@ class Train:
         r = self._r
         pack = self._package
         ce = self.mpi_evaluate(mpi, com, rank, size)
+        
+        
         #
         if mpi:
             if rank==0:

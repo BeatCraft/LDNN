@@ -343,7 +343,7 @@ __kernel void k_test(const float in)
     int i = get_global_id(0);
     float out = 0.0;
     out = exp(in);
-//    printf(\"%d : exp(%If) = %If\\n\", i, in, out);
+    printf(\"%d : exp(%If) = %If\\n\", i, in, out);
 };
 
 """

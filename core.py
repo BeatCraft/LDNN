@@ -728,7 +728,7 @@ class Roster:
         # with
 
 #    def propagate(self, li=-1, ni=-1, ii=-1, wi=-1, debug=0):
-    def propagate(self, array_in, debug=0):
+    def propagate(self, debug=0):
         c = self.count_layers()
         pre = self.get_layer_at(0)
         for i in range(1, c):

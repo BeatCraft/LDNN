@@ -91,7 +91,7 @@ LAYER_TYPE_INPUT   = 0
 LAYER_TYPE_HIDDEN  = 1
 LAYER_TYPE_OUTPUT  = 2
 LAYER_TYPE_CONV_4  = 3
-LAYER_TYPE_MAX    = 4 # MAX
+LAYER_TYPE_MAX     = 4 # MAX
 #
 class Layer(object):
     # i         : index of layers
@@ -138,7 +138,8 @@ class Layer(object):
     def update_weight(self):
         pass
 
-    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+#    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+    def propagate(self, array_in, debug=0):
         pass
     
     def get_weight_index(self, ni, ii):
@@ -196,7 +197,8 @@ class InputLayer(Layer):
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
         #
         
-    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+#    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+    def propagate(self, array_in, debug=0):
         pass
     
     def set_weight_index(self, ni, ii, wi):
@@ -242,17 +244,19 @@ class HiddenLayer(Layer):
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
         
-    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+    #def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+    def propagate(self, array_in, debug=0):
         stride_1 = self._num_node * self._num_input
         stride_2 = self._num_input
-        if ni>=0: # alt
-            self._gpu.multiple_x_by_w_batch_alt(array_in, self._gpu_weight, self._gpu_product,
-                                                self._batch_size, stride_1, stride_2,
-                                                self._num_input, self._num_node, ni, ii, WEIGHT_SET[wi])
-        else: # propagation
-            self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
-                                            self._batch_size, stride_1, stride_2,
-                                            self._num_input, self._num_node)
+#        if ni>=0: # alt
+#            self._gpu.multiple_x_by_w_batch_alt(array_in, self._gpu_weight, self._gpu_product,
+#                                                self._batch_size, stride_1, stride_2,
+#                                                self._num_input, self._num_node, ni, ii, WEIGHT_SET[wi])
+#        else: # propagation
+        
+        self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
+                                        self._batch_size, stride_1, stride_2,
+                                        self._num_input, self._num_node)
         #
         # sum
         #
@@ -293,18 +297,19 @@ class OutputLayer(Layer):
     def update_weight(self):
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
         
-    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+#    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+    def propagate(self, array_in, debug=0):
         stride_1 = self._num_node * self._num_input
         stride_2 = self._num_input
         
-        if ni>=0: # alt
-            self._gpu.multiple_x_by_w_batch_alt(array_in, self._gpu_weight, self._gpu_product,
-                                                self._batch_size, stride_1, stride_2,
-                                                self._num_input, self._num_node, ni, ii, WEIGHT_SET[wi])
-        else: # propagation
-            self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
-                                            self._batch_size, stride_1, stride_2,
-                                            self._num_input, self._num_node)
+#        if ni>=0: # alt
+#            self._gpu.multiple_x_by_w_batch_alt(array_in, self._gpu_weight, self._gpu_product,
+#                                                self._batch_size, stride_1, stride_2,
+#                                                self._num_input, self._num_node, ni, ii, WEIGHT_SET[wi])
+#        else: # propagation
+        self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
+                                        self._batch_size, stride_1, stride_2,
+                                        self._num_input, self._num_node)
         #
         activation = 1
         self._gpu.sum(self._gpu_product, self._gpu_output,
@@ -357,7 +362,8 @@ class MaxLayer(Layer):
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
         #
         
-    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+#    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+    def propagate(self, array_in, debug=0):
         self._gpu.max_batch(array_in, self._gpu_output,
                             self._ch, self._x, self._y,
                             self._batch_size, self._num_input)
@@ -369,7 +375,7 @@ class Conv_4_Layer(Layer):
         self._ch = ch
         self._w = w
         self._h = h
-        self._filter = filter
+        self._filter = filter # node
         self._filter_size = 3 * 3 * ch # width and height of filter are fixed to 3
         num_input = self._filter_size
         num_node = self._filter
@@ -405,8 +411,8 @@ class Conv_4_Layer(Layer):
     def reset(self):
         self._cache = 0
         
-    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
-#        print("Conv_4_Layer::propagate()")
+#    def propagate(self, array_in, ni=-1, ii=-1, wi=-1, debug=0):
+    def propagate(self, array_in, debug=0):
         if self._cache:
             pass
         else:
@@ -416,15 +422,16 @@ class Conv_4_Layer(Layer):
         
         # ni : filetr index, 0 to num of filter -1
         # ii : index of matrix, 0 to 3*3*ch-1
-        if ni>=0:
-            wi_undo = self._weight_index_matrix[ni][ii]
-            self.set_weight_index(ni, ii, wi)
-            self.update_weight()
-            self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
-            self.set_weight_index(ni, ii, wi_undo)
-            self.update_weight()
-        else:
-            self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
+#        if ni>=0:
+#            wi_undo = self._weight_index_matrix[ni][ii]
+#            self.set_weight_index(ni, ii, wi)
+#            self.update_weight()
+#            self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
+#            self.set_weight_index(ni, ii, wi_undo)
+#            self.update_weight()
+#        else:
+        self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output,
+                                    self._w, self._h, self._ch, self._filter, self._batch_size)
         #
         # scale
         #
@@ -676,10 +683,10 @@ class Roster:
                 #print "%d : %d" % (i, layer.get_type())
                 data = layer.export_weight_index()
                 if data:
-                    type = layer.get_type()
-                    if i==1 and type==LAYER_TYPE_CONV_4:
-                        print(data[0])
-                    #
+#                    type = layer.get_type()
+#                    if i==1 and type==LAYER_TYPE_CONV_4:
+#                        print(data[0])
+#                    #
                     writer.writerows(data)
                 #
             #
@@ -712,24 +719,26 @@ class Roster:
                         break
                     #
                 #
-                type = layer.get_type()
-                if i==1 and type==LAYER_TYPE_CONV_4:
-                    print(block[0])
-                #
+#                type = layer.get_type()
+#                if i==1 and type==LAYER_TYPE_CONV_4:
+#                    print(block[0])
+#                #
                 layer.import_weight_index(block)
             # for
         # with
 
-    def propagate(self, li=-1, ni=-1, ii=-1, wi=-1, debug=0):
+#    def propagate(self, li=-1, ni=-1, ii=-1, wi=-1, debug=0):
+    def propagate(self, array_in, debug=0):
         c = self.count_layers()
         pre = self.get_layer_at(0)
         for i in range(1, c):
             layer = self.get_layer_at(i)
-            if i==li: # alt
-                layer.propagate(pre._gpu_output, ni, ii, wi, debug)
-            else: # propagation
-                layer.propagate(pre._gpu_output, -1, -1, -1, debug)
-            #
+            layer.propagate(pre._gpu_output, debug)
+#            if i==li: # alt
+#                layer.propagate(pre._gpu_output, ni, ii, wi, debug)
+#            else: # propagation
+#                layer.propagate(pre._gpu_output, -1, -1, -1, debug)
+#            #
             pre = layer
         #
 #

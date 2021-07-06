@@ -400,7 +400,9 @@ class Conv_4_Layer(Layer):
             pass
         else:
             self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-            self._cache = 1 # cache for padding
+            if self._index==1:
+                self._cache = 1 # cache for padding
+            #
         #
         
         # ni : filetr index, 0 to num of filter -1
@@ -647,7 +649,7 @@ class Roster:
         self.export_weight_index(path)
         
     def export_weight_index(self, path):
-        print("Roster : export_weight_index(%s)" % path)
+        #print("Roster : export_weight_index(%s)" % path)
         with open(path, "w") as f:
             writer = csv.writer(f, lineterminator='\n')
             c = self.count_layers()
@@ -670,7 +672,7 @@ class Roster:
         self.import_weight_index(path)
         
     def import_weight_index(self, path):
-        print("Roster : import_weight_index(%s)" % path)
+        #print("Roster : import_weight_index(%s)" % path)
         with open(path, "r") as f:
             reader = csv.reader(f)
             lc = self.count_layers()

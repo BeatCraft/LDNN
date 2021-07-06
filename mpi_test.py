@@ -102,8 +102,8 @@ def main():
     config_id = 1   # 0 : FC, 1 : CNN
     #
     wk = worker(com, rank, size, package_id, config_id)
-    print("exit of rank=%d" % (rank))
-    return 0
+    #print("exit of rank=%d" % (rank))
+    #return 0
     #
     wk._train.mpi_loop(1, 1, com, rank, size)
     return 0

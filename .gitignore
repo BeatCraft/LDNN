@@ -9,6 +9,6 @@ obsolute/
 test/
 debug/
 client_data/
-test.sh
-train.sh
+./test.sh
+./train.sh
 

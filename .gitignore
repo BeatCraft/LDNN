@@ -9,5 +9,4 @@ obsolute/
 test/
 debug/
 client_data/
-
-
+*.sh

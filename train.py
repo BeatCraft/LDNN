@@ -342,3 +342,172 @@ class Train:
             #
         #
         return 0
+#
+#
+#
+    def mpi_cnn_multi_attack(self, ce, w_list, w_cnn_list, mode=1, div=0, mpi=0, com=None, rank=0, size=0):
+        r = self._r
+        #
+        if mpi:
+            if rank==0:
+                a_list_0 = self.make_attack_list(div, mode, w_cnn_list)
+                a_list_1 = self.make_attack_list(div, mode, w_list)
+                attack_list = a_list_0 + a_list_1
+            else:
+                attack_list = []
+            #
+            attack_list = com.bcast(attack_list, root=0)
+        else:
+            a_list_0 = self.make_attack_list(div, mode, w_cnn_list)
+            a_list_1 = self.make_attack_list(div, mode, w_list)
+            attack_list = a_list_0 + a_list_1
+        #
+        w_num = len(w_list)
+        for wt in attack_list:
+            #print(wt)
+            li = wt[0]
+            ni = wt[1]
+            ii = wt[2]
+            wi = wt[3]
+            wi_alt = wt[4]
+            layer = r.get_layer_at(li)
+            layer.set_weight_index(ni, ii, wi_alt)
+        #
+        c = r.count_layers()
+        for li in range(c):
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+        ce_alt = self.mpi_evaluate(mpi, com, rank, size)
+        ret = 0
+        if ce_alt<ce:
+            ce = ce_alt
+            ret = 1
+        else:
+            self.undo_attack(attack_list)
+        #
+        return ce, ret
+        
+    def mpi_w_cnn_loop(self, c, n, d, ce, w_list, w_cnn_list, lv_min, lv_max, label, mpi=0, com=None, rank=0, size=0):
+        level = lv_min
+        mode = 1
+        r = self._r
+        pack = self._package
+        
+        print(len(w_list))
+        print(len(w_cnn_list))
+        #
+        for j in range(n):
+            #
+            div = float(d)*float(2**(level))
+            wa = int(len(w_list)/div)
+            ca = int(len(w_cnn_list)/div)
+            #
+            cnt = 0
+            for i in range(100):
+                ce, ret = self.mpi_cnn_multi_attack(ce, w_list, w_cnn_list, 1, div, mpi, com, rank, size)
+                cnt = cnt + ret
+                if mpi:
+                    if rank==0:
+                        print("[%d|%s] %d : H : %d : %f, %d (%d, %d) %d (%d, %d, %d)" %
+                            (c, label, j, i, ce, level, lv_min, lv_max, cnt, 2**(level), wa, ca))
+                    #
+                else:
+                    print("[%d|%s] %d : H : %d : %f, %d (%d, %d) %d (%d, %d, %d)" %
+                        (c, label, j, i, ce, level, lv_min, lv_max, cnt, 2**(level), wa, ca))
+                #
+            #
+            for i in range(100):
+                ce, ret = self.mpi_cnn_multi_attack(ce, w_list, w_cnn_list, 0, div, mpi, com, rank, size)
+                cnt = cnt + ret
+                if mpi:
+                    if rank==0:
+                        print("[%d|%s] %d : C : %d : %f, %d (%d, %d) %d (%d, %d, %d)" %
+                            (c, label, j, i, ce, level, lv_min, lv_max, cnt, 2**(level), wa, ca))
+                    #
+                else:
+                    print("[%d|%s] %d : C : %d : %f, %d (%d, %d) %d (%d, %d, %d)" %
+                        (c, label, j, i, ce, level, lv_min, lv_max, cnt, 2**(level), wa, ca))
+                #
+            #
+            if mode==1:
+                if level==lv_max:
+                    if level==lv_min:
+                        mode = 0
+                    else:
+                        mode = -1
+                elif level<lv_max-1:
+                    if cnt==0:
+                        if level==lv_min:
+                            lv_min = lv_min + 1
+                        #
+                    #
+                #
+                level = level + mode
+            elif mode==-1:
+                if level==lv_min:
+                    if level==lv_max:
+                        mode = 0
+                    else:
+                        mode = 1
+                        if cnt==0:
+                            lv_min = lv_min + 1
+                        #
+                    #
+                #
+                level = level + mode
+            #
+            #print("[%d] wi saved as CE=%f" % (rank, ce))
+            self.mpi_save(pack.save_path(), mpi, com, rank, size)
+        #
+        return ce, lv_min, lv_max
+
+
+    def mpi_cnn_loop(self, n=1, mpi=0, com=None, rank=0, size=0):
+        w_list = None
+        w_cnn_list = None
+        ce = 0.0
+        ret = 0
+        r = self._r
+        pack = self._package
+        ce = self.mpi_evaluate(mpi, com, rank, size)
+        print("CE starts with %f" % ce)
+        #
+        if mpi:
+            if rank==0:
+                w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+                w_cnn_list = w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
+            else:
+                w_list = []
+                w_cnn_list = []
+            #
+            w_list = com.bcast(w_list, root=0)
+            w_num = len(w_list)
+            w_cnn_list = com.bcast(w_cnn_list, root=0)
+            w_cnn_num = len(w_cnn_list)
+            print("rank=%d, w=%d, w_cnn=%d" % (rank, w_num, w_cnn_num))
+        else:
+            w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+            w_num = len(w_list)
+            #
+            w_cnn_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
+            w_cnn_num = len(w_cnn_list)
+            print("w=%d, w_cnn=%d" % (w_num, w_cnn_num))
+        #
+        #return 0
+        #
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        print("lv_max=%d" %(lv_max))
+        #return 0
+        #
+        #
+        #
+        #
+        
+        for i in range(n):
+            ce, lv_min, lv_min = self.mpi_w_cnn_loop(i, 500, d, ce, w_list, w_cnn_list, lv_min, lv_max, "all", mpi, com, rank, size)
+            #self.mpi_save(pack.save_path(), mpi, com, rank, size)
+        #
+        return 0

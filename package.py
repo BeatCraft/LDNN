@@ -142,23 +142,39 @@ class Package:
                 r.layers.append(input)
                 # 1 : CNN 28 x 28 x 1 > 28 x 28 x 4
                 c = r.count_layers()
-                cnn_1 = core.Conv_4_Layer(c, 28, 28, 1, 4, input, my_gpu)
+                cnn_1 = core.Conv_4_Layer(c, 28, 28, 1, 8, input, my_gpu)
                 r.layers.append(cnn_1)
+                # 2 : CNN 28 x 28 x 1 > 28 x 28 x 8
+                c = r.count_layers()
+                cnn_2 = core.Conv_4_Layer(c, 28, 28, 8, 8, cnn_1, my_gpu)
+                r.layers.append(cnn_2)
                 # 2 : max
                 c = r.count_layers()
-                max_1 = core.MaxLayer(c, 4, 28, 28, cnn_1, my_gpu)
+                max_1 = core.MaxLayer(c, 8, 28, 28, cnn_2, my_gpu)
                 r.layers.append(max_1)
-                # 3 hidden : 14 x 14 x 4 = 784
+                # 1 : CNN 14 x 14 x 8 > 14 x 14 x 4
                 c = r.count_layers()
-                hidden_1 = core.HiddenLayer(c, 784, 128, max_1, my_gpu)
+                cnn_3 = core.Conv_4_Layer(c, 14, 14, 8, 16, max_1, my_gpu)
+                r.layers.append(cnn_3)
+                # 2 : CNN 28 x 28 x 1 > 28 x 28 x 8
+                c = r.count_layers()
+                cnn_4 = core.Conv_4_Layer(c, 14, 14, 16, 16, cnn_3, my_gpu)
+                r.layers.append(cnn_3)
+                # 2 : max
+                c = r.count_layers()
+                max_2 = core.MaxLayer(c, 16, 14, 14, cnn_4, my_gpu)
+                r.layers.append(max_2)
+                # 3 hidden : 7 x 7 x 16 = 784
+                c = r.count_layers()
+                hidden_1 = core.HiddenLayer(c, 784, 64, max_2, my_gpu)
                 r.layers.append(hidden_1)
-                # 4 hidden : 128
+                # 4 hidden : 64
                 c = r.count_layers()
-                hidden_2 = core.HiddenLayer(c, 128, 128, hidden_1, my_gpu)
+                hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, my_gpu)
                 r.layers.append(hidden_2)
                 # 5 : output
                 c = r.count_layers()
-                output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
+                output = core.OutputLayer(c, 64, 10, hidden_2, my_gpu)
                 r.layers.append(output)
             #
         elif self._package_id==1: # cifa-10

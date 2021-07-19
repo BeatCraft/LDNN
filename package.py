@@ -150,7 +150,7 @@ class Package:
                 r.layers.append(cnn_2)
                 # 2 : max
                 c = r.count_layers()
-                max_1 = core.MaxLayer(c, 8, 28, 28, cnn_2, my_gpu)
+                max_1 = core.MaxLayer(c, 4, 28, 28, cnn_2, my_gpu)
                 r.layers.append(max_1)
                 # 3 : hidden : (7 x 7 x 160 X 64 = 784 x 64
                 c = r.count_layers()

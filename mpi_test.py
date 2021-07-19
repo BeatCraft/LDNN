@@ -98,7 +98,7 @@ def main():
     my_size = my_self.group.Get_size()
     print("%d, %d, %d, %d" % (rank, size, my_rank, my_size))
     #
-    package_id = 1  # 0 : MNIST, 1 : Cifar-10
+    package_id = 0  # 0 : MNIST, 1 : Cifar-10
     config_id = 1   # 0 : FC, 1 : CNN
     #
     wk = worker(com, rank, size, package_id, config_id)

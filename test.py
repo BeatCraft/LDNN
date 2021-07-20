@@ -92,7 +92,7 @@ def test_n(r, pack, n):
     print("time = %s" % (t))
     #
     #r.propagate()
-    ce = r.get_cross_entropy()
+    ce = r.get_cross_entropy(1)
     print("CE = %f" % (ce))
     #
   

@@ -352,7 +352,16 @@ class Train:
             if rank==0:
                 a_list_0 = self.make_attack_list(div, mode, w_cnn_list)
                 a_list_1 = self.make_attack_list(div, mode, w_list)
-                attack_list = a_list_0 + a_list_1
+                if len(a_list_0)==1 and len(a_list_1):
+                    k = random.randint(0, 9)
+                    if k % 2 == 0:
+                        attack_list = a_list_0
+                    else:
+                        attack_list = a_list_1
+                    #
+                else:
+                    attack_list = a_list_0 + a_list_1
+                #
             else:
                 attack_list = []
             #
@@ -360,7 +369,20 @@ class Train:
         else:
             a_list_0 = self.make_attack_list(div, mode, w_cnn_list)
             a_list_1 = self.make_attack_list(div, mode, w_list)
-            attack_list = a_list_0 + a_list_1
+            if len(a_list_0)==1 and len(a_list_1)==1:
+                #print("+")
+                #print("+ cnn %d" % (len(a_list_0)))
+                #print("+ fc  %d" % (len(a_list_1)))
+                #print("+")
+                k = random.randint(0, 9)
+                if k % 2 == 0:
+                    attack_list = a_list_0
+                else:
+                    attack_list = a_list_1
+                #
+            else:
+                attack_list = a_list_0 + a_list_1
+            #
         #
         w_num = len(w_list)
         for wt in attack_list:

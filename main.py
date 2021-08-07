@@ -59,7 +59,7 @@ def main():
     my_gpu = gpu.Gpu(platform_id, device_id)
     my_gpu.set_kernel_code()
     pack = package.Package(package_id)
-    r = pack.setup_dnn(my_gpu, config)
+    r = pack.setup_dnn(my_gpu, config, 0) # weight mode : 0=float, 1=int
     #
     if mode==0: # train
         print("batch_offset=%d" % (batch_offset))
@@ -75,6 +75,7 @@ def main():
         #
     elif mode==1: # test
         test.test_n(r, pack, 500)
+        #test.test_n(r, pack, 3)
         #r.export_weight(pack.save_path())
     else:
         print("mode error : %d" % (mode))

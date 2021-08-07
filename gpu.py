@@ -7,8 +7,151 @@ import os
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 #
 #
+#   -1.0    -0.5    -0.25   -0.125  0   0.125   0.25    0.5     1.0
+#   0       1       2       3       4   5       6       7       8
+#   -1      -1/2    -1/4    -1/8    0   1/8     1/4     1/2     1
 #
 KERNEL_CODE = """
+__kernel void int_cross_entropy(
+    __global const float* infs,
+    __global const float* labels,
+    __global float* output,
+    int num)
+{
+    int bi = get_global_id(0); // batch index
+    float delta;
+    float k;
+    float t;
+    float sum;
+    
+    delta = 0.0000001;
+    sum = 0.0;
+    
+    //printf(\"int_cross_entropy=%d\\n\", num);
+    for (int i=0;i<num;i++){
+        t = labels[bi*num + i];
+        k = infs[bi*num + i] + delta;
+        //printf(\"%d-%d | %f | %f | %f\\n\", bi, i, infs[bi*num + i], k, t * log(k));
+        sum += t * log(k);
+    }
+    
+    output[bi] = (-1.0)*sum;
+}
+
+__kernel void int_softmax(
+    __global int* in,
+    __global float* out,
+    int num)
+{
+    int bi = get_global_id(0);
+    float sum = 0.0;
+
+    for (int i=0;i<num;i++){
+        out[bi*num+i] = exp(float(in[bi*num+i]/256));
+        sum += out[bi*num+i];
+    }
+    //printf(\"sum=%f\\n\", sum);
+    for (int i=0;i<num;i++){
+        out[bi*num+i] = out[bi*num+i]/sum;
+    }
+}
+
+
+__kernel void int_scale_layer(
+    __global int* data, int size)
+{
+    int bi = get_global_id(0);
+    int max = 0.0;
+    
+    for (int i=0;i<size;i++){
+        if (data[bi*size+i]>max){
+            max = data[bi*size+i];
+        }
+    }
+    
+    for (int i=0;i<size;i++){
+        data[bi*size+i] = 4095 * data[bi*size+i] / max;
+    }
+}
+
+__kernel void int_sum(
+    __global const int* in,
+    __global int* out,
+    int num_input,
+    int num_node,
+    int activation)
+{
+    int ni = get_global_id(0);
+    int bi = get_global_id(1);
+    int ii = 0;
+    int sum = 0.0;
+    
+    for (ii=0;ii<num_input;ii++){
+        sum += in[num_node*num_input*bi + num_input*ni + ii];
+    }
+    //printf(\"sum=%d\\n\", sum);
+    // relu
+    if (activation==0 && sum<0){
+        out[num_node*bi + ni] = 0;
+    }else{
+        out[num_node*bi + ni] = sum;
+    }
+}
+
+__kernel void int_multiple_x_by_w_batch(
+    __global int* input,
+    __global int* weight_index,
+    __global int* output,
+    const int stride_1,
+    const int stride_2)
+{
+    int i = get_global_id(0);  // num_input
+    int j = get_global_id(1);  // num_node
+    int bi = get_global_id(2); // batch id
+    int wi = weight_index[stride_2*j+i];
+    int x =  input[stride_2*bi+i];
+    int ret = 0;
+    //y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
+    //printf(\"wi=%d\\n\", wi);
+
+    switch (wi){
+        case 0:
+            ret = x*-1;
+            break;
+        case 1:
+            ret = (x>>1)*-1;
+            break;
+        case 2:
+            ret = (x>>2)*-1;
+            break;
+        case 3:
+            ret = (x>>3)*-1;
+            break;
+        case 4:
+            ret = 0;
+            break;
+        case 5:
+            ret = x>>3;
+            break;
+        case 6:
+            ret = x>>2;
+            break;
+        case 7:
+            ret = x>>1;
+            break;
+        case 8:
+            ret = x;
+            break;
+        default:
+            ret = 0;
+    }
+    //printf(\"ret=%d (%d) %d\\n\", ret, x, wi);
+    output[stride_1*bi + stride_2*j+i] = ret;
+    //y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
+}
+//
+//
+//
 __kernel void conv_4_pad_batch(
     __global float* input,
     __global float* output,
@@ -207,11 +350,12 @@ __kernel void cross_entropy(__global const float* infs,
     for (int i=0;i<num;i++){
         t = labels[bi*num + i];
         k = infs[bi*num + i] + delta;
+        //printf(\"%d-%d | %f\\n\", bi, i, t * log(k));
         sum += t * log(k);
     }
     
     output[bi] = (-1.0)*sum;
-    //printf(\"%f\\n\", output[bi]);
+    //printf(\"%d | %f\\n\", bi, output[bi]);
 }
 
 __kernel void k_cross_entropy(__global const float* infs,
@@ -398,6 +542,22 @@ class Gpu:
                                                np.int32(stride_2))
         event.wait()
         
+    def int_multiple_x_by_w_batch(self, d_x, d_w, d_y, bsize, stride_1, stride_2, row, col):
+        event = self.prg.int_multiple_x_by_w_batch(self._queue,(row,col,bsize), None,
+                                               d_x, d_w, d_y,
+                                               np.int32(stride_1),
+                                               np.int32(stride_2))
+        event.wait()
+    
+    def int_sum(self, data_in, data_out, num_input, num_node, activation, num_batch):
+        event = self.prg.int_sum(self._queue, (num_node, num_batch), None,
+                               data_in, data_out,
+                               np.int32(num_input), np.int32(num_node), np.int32(activation))
+        event.wait()
+    
+    def int_scale_layer(self, data, size, batch_size):
+        event = self.prg.int_scale_layer(self._queue, (batch_size,), None, data, np.int32(size))
+        event.wait()
 #    def multiple_x_by_w_batch_alt(self, d_x, d_w, d_y, bsize, stride_1, stride_2, row, col, ni, ii, wv):
 #        event = self.prg.multiple_x_by_w_batch_alt(self._queue,(row,col,bsize), None,
 #                                                   d_x, d_w, d_y,
@@ -438,6 +598,15 @@ class Gpu:
     
     def softmax(self, data, size, num_batch):
         event = self.prg.p_softmax(self._queue, (num_batch,), None, data, np.int32(size))
+        event.wait()
+
+    def int_softmax(self, data, data_out, size, num_batch):
+        event = self.prg.int_softmax(self._queue, (num_batch,), None, data, data_out, np.int32(size))
+        event.wait()
+
+    def int_cross_entropy(self, infs, labels, output, num_node, num_batch):
+        event = self.prg.int_cross_entropy(self._queue, (num_batch,), None,
+                                       infs, labels, output, np.int32(num_node))
         event.wait()
         
     def cross_entropy(self, infs, labels, output, num_node, num_batch):

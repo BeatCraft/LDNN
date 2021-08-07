@@ -54,14 +54,23 @@ def test_n(r, pack, n):
     if left>0:
         print("error : n(=%d) is not appropriate" % (n))
     #
+    #n = 3
+    #
     start_time = time.time()
     #
     r.prepare(n, data_size, num_class)
-    data_array = np.zeros((n, data_size), dtype=np.float32)
+    mode = r.mode()
+    if mode==0:
+        data_array = np.zeros((n, data_size), dtype=np.float32)
+    elif mode==1:
+        data_array = np.zeros((n, data_size), dtype=np.int32)
+    #
+    
     class_array = np.zeros(n, dtype=np.int32)
     class_array_2 = np.zeros((n, num_class), dtype=np.float32)
     #
     for i in range(it):
+    #for i in range(1):
         class_array_2 = class_array_2*0.0
         for j in range(n):
             data_array[j] = pack._train_image_batch[i*n+j]
@@ -70,8 +79,9 @@ def test_n(r, pack, n):
             class_array_2[j][k] = 1.0
         #
         scale = 1
+        #print data_array[0]
         r.set_data(data_array, data_size, class_array_2, n, scale)
-        r.propagate()
+        r.propagate(0)
         #
         answes = r.get_answer()
         for j in range(n):
@@ -92,7 +102,7 @@ def test_n(r, pack, n):
     print("time = %s" % (t))
     #
     #r.propagate()
-    ce = r.get_cross_entropy(1)
+    ce = r.get_cross_entropy(0)
     print("CE = %f" % (ce))
     #
   

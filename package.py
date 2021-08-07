@@ -93,12 +93,13 @@ class Package:
         #
     
     def save_path_by_mode(self, mode=0):
-        if mode==0:
-            return self._wi_csv_path
-        elif mode==1:
-            return self._w_float_path
+        return self._wi_csv_path
+#        if mode==0:
+#            return self._wi_csv_path
+#        elif mode==1:
+#            return self._w_float_path
         #
-        return None
+#        return None
     
     def save_path(self):
         return self._w_save_path
@@ -106,33 +107,34 @@ class Package:
     def setup_dnn(self, my_gpu, config=0, mode=0):
         r = core.Roster(mode)
         r.set_gpu(my_gpu)
-        if mode==0: # quantized
-            self._w_save_path = self._wi_csv_path
-        elif mode==1: # float
-            self._w_save_path = self._w_float_path
+        #if mode==0: # quantized
+        self._w_save_path = self._wi_csv_path
+#        elif mode==1: # float
+#            self._w_save_path = self._w_float_path
         #
         if self._package_id==0: # MNIST
             if config==0:
                 print("FC")
+                #mode = r.mode()
                 # 0 : input
                 c = r.count_layers()
-                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
+                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu, mode)
                 r.layers.append(input)
                 # 1 : hidden : 28 x 28 x 1 = 784
                 c = r.count_layers()
-                hidden_1 = core.HiddenLayer(c, 784, 64, input, my_gpu)
+                hidden_1 = core.HiddenLayer(c, 784, 64, input, my_gpu, mode)
                 r.layers.append(hidden_1)
                 # 2 : hidden : 64
                 c = r.count_layers()
-                hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, my_gpu)
+                hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, my_gpu, mode)
                 r.layers.append(hidden_2)
                 # 3 : hidden : 64
                 c = r.count_layers()
-                hidden_3 = core.HiddenLayer(c, 64, 64, hidden_2, my_gpu)
+                hidden_3 = core.HiddenLayer(c, 64, 64, hidden_2, my_gpu, mode)
                 r.layers.append(hidden_3)
                 # 3 : output
                 c = r.count_layers()
-                output = core.OutputLayer(c, 64, 10, hidden_3, my_gpu)
+                output = core.OutputLayer(c, 64, 10, hidden_3, my_gpu, mode)
                 r.layers.append(output)
             elif config==1:
                 print("CNN")

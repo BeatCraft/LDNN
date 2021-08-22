@@ -69,8 +69,8 @@ def main():
         if config==0: # fc
             t.mpi_loop(1)
         else:
-            #t.mpi_loop(1)
-            t.mpi_cnn_loop(1)
+            t.mpi_loop(1)
+            #t.mpi_cnn_loop(1)
             #t.mpi_cnn_filter_loop(1000)
         #
     elif mode==1: # test

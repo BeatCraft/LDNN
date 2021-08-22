@@ -142,27 +142,31 @@ class Package:
                 c = r.count_layers()
                 input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
                 r.layers.append(input)
-                # 1 : CNN 28 x 28 x 1 > 28 x 28 x 4
+                # 1 : CNN 28 x 28 x 1 > 28 x 28 x 3
                 c = r.count_layers()
-                cnn_1 = core.Conv_4_Layer(c, 28, 28, 1, 4, input, my_gpu)
+                cnn_1 = core.Conv_4_Layer(c, 28, 28, 1, 3, input, my_gpu)
                 r.layers.append(cnn_1)
-                # 2 : CNN 28 x 28 x 4 > 28 x 28 x 4
+                # 2 : max 28 x28 x 3 > 14 x 14 x 3
                 c = r.count_layers()
-                cnn_2 = core.Conv_4_Layer(c, 28, 28, 4, 4, cnn_1, my_gpu)
-                r.layers.append(cnn_2)
-                # 2 : max
-                c = r.count_layers()
-                max_1 = core.MaxLayer(c, 4, 28, 28, cnn_2, my_gpu)
+                max_1 = core.MaxLayer(c, 3, 28, 28, cnn_1, my_gpu)
                 r.layers.append(max_1)
-                # 3 : hidden : (7 x 7 x 160 X 64 = 784 x 64
+                # 3 : CNN 14 x 14 x 3 > 14 x 14 x 6
                 c = r.count_layers()
-                hidden_1 = core.HiddenLayer(c, 784, 64, max_1, my_gpu)
+                cnn_2 = core.Conv_4_Layer(c, 14, 14, 3, 6, max_1, my_gpu)
+                r.layers.append(cnn_2)
+                # 4 : max 14 x 14 x 6 > 7 x 7 x 6
+                c = r.count_layers()
+                max_2 = core.MaxLayer(c, 6, 14, 14, cnn_2, my_gpu)
+                r.layers.append(max_2)
+                # 5 : hidden : (7 x 7 x 160 X 64 = 784 x 64
+                c = r.count_layers()
+                hidden_1 = core.HiddenLayer(c, 294, 64, max_2, my_gpu)
                 r.layers.append(hidden_1)
-                # 4 : hidden : 64 x 64
+                # 6 : hidden : 64 x 64
                 c = r.count_layers()
                 hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, my_gpu)
                 r.layers.append(hidden_2)
-                # 5 : output : 64 x 10
+                # 7 : output : 64 x 10
                 c = r.count_layers()
                 output = core.OutputLayer(c, 64, 10, hidden_2, my_gpu)
                 r.layers.append(output)
@@ -175,50 +179,47 @@ class Package:
                 r.layers.append(input)
                 # 1 : hidden : 3072 x 128
                 c = r.count_layers()
-                hidden_1 = core.HiddenLayer(c, 3072, 64, input, my_gpu)
+                hidden_1 = core.HiddenLayer(c, 3072, 128, input, my_gpu)
                 r.layers.append(hidden_1)
                 # 2 : hidden : 128 x 128
                 c = r.count_layers()
-                hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, my_gpu)
+                hidden_2 = core.HiddenLayer(c, 128, 128, hidden_1, my_gpu)
                 r.layers.append(hidden_2)
-                # 3
+                # 3 : output : 64 x 10
                 c = r.count_layers()
-                hidden_3 = core.HiddenLayer(c, 64, 64, hidden_2, my_gpu)
-                r.layers.append(hidden_3)
-                # 4
-                c = r.count_layers()
-                hidden_4 = core.HiddenLayer(c, 64, 64, hidden_3, my_gpu)
-                r.layers.append(hidden_4)
-                # 5 : output : 64 x 10
-                c = r.count_layers()
-                output = core.OutputLayer(c, 64, 10, hidden_4, my_gpu)
+                output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
                 r.layers.append(output)
             elif config==1:
                 # 0 : input : 32x32x3 = 3072
                 c = r.count_layers()
                 input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
                 r.layers.append(input)
-                # 1 : CNN : 32x32x3 > 32x32x4
+                # 1 : CNN : 32 x 32 x 3 > 32 x 32 x 6
                 c = r.count_layers()
-                cnn_1 = core.Conv_4_Layer(c, 32, 32, 3, 4, input, my_gpu)
+                cnn_1 = core.Conv_4_Layer(c, 32, 32, 3, 6, input, my_gpu)
                 r.layers.append(cnn_1)
-                # 2 : CNN : 32x32x4 > 32x32x4
+                # 2 : max : 32 x 32 x 3 > 16 x 16 x 6
                 c = r.count_layers()
-                cnn_2 = core.Conv_4_Layer(c, 32, 32, 4, 4, cnn_1, my_gpu)
-                r.layers.append(cnn_2)
-                # 3 : max : 32x32x4 > 16x16x4
-                c = r.count_layers()
-                max_1 = core.MaxLayer(c, 4, 32, 32, cnn_2, my_gpu)
+                max_1 = core.MaxLayer(c, 6, 32, 32, cnn_1, my_gpu)
                 r.layers.append(max_1)
-                # 4 : hidden : (16x16x4) x 64 = 1024 x 64
+                # 3 : CNN : 16 x 16 x 3 > 16 x 16 x 6
                 c = r.count_layers()
-                hidden_1 = core.HiddenLayer(c, 1024, 64, max_1, my_gpu)
+                cnn_2 = core.Conv_4_Layer(c, 16, 16, 6, 9, max_1, my_gpu)
+                r.layers.append(cnn_2)
+                # 4 : max : 16 x 16 x 9 > 8 x 8 x 9
+                c = r.count_layers()
+                max_2 = core.MaxLayer(c, 9, 16, 16, cnn_2, my_gpu)
+                r.layers.append(max_2)
+
+                # 5 : hidden : (8 x 8 x 9) x 64 = 576 x 64
+                c = r.count_layers()
+                hidden_1 = core.HiddenLayer(c, 576, 64, max_2, my_gpu)
                 r.layers.append(hidden_1)
-                # 8 : hidden : 64x64
+                # 6 : hidden : 64x64
                 c = r.count_layers()
                 hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, my_gpu)
                 r.layers.append(hidden_2)
-                # 9 : output : 64 x 10
+                # 7 : output : 64 x 10
                 c = r.count_layers()
                 output = core.OutputLayer(c, 64, 10, hidden_2, my_gpu)
                 r.layers.append(output)

@@ -29,14 +29,14 @@ sys.setrecursionlimit(10000)
 #
 def print_result(ca, eval_size, num_class, dist, rets, oks):
     print("---------------------------------")
-    print(("result : %d / %d" % (ca, eval_size)))
+    print("result : %d / %d" % (ca, eval_size))
     accuracy = float(ca) / float(eval_size)
-    print(("accuracy : %f" % (accuracy)))
+    print("accuracy : %f" % (accuracy))
     print("---------------------------------")
     print("class\t|dist\t|infs\t|ok")
     print("---------------------------------")
     for i in range(num_class):
-        print(("%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i])))
+        print("%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i]))
     #
     print("---------------------------------")
     
@@ -48,11 +48,11 @@ def test_n(r, pack, n):
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
-    print((">>test(%d) = %d" % (n, eval_size)))
+    print(">>test(%d) = %d" % (n, eval_size))
     #
     it, left = divmod(eval_size, n)
     if left>0:
-        print(("error : n(=%d) is not appropriate" % (n)))
+        print("error : n(=%d) is not appropriate" % (n))
     #
     #n = 3
     #
@@ -99,11 +99,11 @@ def test_n(r, pack, n):
     #
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
-    print(("time = %s" % (t)))
+    print("time = %s" % (t))
     #
     #r.propagate()
     ce = r.get_cross_entropy(0)
-    print(("CE = %f" % (ce)))
+    print("CE = %f" % (ce))
     #
   
     #self.mpi_save(pack.save_path(), mpi, com, rank, size)

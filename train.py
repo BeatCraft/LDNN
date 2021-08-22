@@ -533,3 +533,206 @@ class Train:
             #self.mpi_save(pack.save_path(), mpi, com, rank, size)
         #
         return 0
+#
+#
+#
+#
+#
+#
+    def sa_make_attack_list(self, num, mode, w_list):
+        w_num = len(w_list)
+        attack_num = num #int(w_num/div)
+        if attack_num<1:
+            attack_num = 1
+        #
+        attack_list = []
+        for i in range(attack_num*10):
+            if i>=attack_num:
+                break
+            #
+            attack_i = random.randrange(w_num)
+            w = w_list[attack_i]
+            li = w[0]
+            ni = w[1]
+            ii = w[2]
+            wi, wi_alt = self.weight_ops(attack_i, mode, w_list)
+            if wi!=wi_alt:
+                attack_list.append((li, ni, ii, wi, wi_alt))
+            #
+        #
+        return attack_list
+        
+    def mpi_sa_multi_attack(self, ce, w_list, mode=1, num=1, mpi=0, com=None, rank=0, size=0):
+        r = self._r
+        #
+        if mpi:
+            if rank==0:
+                attack_list = self.sa_make_attack_list(num, mode, w_list)
+            else:
+                attack_list = []
+            #
+            attack_list = com.bcast(attack_list, root=0)
+        else:
+            attack_list = self.sa_make_attack_list(num, mode, w_list)
+        #
+        w_num = len(w_list)
+        for wt in attack_list:
+            li = wt[0]
+            ni = wt[1]
+            ii = wt[2]
+            wi = wt[3]
+            wi_alt = wt[4]
+            layer = r.get_layer_at(li)
+            layer.set_weight_index(ni, ii, wi_alt)
+        #
+        c = r.count_layers()
+        for li in range(c):
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+        ce_alt = self.mpi_evaluate(mpi, com, rank, size)
+        ret = 0
+        if ce_alt<ce:
+            ce = ce_alt
+            ret = 1
+        else:
+            self.undo_attack(attack_list)
+        #
+        return ce, ret
+        
+    def mpi_sa_w_loop(self, c, n, d, ce, w_list, lv_min, lv_max, label, mpi=0, com=None, rank=0, size=0):
+        level = lv_min
+        mode = 1
+        local_mode = 1
+        r = self._r
+        pack = self._package
+        #
+        cnt = 0
+        out = 0
+        num = 1
+        k = 0
+        cnt = 0
+        local_mode = 1
+        local_mode_flip = 0
+        #while num>0:
+        while k<1000:
+            ce, ret = self.mpi_sa_multi_attack(ce, w_list, 1, num, mpi, com, rank, size)
+            cnt = cnt + ret
+            if mpi:
+                if rank==0:
+                    print("[%d|%s] H : %f, %d (%d, %d) %d (%d) %d"
+                          % (k, label, ce, level, lv_min, lv_max, cnt, num, out))
+                #
+            else:
+                print("[%d|%s] H : %f, %d (%d, %d) %d (%d) %d"
+                      % (k, label, ce, level, lv_min, lv_max, cnt, num, out))
+                #
+            #
+            if local_mode>0:
+                if ret>0:
+                    num = num + 10
+                    out = 0
+                else:
+                    out = out + 1
+                #
+                if out>20:
+                    local_mode = -1
+                #
+            else:
+                if ret>0:
+                    out = 0
+                else:
+                    out = out + 1
+                    if out>20:
+                        out = 0
+                        num = num - 1
+                        if num<0:
+                            break
+                        #
+                    #
+                #
+            #
+            k = k + 1
+        #
+        self.mpi_save(pack.save_path(), mpi, com, rank, size)
+        mode = -1
+        k = 0
+        out = 0
+        num = 1
+        cnt = 0
+        local_mode = 1
+        local_mode_flip = 0
+        while k<1000:
+            ce, ret = self.mpi_sa_multi_attack(ce, w_list, 1, num, mpi, com, rank, size)
+            cnt = cnt + ret
+            if mpi:
+                if rank==0:
+                    print("[%d|%s] C : %f, %d (%d, %d) %d (%d) %d"
+                          % (k, label, ce, level, lv_min, lv_max, cnt, num, out))
+                #
+            else:
+                print("[%d|%s] C : %f, %d (%d, %d) %d (%d) %d"
+                      % (k, label, ce, level, lv_min, lv_max, cnt, num, out))
+                #
+            #
+            if local_mode>0:
+                if ret>0:
+                    num = num + 10
+                    out = 0
+                else:
+                    out = out + 1
+                #
+                if out>20:
+                    local_mode = -1
+                #
+            else:
+                if ret>0:
+                    out = 0
+                else:
+                    out = out + 1
+                    if out>5:
+                        out = 0
+                        num = num - 1
+                        if num<0:
+                            break
+                        #
+                    #
+                #
+            #
+            k = k + 1
+        #
+        self.mpi_save(pack.save_path(), mpi, com, rank, size)
+        return ce, lv_min, lv_max
+        
+    def mpi_sa_loop(self, n=1, mpi=0, com=None, rank=0, size=0):
+        w_list = None
+        ce = 0.0
+        ret = 0
+        r = self._r
+        pack = self._package
+        ce = self.mpi_evaluate(mpi, com, rank, size)
+        print("CE starts with %f" % ce)
+        #
+        if mpi:
+            if rank==0:
+                w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+            else:
+                w_list = []
+            #
+            w_list = com.bcast(w_list, root=0)
+            w_num = len(w_list)
+            print("rank=%d, w=%d" % (rank, w_num))
+        else:
+            w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+            w_num = len(w_list)
+        #
+        print(len(w_list))
+        #
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        #
+        for i in range(n):
+            ce, lv_min, lv_min = self.mpi_sa_w_loop(i, 500, d, ce, w_list, lv_min, lv_max, "all", mpi, com, rank, size)
+        #
+        return 0

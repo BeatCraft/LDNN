@@ -18,24 +18,7 @@ __kernel void int_cross_entropy(
     __global float* output,
     int num)
 {
-    int bi = get_global_id(0); // batch index
-    float delta;
-    float k;
-    float t;
-    float sum;
     
-    delta = 0.0000001;
-    sum = 0.0;
-    
-    //printf(\"int_cross_entropy=%d\\n\", num);
-    for (int i=0;i<num;i++){
-        t = labels[bi*num + i];
-        k = infs[bi*num + i] + delta;
-        //printf(\"%d-%d | %f | %f | %f\\n\", bi, i, infs[bi*num + i], k, t * log(k));
-        sum += t * log(k);
-    }
-    
-    output[bi] = (-1.0)*sum;
 }
 
 __kernel void int_softmax(
@@ -43,17 +26,7 @@ __kernel void int_softmax(
     __global float* out,
     int num)
 {
-    int bi = get_global_id(0);
-    float sum = 0.0;
 
-    for (int i=0;i<num;i++){
-        out[bi*num+i] = exp(float(in[bi*num+i]/256));
-        sum += out[bi*num+i];
-    }
-    //printf(\"sum=%f\\n\", sum);
-    for (int i=0;i<num;i++){
-        out[bi*num+i] = out[bi*num+i]/sum;
-    }
 }
 
 

@@ -206,7 +206,7 @@ class InputLayer(Layer):
         if debug:
             #self._gpu.copy(self._gpu_output, self._output_array)
             self._gpu.copy(self._output_array, self._gpu_output)
-            print((self._output_array[0]))
+            print(self._output_array[0])
         else:
             pass
         #
@@ -301,7 +301,7 @@ class HiddenLayer(Layer):
         #
         if debug:
             self._gpu.copy(self._output_array, self._gpu_output)
-            print((self._output_array[0]))
+            print(self._output_array[0])
         #
 #
 #
@@ -363,7 +363,7 @@ class OutputLayer(Layer):
             self._gpu.softmax(self._gpu_output, self._num_node, self._batch_size)
             if debug:
                 self._gpu.copy(self._output_array, self._gpu_output)
-                print((self._output_array[0]))
+                print(self._output_array[0])
             #
         elif self._mode==1:
             # multiple
@@ -381,9 +381,9 @@ class OutputLayer(Layer):
             
             if debug:
                 self._gpu.copy(self._output_array, self._gpu_output)
-                print((self._output_array[0]))
+                print(self._output_array[0])
                 self._gpu.copy(self._softmax_array, self._gpu_softmax)
-                print((self._softmax_array[0]))
+                print(self._softmax_array[0])
                 #print(self._softmax_array[1])
                 #print(self._softmax_array[2])
             #
@@ -459,7 +459,7 @@ class Conv_4_Layer(Layer):
         self._cache = 0 # cache for padding
         
     def prepare(self, batch_size):
-        print(("Conv_4_Layer::prepare(%d)" %(batch_size)))
+        print("Conv_4_Layer::prepare(%d)" %(batch_size))
         self._batch_size = batch_size
         # intermidiate
         self._padded_array = np.zeros((self._batch_size, (self._w+2)*(self._h+2)*self._ch), dtype=np.float32)
@@ -497,7 +497,7 @@ class Conv_4_Layer(Layer):
         #
         if debug:
             self._gpu.copy(self._output_array, self._gpu_output)
-            print((self._output_array))
+            print(self._output_array)
         #
         
     def save_output(self):
@@ -509,7 +509,7 @@ class Conv_4_Layer(Layer):
                 size = self._w * self._h
                 max = np.max(data_array)
                 min = np.min(data_array)
-                print(("max=%f, min=%f" % (max, min)))
+                print("max=%f, min=%f" % (max, min))
                 img = Image.new("L", (self._w, self._h), 0)
                 pix = img.load()
                 for y in range(self._h):
@@ -532,7 +532,7 @@ class Roster:
         self.layers = []
         self._batch_size = 1
         self._mode = mode # weight type : 0=float, 1=int
-        print(("weight type=%d" % (mode)))
+        print("weight type=%d" % (mode))
         
     def mode(self):
         return self._mode
@@ -542,7 +542,7 @@ class Roster:
         self._remote = None
 
     def prepare(self, batch_size, data_size, num_class):
-        print(("Roster:prepare(%d, %d, %d)" %(batch_size, data_size, num_class)))
+        print("Roster:prepare(%d, %d, %d)" %(batch_size, data_size, num_class))
         #
         self.num_class = num_class
         self._batch_size = batch_size
@@ -565,7 +565,7 @@ class Roster:
         #
     
     def set_batch(self, pack, size, offset):
-        print(("Roster::set_batch(%d, %d)" % (size, offset)))
+        print("Roster::set_batch(%d, %d)" % (size, offset))
         pack.load_batch()
         if self._mode==0:
             data_array = np.zeros((size, pack._image_size), dtype=np.float32)
@@ -599,7 +599,7 @@ class Roster:
         #
             
     def init_weight(self):
-        print(("Roster : init_weight(%d)" % (self._mode)))
+        print("Roster : init_weight(%d)" % (self._mode))
         c = self.count_layers()
         for i in range(c):
             layer = self.get_layer_at(i)
@@ -729,7 +729,7 @@ class Roster:
         #
         self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
         if debug:
-            print(self._batch_cross_entropy)
+            print self._batch_cross_entropy
         #
         s = np.sum(self._batch_cross_entropy)
         s = s/float(self._batch_size)
@@ -740,13 +740,13 @@ class Roster:
             for i in range(self._batch_size):
                 li = c-1
                 if np.isnan(self._batch_cross_entropy[i]):
-                    print(("NaN : %d" % (i)))
+                    print("NaN : %d" % (i))
                     for li in range(c):
                         output = self.get_layer_at(li)
                         self._gpu.copy(output._output_array, output._gpu_output)
-                        print(("layer : %d" % (li)))
-                        print((output._output_array[i].shape))
-                        print((output._output_array[i]))
+                        print("layer : %d" % (li))
+                        print(output._output_array[i].shape)
+                        print(output._output_array[i])
                     #
                 #
             #
@@ -755,7 +755,7 @@ class Roster:
         return s
     
     def export_weight(self, path):
-        print(("Roster : export_weight(%s)" % path))
+        print("Roster : export_weight(%s)" % path)
         self.export_weight_index(path)
         
     def export_weight_index(self, path):
@@ -778,7 +778,7 @@ class Roster:
         #
         
     def import_weight(self, path):
-        print(("Roster : import_weight(%s)" % path))
+        print("Roster : import_weight(%s)" % path)
         self.import_weight_index(path)
         
     def import_weight_index(self, path):

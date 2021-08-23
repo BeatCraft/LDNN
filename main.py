@@ -69,8 +69,8 @@ def main():
         if config==0: # fc
             t.mpi_loop(1)
         else:
-            #t.mpi_loop(1)
-            t.mpi_sa_loop(1)
+            t.mpi_loop(1)
+            #t.mpi_sa_loop(1)
         #
     elif mode==1: # test
         test.test_n(r, pack, 500)

@@ -204,18 +204,18 @@ class Package:
                 max_1 = core.MaxLayer(c, 4, 32, 32, cnn_1, my_gpu)
                 r.layers.append(max_1)
                 
-                # 3 : CNN : 16 x 16 x 16 > 16 x 16 x 32
+                # 3 : CNN : 16 x 16 x 4 > 16 x 16 x 8
                 c = r.count_layers()
                 cnn_2 = core.Conv_4_Layer(c, 16, 16, 4, 8, max_1, my_gpu)
                 r.layers.append(cnn_2)
-                # 4 : max : 16 x 16 x 32 > 8 x 8 x 32
+                # 4 : max : 16 x 16 x 8 > 8 x 8 x 8
                 c = r.count_layers()
                 max_2 = core.MaxLayer(c, 8, 16, 16, cnn_2, my_gpu)
                 r.layers.append(max_2)
 
-                # 5 : hidden : (8 x 8 x 32) x 64 = 2048 x 64
+                # 5 : hidden : (8 x 8 x 8) x 64 = 512 x 64
                 c = r.count_layers()
-                hidden_1 = core.HiddenLayer(c, 1024, 64, max_2, my_gpu)
+                hidden_1 = core.HiddenLayer(c, 512, 64, max_2, my_gpu)
                 r.layers.append(hidden_1)
                 # 6 : hidden : 64 x 64
                 c = r.count_layers()

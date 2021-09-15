@@ -204,11 +204,11 @@ class Package:
                 max_1 = core.MaxLayer(c, 6, 32, 32, cnn_1, my_gpu)
                 r.layers.append(max_1)
                 
-                # 3 : CNN : 16 x 16 x 6 > 16 x 16 x 9
+                # 3 : CNN : 16 x 16 x 6 > 16 x 16 x 12
                 c = r.count_layers()
                 cnn_2 = core.Conv_4_Layer(c, 16, 16, 6, 12, max_1, my_gpu)
                 r.layers.append(cnn_2)
-                # 4 : max : 16 x 16 x 6 > 8 x 8 x 6
+                # 4 : max : 16 x 16 x 12 > 8 x 8 x 12
                 c = r.count_layers()
                 max_2 = core.MaxLayer(c, 12, 16, 16, cnn_2, my_gpu)
                 r.layers.append(max_2)

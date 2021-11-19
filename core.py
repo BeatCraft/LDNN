@@ -22,12 +22,19 @@ sys.setrecursionlimit(10000)
 #
 WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078125,
                 0.0,
-                0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0]
-WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0]
-WEIGHT_SET_2 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0, 0.0625, 0.125, 0.25, 0.5, 1.0]
-WEIGHT_SET_3 = [0, 0.125, 0.25, 0.5, 1.0]
+                0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 17
+WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625,
+                0.0,
+                0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 15
+WEIGHT_SET_2 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125,
+                0.0,
+                0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 13
+WEIGHT_SET_3 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0, 0.0625, 0.125, 0.25, 0.5, 1.0] # 11
+WEIGHT_SET_4 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0] # 9
+
+
 #
-WEIGHT_SET = WEIGHT_SET_1
+WEIGHT_SET = WEIGHT_SET_3
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -155,10 +162,21 @@ class Layer(object):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
                 wi = self.get_weight_index(ni, ii)
-                if wi == WEIGHT_INDEX_MAX :
-                    self.set_weight_index(ni, ii, wi-1)
-                elif wi == WEIGHT_INDEX_MIN :
-                    self.set_weight_index(ni, ii, wi+1)
+                if all:
+                    v = WEIGHT_SET[wi]
+                    if v == 0:
+                        pass
+                    elif v>0:
+                        self.set_weight_index(ni, ii, wi-1)
+                    elif v<0:
+                        self.set_weight_index(ni, ii, wi+1)
+                    #
+                else:
+                    if wi == WEIGHT_INDEX_MAX :
+                        self.set_weight_index(ni, ii, wi-1)
+                    elif wi == WEIGHT_INDEX_MIN :
+                        self.set_weight_index(ni, ii, wi+1)
+                    #
                 #
             #
         #

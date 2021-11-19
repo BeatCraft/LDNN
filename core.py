@@ -150,6 +150,19 @@ class Layer(object):
         self._weight_index_matrix[ni][ii] = wi
         self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
     
+    
+    def denominate(self, all=False):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                wi = self.get_weight_index(ni, ii)
+                if wi == WEIGHT_INDEX_MAX :
+                    self.set_weight_index(ni, ii, wi-1)
+                elif wi == WEIGHT_INDEX_MIN :
+                    self.set_weight_index(ni, ii, wi+1)
+                #
+            #
+        #
+    
     def init_weight_with_random_index(self):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
@@ -597,7 +610,21 @@ class Roster:
             self._gpu.copy(layer._gpu_output, data)
             #print data
         #
-            
+    
+    def denominate(self, all=False):
+        print("Roster : denominate()")
+        
+        c = self.count_layers()
+        for i in range(c):
+            layer = self.get_layer_at(i)
+            type = layer.get_type()
+            if type==LAYER_TYPE_MAX or type==LAYER_TYPE_INPUT:
+                pass
+            else:
+                layer.denominate()
+            #
+        #
+
     def init_weight(self):
         print(("Roster : init_weight(%d)" % (self._mode)))
         c = self.count_layers()

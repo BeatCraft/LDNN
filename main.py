@@ -76,6 +76,16 @@ def main():
         test.test_n(r, pack, 500)
         #test.test_n(r, pack, 3)
         #r.export_weight(pack.save_path())
+        
+    elif mode==2: # denomi
+        test.test_n(r, pack, 500)
+        
+        r.denominate()
+        r.update_weight()
+        path = pack.save_path()
+        r.export_weight(path)
+        
+        test.test_n(r, pack, 500)
     else:
         print("mode error : %d" % (mode))
         return 0

@@ -300,10 +300,11 @@ class HiddenLayer(Layer):
         stride_1 = self._num_node * self._num_input
         stride_2 = self._num_input
         #
-        if debug:
-            buffer = np.zeros( (self._num_input), dtype=np.int32)
-            self._gpu.copy(buffer, array_in)
-            print(buffer)
+ #       if debug:
+ #           print("fuck")
+ #           buffer = np.zeros( (self._num_input), dtype=np.int32)
+ #           self._gpu.copy(buffer, array_in)
+ #           print(buffer)
         #
         if self._mode==0:
             # multiple
@@ -420,7 +421,58 @@ class OutputLayer(Layer):
             #
         #
         
+
+class RegressionOutputLayer(Layer):
+    def __init__(self, i, num_input, num_node, pre, gpu=None, mode=0):
+        print("RegressionOutputLayer::__init__()")
+        super(RegressionOutputLayer, self).__init__(i, LAYER_TYPE_OUTPUT, num_input, num_node, pre, gpu, mode)
+        #
+        self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+        self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+        #
+        if gpu:
+            if self._mode==0:
+                self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+            elif self._mode==1:
+                self._gpu_weight = self._gpu.dev_malloc(self._weight_index_matrix)
+            #
+        #
         
+    def prepare(self, batch_size):
+        self._batch_size = batch_size
+        self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
+        self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+        #
+        if self._gpu:
+            self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        #
+    
+    def update_weight(self):
+        self._gpu.copy(self._gpu_weight, self._weight_matrix)
+
+    def propagate(self, array_in, debug=0):
+        stride_1 = self._num_node * self._num_input
+        stride_2 = self._num_input
+        # multiple
+        self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
+                                        self._batch_size, stride_1, stride_2,
+                                        self._num_input, self._num_node)
+        # sum
+        activation = 1 # relu=0, skip=1
+        self._gpu.sum(self._gpu_product, self._gpu_output,
+                    self._num_input, self._num_node, activation, self._batch_size)
+        #
+        #print((self._output_array[1665]))
+        #
+        #self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
+        # debug
+        if debug:
+            #print((self._output_array[1665]))
+            self._gpu.copy(self._output_array, self._gpu_output)
+            print((self._output_array[0]))
+        #
+
 #
 # 2 x 2 simple max filter for 2D image data
 # w : image width, i : index, h : image height
@@ -561,6 +613,8 @@ class Roster:
         self._weight_list = []
         self._gpu = None
         self.layers = []
+        self.input = None
+        self.output = None
         self._batch_size = 1
         self._mode = mode # weight type : 0=float, 1=int
         print(("weight type=%d" % (mode)))

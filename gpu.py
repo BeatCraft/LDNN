@@ -300,9 +300,71 @@ __kernel void scale_layer(__global float* data, int size)
     }
     
     for (int i=0;i<size;i++){
-        data[bi*size+i] = (data[bi*size+i]/max);
+        if (max > 0.0){
+            data[bi*size+i] = (data[bi*size+i]/max);
+        }else{
+            data[bi*size+i] = 0.0;
+        }
     }
 }
+
+
+__kernel void mse(__global const float* infs,
+                            __global const float* labels,
+                            __global float* output,
+                            int num)
+{
+    int bi = get_global_id(0); // batch index
+    
+    float k;
+    float t;
+    float d;
+    float sum;
+
+    sum = 0.0;
+
+    for (int i=0;i<num;i++){
+        t = labels[bi*num + i];
+        k = infs[bi*num + i];
+        d = t - k;
+        sum += d * d;
+    }
+    
+    output[bi] = sum/2.0;
+}
+
+__kernel void cross_entropy_rg(__global const float* infs,
+                            __global const float* labels,
+                            __global float* output,
+                            int num)
+{
+    int bi = get_global_id(0); // batch index
+    //int ni = get_global_id(1); // node index
+    
+    float delta;
+    float k;
+    float t;
+    float sum;
+    
+    delta = 0.0000001;
+    sum = 0.0;
+    
+//    printf(\"[%d](%d)\\n\", bi, num);
+
+    for (int i=0;i<num;i++){
+        //printf(\"[%d](%d)\\n\", bi, i);
+        t = labels[bi*num + i];
+        k = infs[bi*num + i] + delta;
+        //printf(\"[%d](%i) %f\\n\", bi, i, t);
+        sum += t * log(k);
+        //printf(\"[%d](%i) %f\\n\", bi, i, t * log(k));
+    }
+    
+    output[bi] = (-1.0)*sum;
+    //printf(\"%d | %f\\n\", bi, output[bi]);
+}
+
+
 
 __kernel void cross_entropy(__global const float* infs,
                             __global const float* labels,
@@ -579,6 +641,15 @@ class Gpu:
 
     def int_cross_entropy(self, infs, labels, output, num_node, num_batch):
         event = self.prg.int_cross_entropy(self._queue, (num_batch,), None,
+                                       infs, labels, output, np.int32(num_node))
+        event.wait()
+    
+    def mse(self, infs, labels, output, num_node, num_batch):
+        event = self.prg.mse(self._queue, (num_batch,), None, infs, labels, output, np.int32(num_node))
+        event.wait()
+        
+    def cross_entropy_rg(self, infs, labels, output, num_node, num_batch):
+        event = self.prg.cross_entropy_rg(self._queue, (num_batch,), None,
                                        infs, labels, output, np.int32(num_node))
         event.wait()
         

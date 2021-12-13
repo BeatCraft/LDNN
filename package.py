@@ -330,6 +330,38 @@ class Package:
                 output = core.OutputLayer(c, 64, 10, fc_2, my_gpu)
                 r.layers.append(output)
             #
+        elif self._package_id==2: # codec test
+            if config==0:
+                print("FC")
+                # 0 : input
+                c = r.count_layers()
+                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu, mode)
+                r.layers.append(input)
+                # 1 : enc
+                c = r.count_layers()
+                enc_1 = core.HiddenLayer(c, 128, 32, input, my_gpu, mode)
+                r.layers.append(enc_1)
+                # 2 : enc
+                c = r.count_layers()
+                enc_2 = core.HiddenLayer(c, 32, 32, enc_1, my_gpu, mode)
+                r.layers.append(enc_2)
+                # 3 : intermediate
+                c = r.count_layers()
+                inter = core.HiddenLayer(c, 32, 4, enc_2, my_gpu, mode)
+                r.layers.append(inter)
+                # 4 : dec
+                c = r.count_layers()
+                dec_1 = core.HiddenLayer(c, 4, 32, inter, my_gpu, mode)
+                r.layers.append(dec_1)
+                # 5 : dec
+                c = r.count_layers()
+                dec_2 = core.HiddenLayer(c, 32, 32, dec_1, my_gpu, mode)
+                r.layers.append(dec_2)
+                # 3 : output
+                c = r.count_layers()
+                output = core.OutputLayer(c, 32, 128, dec_2, my_gpu, mode)
+                r.layers.append(output)
+            #
         else:
             print("package error")
             return None

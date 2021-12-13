@@ -10,4 +10,10 @@ test/
 debug/
 client_data/
 *.sh
-codec/*.png
+codec-test/*.png
+codec-test/test
+codec-test/test/*.png
+codec-test/tes2/
+codec-test/tes2/*.png
+
+

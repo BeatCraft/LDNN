@@ -15,5 +15,4 @@ codec-test/test
 codec-test/test/*.png
 codec-test/tes2/
 codec-test/tes2/*.png
-
-
+codec-test/tes*/

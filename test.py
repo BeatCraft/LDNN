@@ -57,6 +57,7 @@ def test_n(r, pack, n):
     #n = 3
     #
     start_time = time.time()
+    #print(r)
     #
     r.prepare(n, data_size, num_class)
     mode = r.mode()

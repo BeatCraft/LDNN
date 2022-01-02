@@ -17,3 +17,5 @@ codec-test/tes2/
 codec-test/tes2/*.png
 codec-test/tes*/
 *.pyc
+*.jpg
+*.png

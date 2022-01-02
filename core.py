@@ -550,6 +550,7 @@ class Conv_4_Layer(Layer):
         # output
         self._output_array = np.zeros((self._batch_size, self._filter, self._w*self._h), dtype=np.float32)
         if self._gpu:
+            #print("gpu on")
             self._gpu_padded = self._gpu.dev_malloc(self._padded_array)
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
         #
@@ -618,6 +619,10 @@ class Roster:
         self._batch_size = 1
         self._mode = mode # weight type : 0=float, 1=int
         print(("weight type=%d" % (mode)))
+        self._eval_mode = 0
+    
+    def set_evaluate_mode(self, mode):
+        self._eval_mode = mode
         
     def mode(self):
         return self._mode
@@ -631,6 +636,9 @@ class Roster:
         #
         self.num_class = num_class
         self._batch_size = batch_size
+        #self._bacth_size
+        
+        self._data_size = data_size
         #
         if self._gpu:
             if self._mode==0:
@@ -648,25 +656,24 @@ class Roster:
         for layer in self.layers:
             layer.prepare(batch_size)
         #
-    
-    def set_batch(self, pack, size, offset):
+
+    def set_batch(self, data_size, num_class, train_data_batch, train_label_batch, size, offset):
         print(("Roster::set_batch(%d, %d)" % (size, offset)))
-        pack.load_batch()
         if self._mode==0:
-            data_array = np.zeros((size, pack._image_size), dtype=np.float32)
+            data_array = np.zeros((size, data_size), dtype=np.float32)
         elif self._mode==1:
-            data_array = np.zeros((size, pack._image_size), dtype=np.int32)
+            data_array = np.zeros((size, data_size), dtype=np.int32)
         #
-        labels = np.zeros((size, pack._num_class), dtype=np.float32)
+        labels = np.zeros((size, num_class), dtype=np.float32)
         #
-        self.prepare(size, pack._image_size, pack._num_class)
+        self.prepare(size, data_size, num_class)
         #
         for j in range(size):
-            data_array[j] = pack._train_image_batch[offset+j]
-            k = pack._train_label_batch[offset+j]
+            data_array[j] = train_data_batch[offset+j]
+            k = train_label_batch[offset+j]
             labels[j][k] = 1.0
         #
-        self.set_data(data_array, pack._image_size, labels, size, 1)
+        self.set_data(data_array, data_size, labels, size, 1)
         
     def set_data(self, data, data_size, label, batch_size, scale=0):
         self.reset()
@@ -814,6 +821,18 @@ class Roster:
             ret.append(max_index)
         #
         return ret
+    
+    def evaluate(self):
+        self.propagate()
+        #
+        if self._eval_mode==0:
+            ce = self.get_cross_entropy()
+        elif self._eval_mode ==1:
+            self._gpu.mse(self.output._gpu_output, self.input._gpu_output, self._gpu_entropy, self._data_size, self._batch_size)
+            self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
+            ce = np.sum(self._batch_cross_entropy)/np.float32(self._batch_size)
+        #
+        return ce
     
     def get_cross_entropy(self, debug=0):
         c = self.count_layers()

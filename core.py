@@ -472,7 +472,6 @@ class RegressionOutputLayer(Layer):
             self._gpu.copy(self._output_array, self._gpu_output)
             print((self._output_array[0]))
         #
-
 #
 # 2 x 2 simple max filter for 2D image data
 # w : image width, i : index, h : image height

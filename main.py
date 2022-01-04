@@ -17,6 +17,8 @@ import struct
 import pickle
 import pyopencl as cl
 #
+from PIL import Image
+#
 # LDNN Modules
 #
 import util
@@ -136,7 +138,8 @@ def setup_dnn(my_gpu, path, config=0, mode=0):
     elif config==1:
         setup_cnn(r)
     elif config==2:
-        setup_autoencoder(r, 32*32*3)
+        setup_autoencoder(r, 28*28)
+        #setup_autoencoder(r, 32*32*3)
     #
     if os.path.isfile(path):
         r.import_weight(path)
@@ -149,6 +152,29 @@ def setup_dnn(my_gpu, path, config=0, mode=0):
     #
     return r
     
+    
+def save_array_to_png(array, w, h, path): # uint8, 1d, RGB
+    data_in = np.reshape(array, (3, w*h))
+    r = data_in[0]
+    g = data_in[1]
+    b = data_in[2]
+    
+    data = np.zeros((w*h, 3), dtype=np.uint8)
+    
+    for i in range(w*h):
+        data[i][0] = r[i]
+        data[i][1] = g[i]
+        data[i][2] = b[i]
+    #
+    data = np.reshape(data, (h, w, 3)) # (2048, 1536, 4)
+    pimg = Image.fromarray(data)
+    pimg.save(path)
+
+def save_array_gray_to_png(array, w, h, path): # uint8, 1d
+    data = np.reshape(array, (h, w))
+    pimg = Image.fromarray(data)
+    pimg.save(path)
+
 def main():
     argvs = sys.argv
     argc = len(argvs)
@@ -206,6 +232,28 @@ def main():
         r.export_weight(path)
         
         test.test_n(r, pack, 500)
+        
+    elif mode==3:
+        t = train.Train(r)
+        data_size = pack._image_size
+        num_class = pack._num_class
+        train_data_batch = pack._train_image_batch
+        train_label_batch = pack._train_label_batch
+        t.set_batch(data_size, num_class, train_data_batch, train_label_batch, 10, 0)
+        r.propagate()
+        r._gpu.copy(r.output._output_array, r.output._gpu_output)
+        #print(r.output._output_array)
+        #print(r.output._output_array.shape)
+        
+        array_in = train_data_batch[0]
+        array_in = np.array(array_in, dtype=np.uint8)
+        #save_array_to_png(array_in, 32, 32, "./in.png")
+        save_array_gray_to_png(array_in, 28, 28, "./in.png")
+
+        array_out = r.output._output_array[0]*255
+        array_out = np.array(array_out, dtype=np.uint8)
+        #save_array_to_png(array_out, 32, 32, "./test.png")
+        save_array_gray_to_png(array_out, 28, 28, "./test.png")
     else:
         print("mode error : %d" % (mode))
         return 0

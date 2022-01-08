@@ -20,16 +20,12 @@ import struct
 import pickle
 import csv
 from PIL import Image
-#from PIL import ImageFile
-#from PIL import JpegImagePlugin
-#from PIL import ImageFile
-#from PIL import PngImagePlugin
-#import zlib
 #
 #
 # LDNN Modules
 import core
 import util
+import package
 import gpu
 #
 #
@@ -126,10 +122,10 @@ def main():
     #
     # 0 : MNIST
     package_id = 0
-    package = util.Package(package_id)
+    pack = package.Package(package_id)
     #
-    make_mnist_train_batch(package)
-    make_mnist_test_batch(package)
+    make_mnist_train_batch(pack)
+    make_mnist_test_batch(pack)
     #
     return 0
 #

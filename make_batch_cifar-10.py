@@ -30,6 +30,7 @@ import zlib
 # LDNN Modules
 import core
 import util
+import package
 import gpu
 #
 #
@@ -112,11 +113,11 @@ def main():
     # cifa-10
     #
     package_id = 1
-    package = util.Package(package_id)
-    package.load_batch()
+    pack = package.Package(package_id)
+    pack.load_batch()
     #
-    make_cifa10_train_batch(package)
-    make_cifa10_test_batch(package)
+    make_cifa10_train_batch(pack)
+    make_cifa10_test_batch(pack)
     #
     return 0
 #

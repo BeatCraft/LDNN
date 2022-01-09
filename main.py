@@ -49,11 +49,11 @@ def setup_autoencoder(r, size):
     r.layers.append(enc_2)
     # 3 : intermediate
     c = r.count_layers()
-    inter = core.HiddenLayer(c, 64, 10, enc_2, r._gpu, mode)
+    inter = core.HiddenLayer(c, 64, 32, enc_2, r._gpu, mode)
     r.layers.append(inter)
     # 4 : dec
     c = r.count_layers()
-    dec_1 = core.HiddenLayer(c, 10, 64, inter, r._gpu, mode)
+    dec_1 = core.HiddenLayer(c, 32, 64, inter, r._gpu, mode)
     r.layers.append(dec_1)
     # 5 : dec
     c = r.count_layers()

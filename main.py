@@ -41,11 +41,11 @@ def setup_autoencoder(r, size):
     r.input = input
     # 1 : enc
     c = r.count_layers()
-    enc_1 = core.HiddenLayer(c, size, 64, input, r._gpu, mode)
+    enc_1 = core.HiddenLayer(c, size, 128, input, r._gpu, mode)
     r.layers.append(enc_1)
     # 2 : enc
     c = r.count_layers()
-    enc_2 = core.HiddenLayer(c, 64, 64, enc_1, r._gpu, mode)
+    enc_2 = core.HiddenLayer(c, 128, 64, enc_1, r._gpu, mode)
     r.layers.append(enc_2)
     # 3 : intermediate
     c = r.count_layers()
@@ -57,11 +57,11 @@ def setup_autoencoder(r, size):
     r.layers.append(dec_1)
     # 5 : dec
     c = r.count_layers()
-    dec_2 = core.HiddenLayer(c, 64, 64, dec_1, r._gpu, mode)
+    dec_2 = core.HiddenLayer(c, 64, 128, dec_1, r._gpu, mode)
     r.layers.append(dec_2)
     # 3 : output
     c = r.count_layers()
-    output = core.RegressionOutputLayer(c, 64, size, dec_2, r._gpu, mode)
+    output = core.RegressionOutputLayer(c, 128, size, dec_2, r._gpu, mode)
     r.layers.append(output)
     r.output = output
     #
@@ -220,7 +220,7 @@ def main():
         train_label_batch = pack._train_label_batch
         t.set_batch(data_size, num_class, train_data_batch, train_label_batch, batch_size, batch_offset)
         #
-        t.loop()
+        t.loop(100)
     elif mode==1: # test
         test.test_n(r, pack, 500)
     elif mode==2: # denomi

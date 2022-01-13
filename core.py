@@ -619,7 +619,22 @@ class Roster:
         self._mode = mode # weight type : 0=float, 1=int
         print(("weight type=%d" % (mode)))
         self._eval_mode = 0
+        self._path = ""
+        
+    def set_path(self, path):
+        self._path = path
+        
+    def save(self):
+        self.export_weight(self._path)
     
+    def load(self):
+        if os.path.isfile(self._path):
+            self.import_weight(self._path)
+        else:
+            self.init_weight()
+            self.export_weight(self._path)
+        #
+
     def set_evaluate_mode(self, mode):
         self._eval_mode = mode
         

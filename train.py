@@ -216,7 +216,8 @@ class Train:
                 #
                 level = level + mode
             #
-            r.export_weight("./wi.csv")
+            #r.export_weight("./wi.csv")
+            r.save()
             #path = "./test-%04d.png" % (j)
             #save_img(r, path)
         #
@@ -241,7 +242,8 @@ class Train:
         
         for i in range(n):
             ce, lv_min, lv_min = self.w_loop(i, 500, d, ce, w_list, lv_min, lv_max, "all")
-            r.export_weight("./wi.csv")
+            #r.export_weight("./wi.csv")
+            r.save()
         #
         return 0
 

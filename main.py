@@ -65,12 +65,7 @@ def setup_autoencoder(r, size):
     r.layers.append(output)
     r.output = output
     #
-    #
-    #
     r.set_evaluate_mode(1)
-    #
-    #
-    #
 
 def setup_cnn(r):
     # 0 : input 28 x 28 x 1 = 784
@@ -114,32 +109,32 @@ def setup_fc(r, size):
     r.layers.append(input)
     # 1 : hidden : 28 x 28 x 1 = 784
     c = r.count_layers()
-    hidden_1 = core.HiddenLayer(c, size, 64, input, r._gpu, mode)
+    hidden_1 = core.HiddenLayer(c, size, 128, input, r._gpu, mode)
     r.layers.append(hidden_1)
     # 2 : hidden : 64
     c = r.count_layers()
-    hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, r._gpu, mode)
+    hidden_2 = core.HiddenLayer(c, 128, 64, hidden_1, r._gpu, mode)
     r.layers.append(hidden_2)
     # 3 : hidden : 64
     c = r.count_layers()
-    hidden_3 = core.HiddenLayer(c, 64, 64, hidden_2, r._gpu, mode)
+    hidden_3 = core.HiddenLayer(c, 64, 32, hidden_2, r._gpu, mode)
     r.layers.append(hidden_3)
     # 3 : output
     c = r.count_layers()
-    output = core.OutputLayer(c, 64, 10, hidden_3, r._gpu, mode)
+    output = core.OutputLayer(c, 32, 10, hidden_3, r._gpu, mode)
     r.layers.append(output)
 
 def setup_dnn(my_gpu, path, config=0, mode=0):
     r = core.Roster(mode)
     r.set_gpu(my_gpu)
+    r.set_path(path)
     #
-    if config==0:
+    if config==0: # fc
         setup_fc(r, 28*28)
-    elif config==1:
+    elif config==1: # cnn
         setup_cnn(r)
-    elif config==2:
+    elif config==2: # auto-encoder
         setup_autoencoder(r, 28*28)
-        #setup_autoencoder(r, 32*32*3)
     #
     if os.path.isfile(path):
         r.import_weight(path)
@@ -207,9 +202,12 @@ def main():
     pack = package.Package(package_id)
     pack.load_batch()
     #
-    #path = "../ldnn_config/cifar-10-batches-py/wi.csv"
     path = "./wi.csv"
     r = setup_dnn(my_gpu, path, config)
+    if package_id==0 or package_id==1: # MNIST, cifar-10
+        r.set_scale_input(1)
+    #
+    #
     #
     if mode==0: # train
         print("batch_offset=%d" % (batch_offset))
@@ -220,7 +218,7 @@ def main():
         train_label_batch = pack._train_label_batch
         t.set_batch(data_size, num_class, train_data_batch, train_label_batch, batch_size, batch_offset)
         #
-        t.loop(100)
+        t.loop()
     elif mode==1: # test
         test.test_n(r, pack, 500)
     elif mode==2: # denomi
@@ -233,7 +231,7 @@ def main():
         
         test.test_n(r, pack, 500)
         
-    elif mode==3:
+    elif mode==3: # test for auto-encoder
         t = train.Train(r)
         data_size = pack._image_size
         num_class = pack._num_class

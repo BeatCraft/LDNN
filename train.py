@@ -31,6 +31,7 @@ class Train:
         self._data_size = data_size
         #
         r = self._r
+        r.prepare(batch_size, data_size, num_class)
         r.set_batch(data_size, num_class, train_data_batch, train_label_batch,  batch_size, batch_offset)
     
     def set_path(path):

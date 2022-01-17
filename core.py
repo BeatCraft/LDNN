@@ -220,7 +220,7 @@ class InputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None, mode=0):
         print("InputLayer::__init__()")
         super(InputLayer, self).__init__(i, LAYER_TYPE_INPUT, num_input, num_node, pre, gpu, mode)
-        
+        # mode : 0 = float32, 1=int32
     def prepare(self, batch_size):
         self._batch_size = batch_size
         #
@@ -236,6 +236,7 @@ class InputLayer(Layer):
     def propagate(self, array_in, debug=0):
         if debug:
             #self._gpu.copy(self._gpu_output, self._output_array)
+            print("input")
             self._gpu.copy(self._output_array, self._gpu_output)
             print((self._output_array[0]))
         else:
@@ -394,6 +395,7 @@ class OutputLayer(Layer):
             # softmax
             self._gpu.softmax(self._gpu_output, self._num_node, self._batch_size)
             if debug:
+                print("output")
                 self._gpu.copy(self._output_array, self._gpu_output)
                 print((self._output_array[0]))
             #
@@ -412,6 +414,7 @@ class OutputLayer(Layer):
             #
             
             if debug:
+                print("output")
                 self._gpu.copy(self._output_array, self._gpu_output)
                 print((self._output_array[0]))
                 self._gpu.copy(self._softmax_array, self._gpu_softmax)
@@ -468,6 +471,7 @@ class RegressionOutputLayer(Layer):
         #self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
         # debug
         if debug:
+            print("output")
             #print((self._output_array[1665]))
             self._gpu.copy(self._output_array, self._gpu_output)
             print((self._output_array[0]))
@@ -616,18 +620,22 @@ class Roster:
         self.input = None
         self.output = None
         self._batch_size = 1
+        self._data_size = 1
         self._mode = mode # weight type : 0=float, 1=int
         print(("weight type=%d" % (mode)))
         self._eval_mode = 0
         self._path = ""
+        self._scale_input = 0
         
     def set_path(self, path):
         self._path = path
         
     def save(self):
+        print("Roster::save(%s)" % (self._path))
         self.export_weight(self._path)
     
     def load(self):
+        print("Roster::load(%s)" % (self._path))
         if os.path.isfile(self._path):
             self.import_weight(self._path)
         else:
@@ -650,8 +658,6 @@ class Roster:
         #
         self.num_class = num_class
         self._batch_size = batch_size
-        #self._bacth_size
-        
         self._data_size = data_size
         #
         if self._gpu:
@@ -667,10 +673,12 @@ class Roster:
             self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
             self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
         #
+        self.input = self.get_layer_at(0)
         for layer in self.layers:
             layer.prepare(batch_size)
         #
-
+        self.output = layer
+        
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch, size, offset):
         print(("Roster::set_batch(%d, %d)" % (size, offset)))
         if self._mode==0:
@@ -680,7 +688,7 @@ class Roster:
         #
         labels = np.zeros((size, num_class), dtype=np.float32)
         #
-        self.prepare(size, data_size, num_class)
+        #self.prepare(size, data_size, num_class)
         #
         for j in range(size):
             data_array[j] = train_data_batch[offset+j]
@@ -695,14 +703,19 @@ class Roster:
         self._gpu.copy(self._gpu_input, data)
         self._gpu.copy(self._gpu_labels, label)
         #
-        layer = self.get_layer_at(0) # input layer
-        #if scale:
-        if self._mode==0:
-            layer._gpu.scale(self._gpu_input, layer._gpu_output, data_size, float(255.0), layer._num_node, batch_size, 0)
-        elif self._mode==1:
-            self._gpu.copy(layer._gpu_output, data)
-            #print data
+        if self._scale_input==0:
+            self._gpu.copy(self.input._gpu_output, data)
+        elif self._scale_input==1:
+            self._gpu.scale(self._gpu_input, self.input._gpu_output,
+                            data_size, float(255.0), self.input._num_node, batch_size, 0)
+        elif self._scale_input==2:
+            self._gpu.scale_exp(self._gpu_input, self.input._gpu_output, data_size, self.input._num_node, batch_size, 0)
+        else:
+            pass
         #
+        
+    def set_scale_input(self, scale):
+        self._scale_input = scale
     
     def denominate(self, all=False):
         print("Roster : denominate()")
@@ -820,6 +833,7 @@ class Roster:
         #
         for i in range(self._batch_size):
             if self._mode==0:
+                #print(i, self._batch_size)
                 inf = output._output_array[i]
             elif self._mode==1:
                 inf = output._softmax_array[i]
@@ -836,8 +850,9 @@ class Roster:
         #
         return ret
     
-    def evaluate(self):
-        self.propagate()
+    def evaluate(self, debug=0):
+        self.propagate(debug)
+        #print("Roster::evaluate(%d)" % (self._eval_mode))
         #
         if self._eval_mode==0:
             ce = self.get_cross_entropy()
@@ -845,6 +860,10 @@ class Roster:
             self._gpu.mse(self.output._gpu_output, self.input._gpu_output, self._gpu_entropy, self._data_size, self._batch_size)
             self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
             ce = np.sum(self._batch_cross_entropy)/np.float32(self._batch_size)
+        #
+        
+        #self._gpu.copy(self._output_array, self._gpu_output)
+        #print((self._output_array))
         #
         return ce
     
@@ -951,6 +970,7 @@ class Roster:
 #            pre.propagate(None, debug)
 #        #
         for i in range(1, c):
+        #for i in range(0, c):
             layer = self.get_layer_at(i)
             layer.propagate(pre._gpu_output, debug)
             pre = layer

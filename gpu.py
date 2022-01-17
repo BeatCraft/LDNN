@@ -243,6 +243,22 @@ __kernel void max_batch(
     }
 }
 
+__kernel void scale_exp(
+    __global float* x,
+    __global float* y,
+    const int stride,
+    const int debug)
+{
+    int i = get_global_id(0); // data index
+    int j = get_global_id(1); // bathch index
+    
+    y[stride*j+i] = exp(x[stride*j+i]);
+    
+    if (debug==1){
+        printf(\"%d, %d\\n\",i, j);
+    }
+};
+
 __kernel void scale(
     __global float* x,
     __global float* y,
@@ -557,6 +573,11 @@ class Gpu:
                         size=host_array.nbytes)
         self._bufs.append(buf)
         return buf
+
+    def scale_exp(self, d_x, d_y, stride, row, batch_size, debug):
+        event = self.prg.scale_exp(self._queue, (row, batch_size), None,
+                               d_x, d_y, np.int32(stride), np.int32(debug))
+        event.wait()
 
     def scale(self, d_x, d_y, stride, max, row, batch_size, debug):
         event = self.prg.scale(self._queue, (row, batch_size), None,

@@ -49,6 +49,7 @@ def test_n(r, pack, n):
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
     print((">>test(%d) = %d" % (n, eval_size)))
+    print(num_class)
     #
     it, left = divmod(eval_size, n)
     if left>0:
@@ -57,8 +58,9 @@ def test_n(r, pack, n):
     #n = 3
     #
     start_time = time.time()
-    #print(r)
+    
     #
+    #r.set_batch(data_size, num_class, train_data_batch, train_label_batch, 10, 0)
     r.prepare(n, data_size, num_class)
     mode = r.mode()
     if mode==0:
@@ -66,25 +68,26 @@ def test_n(r, pack, n):
     elif mode==1:
         data_array = np.zeros((n, data_size), dtype=np.int32)
     #
-    
     class_array = np.zeros(n, dtype=np.int32)
-    class_array_2 = np.zeros((n, num_class), dtype=np.float32)
+    #class_array_2 = np.zeros((n, num_class), dtype=np.float32)
     #
     for i in range(it):
     #for i in range(1):
-        class_array_2 = class_array_2*0.0
+        #class_array_2 = class_array_2*0.0
         for j in range(n):
-            data_array[j] = pack._train_image_batch[i*n+j]
-            class_array[j] = pack._train_label_batch[i*n+j]
-            k = pack._train_label_batch[i*n+j]
-            class_array_2[j][k] = 1.0
+            data_array[j] = pack._test_image_batch[i*n+j]
+            class_array[j] = pack._test_label_batch[i*n+j]
+            #k = pack._test_label_batch[i*n+j]
+            #class_array_2[j][k] = 1.0
         #
         scale = 1
         #print data_array[0]
-        r.set_data(data_array, data_size, class_array_2, n, scale)
+        r.set_batch(data_size, num_class, data_array, class_array, n, 0)
+        #r.set_data(data_array, data_size, class_array_2, n, scale)
         r.propagate(0)
         #
         answes = r.get_answer()
+        #print(answes)
         for j in range(n):
             ans = answes[j]
             label = class_array[j]

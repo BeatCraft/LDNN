@@ -19,3 +19,4 @@ codec-test/tes*/
 *.pyc
 *.jpg
 *.png
+*.auto

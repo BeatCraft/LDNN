@@ -109,19 +109,19 @@ def setup_fc(r, size):
     r.layers.append(input)
     # 1 : hidden : 28 x 28 x 1 = 784
     c = r.count_layers()
-    hidden_1 = core.HiddenLayer(c, size, 128, input, r._gpu, mode)
+    hidden_1 = core.HiddenLayer(c, size, 64, input, r._gpu, mode)
     r.layers.append(hidden_1)
     # 2 : hidden : 64
     c = r.count_layers()
-    hidden_2 = core.HiddenLayer(c, 128, 64, hidden_1, r._gpu, mode)
+    hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, r._gpu, mode)
     r.layers.append(hidden_2)
     # 3 : hidden : 64
     c = r.count_layers()
-    hidden_3 = core.HiddenLayer(c, 64, 32, hidden_2, r._gpu, mode)
+    hidden_3 = core.HiddenLayer(c, 64, 64, hidden_2, r._gpu, mode)
     r.layers.append(hidden_3)
     # 3 : output
     c = r.count_layers()
-    output = core.OutputLayer(c, 32, 10, hidden_3, r._gpu, mode)
+    output = core.OutputLayer(c, 64, 10, hidden_3, r._gpu, mode)
     r.layers.append(output)
 
 def setup_dnn(my_gpu, path, config=0, mode=0):

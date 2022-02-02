@@ -691,8 +691,10 @@ class Roster:
         #self.prepare(size, data_size, num_class)
         #
         for j in range(size):
+            #print(j)
             data_array[j] = train_data_batch[offset+j]
             k = train_label_batch[offset+j]
+            #print("label[%d][%d]" % (j, k))
             labels[j][k] = 1.0
         #
         self.set_data(data_array, data_size, labels, size, 1)

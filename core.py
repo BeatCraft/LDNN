@@ -654,7 +654,7 @@ class Roster:
         self._remote = None
 
     def prepare(self, batch_size, data_size, num_class):
-        print(("Roster:prepare(%d, %d, %d)" %(batch_size, data_size, num_class)))
+        #print(("Roster:prepare(%d, %d, %d)" %(batch_size, data_size, num_class)))
         #
         self.num_class = num_class
         self._batch_size = batch_size
@@ -680,7 +680,7 @@ class Roster:
         self.output = layer
         
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch, size, offset):
-        print(("Roster::set_batch(%d, %d)" % (size, offset)))
+        #print(("Roster::set_batch(size=%d, offset=%d)" % (size, offset)))
         if self._mode==0:
             data_array = np.zeros((size, data_size), dtype=np.float32)
         elif self._mode==1:
@@ -825,6 +825,7 @@ class Roster:
         return output._output_array
 
     def get_answer(self):
+        print("mode=%d" % (self._mode))
         ret = []
         c = self.count_layers()
         output = self.get_layer_at(c-1)

@@ -202,13 +202,16 @@ def main():
     pack = package.Package(package_id)
     pack.load_batch()
     #
-    path = "./wi.csv"
-    r = setup_dnn(my_gpu, path, config)
+    #path = "./wi.csv"
+    path = "../ldnn_config/cifar-10-batches-py/wi.csv"
+    #r = setup_dnn(my_gpu, path, config)
+    r = pack.setup_dnn(my_gpu, config, mode)
     if package_id==0 or package_id==1: # MNIST, cifar-10
         r.set_scale_input(1)
     #
-    #
-    #
+    r.set_path(path)
+    #r.load()
+    
     if mode==0: # train
         print("batch_offset=%d" % (batch_offset))
         t = train.Train(r)
@@ -220,7 +223,7 @@ def main():
         #
         t.loop()
     elif mode==1: # test
-        test.test_n(r, pack, 500)
+        test.test_n(r, pack, 100)
     elif mode==2: # denomi
         test.test_n(r, pack, 500)
         

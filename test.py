@@ -55,12 +55,10 @@ def test_n(r, pack, n):
     if left>0:
         print(("error : n(=%d) is not appropriate" % (n)))
     #
-    #n = 3
-    #
     start_time = time.time()
-    
     #
-    #r.set_batch(data_size, num_class, train_data_batch, train_label_batch, 10, 0)
+    n = 1
+    it = 1
     r.prepare(n, data_size, num_class)
     mode = r.mode()
     if mode==0:
@@ -72,7 +70,6 @@ def test_n(r, pack, n):
     #class_array_2 = np.zeros((n, num_class), dtype=np.float32)
     #
     for i in range(it):
-    #for i in range(1):
         #class_array_2 = class_array_2*0.0
         for j in range(n):
             data_array[j] = pack._test_image_batch[i*n+j]
@@ -86,8 +83,10 @@ def test_n(r, pack, n):
         #r.set_data(data_array, data_size, class_array_2, n, scale)
         r.propagate(0)
         #
+        infs = r.get_inference()
+        print(infs)
         answes = r.get_answer()
-        #print(answes)
+        print(answes)
         for j in range(n):
             ans = answes[j]
             label = class_array[j]

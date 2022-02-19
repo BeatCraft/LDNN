@@ -57,14 +57,15 @@ def test_n(r, pack, n):
     #
     start_time = time.time()
     #
-    n = 1
-    it = 1
+    #n = 1
+    #it = 1
     r.prepare(n, data_size, num_class)
-    mode = r.mode()
-    if mode==0:
-        data_array = np.zeros((n, data_size), dtype=np.float32)
-    elif mode==1:
-        data_array = np.zeros((n, data_size), dtype=np.int32)
+    #mode = r.mode()
+    data_array = np.zeros((n, data_size), dtype=np.float32)
+    #if mode==0:
+    #    data_array = np.zeros((n, data_size), dtype=np.float32)
+    #elif mode==1:
+    #    data_array = np.zeros((n, data_size), dtype=np.int32)
     #
     class_array = np.zeros(n, dtype=np.int32)
     #class_array_2 = np.zeros((n, num_class), dtype=np.float32)
@@ -84,9 +85,9 @@ def test_n(r, pack, n):
         r.propagate(0)
         #
         infs = r.get_inference()
-        print(infs)
+        #print(infs)
         answes = r.get_answer()
-        print(answes)
+        #print(answes)
         for j in range(n):
             ans = answes[j]
             label = class_array[j]
@@ -105,8 +106,8 @@ def test_n(r, pack, n):
     print(("time = %s" % (t)))
     #
     #r.propagate()
-    ce = r.get_cross_entropy(0)
-    print(("CE = %f" % (ce)))
+    #ce = r.get_cross_entropy(0)
+    #print(("CE = %f" % (ce)))
     #
   
     #self.mpi_save(pack.save_path(), mpi, com, rank, size)

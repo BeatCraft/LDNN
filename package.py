@@ -105,7 +105,7 @@ class Package:
         return self._w_save_path
     
     def setup_dnn(self, my_gpu, config=0, mode=0):
-        r = core.Roster(mode)
+        r = core.Roster()#mode)
         r.set_gpu(my_gpu)
         #if mode==0: # quantized
         self._w_save_path = self._wi_csv_path

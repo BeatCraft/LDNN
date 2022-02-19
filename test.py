@@ -57,37 +57,21 @@ def test_n(r, pack, n):
     #
     start_time = time.time()
     #
-    #n = 1
-    #it = 1
     r.prepare(n, data_size, num_class)
-    #mode = r.mode()
     data_array = np.zeros((n, data_size), dtype=np.float32)
-    #if mode==0:
-    #    data_array = np.zeros((n, data_size), dtype=np.float32)
-    #elif mode==1:
-    #    data_array = np.zeros((n, data_size), dtype=np.int32)
-    #
     class_array = np.zeros(n, dtype=np.int32)
-    #class_array_2 = np.zeros((n, num_class), dtype=np.float32)
-    #
     for i in range(it):
-        #class_array_2 = class_array_2*0.0
         for j in range(n):
             data_array[j] = pack._test_image_batch[i*n+j]
             class_array[j] = pack._test_label_batch[i*n+j]
-            #k = pack._test_label_batch[i*n+j]
-            #class_array_2[j][k] = 1.0
         #
-        scale = 1
-        #print data_array[0]
         r.set_batch(data_size, num_class, data_array, class_array, n, 0)
+        #scale = 1
         #r.set_data(data_array, data_size, class_array_2, n, scale)
         r.propagate(0)
         #
-        infs = r.get_inference()
-        #print(infs)
+        #infs = r.get_inference()
         answes = r.get_answer()
-        #print(answes)
         for j in range(n):
             ans = answes[j]
             label = class_array[j]
@@ -104,15 +88,6 @@ def test_n(r, pack, n):
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
     print(("time = %s" % (t)))
-    #
-    #r.propagate()
-    #ce = r.get_cross_entropy(0)
-    #print(("CE = %f" % (ce)))
-    #
-  
-    #self.mpi_save(pack.save_path(), mpi, com, rank, size)
-
-    
-
-
-    
+#
+#
+#

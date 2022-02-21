@@ -105,13 +105,10 @@ class Package:
         return self._w_save_path
     
     def setup_dnn(self, my_gpu, config=0, mode=0):
-        r = core.Roster()#mode)
+        r = core.Roster()
         r.set_gpu(my_gpu)
-        #if mode==0: # quantized
         self._w_save_path = self._wi_csv_path
-#        elif mode==1: # float
-#            self._w_save_path = self._w_float_path
-        #
+
         if self._package_id==0: # MNIST
             if config==0:
                 print("FC")
@@ -190,12 +187,10 @@ class Package:
                 output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
                 r.layers.append(output)
             elif config==1:
-                print("check")
                 c = r.count_layers()
                 input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
                 r.layers.append(input)
                 
-                # 1 : CNN : 32 x 32 x 3 > 32 x 32 x 8
                 c = r.count_layers()
                 cnn_1 = core.Conv_4_Layer(c, 32, 32, 3, 16, input, my_gpu)
                 r.layers.append(cnn_1)
@@ -212,107 +207,86 @@ class Package:
                 fc_1 = core.HiddenLayer(c, 4096, 512, max_1, my_gpu)
                 r.layers.append(fc_1)
                 
-                # 8 : FC : 64 x 64
                 c = r.count_layers()
                 fc_2 = core.HiddenLayer(c, 512, 512, fc_1, my_gpu)
                 r.layers.append(fc_2)
                 
-                # 8 : output : 64 x 10
                 c = r.count_layers()
                 output = core.OutputLayer(c, 512, 10, fc_2, my_gpu)
                 r.layers.append(output)
             #
             elif config==2:
-                # 0 : input : 32x32x3 = 3072
                 c = r.count_layers()
                 input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
                 r.layers.append(input)
                 
-                # 1 : CNN : 32 x 32 x 3 > 32 x 32 x 8
+                c = r.count_layers()
+                cnn_1 = core.Conv_4_Layer(c, 32, 32, 3, 16, input, my_gpu)
+                r.layers.append(cnn_1)
+                
+                c = r.count_layers()
+                cnn_2 = core.Conv_4_Layer(c, 32, 32, 16, 16, cnn_1, my_gpu)
+                r.layers.append(cnn_2)
+                
+                c = r.count_layers()
+                max_1 = core.MaxLayer(c, 16, 32, 32, cnn_2, my_gpu) # 16 x 16 x 16 = 8192
+                r.layers.append(max_1)
+                
+                c = r.count_layers()
+                cnn_3 = core.Conv_4_Layer(c, 16, 16, 16, 32, max_1, my_gpu)
+                r.layers.append(cnn_3)
+                
+                c = r.count_layers()
+                cnn_4 = core.Conv_4_Layer(c, 16, 16, 32, 32, cnn_3, my_gpu)
+                r.layers.append(cnn_4)
+                
+                c = r.count_layers()
+                max_2 = core.MaxLayer(c, 32, 16, 16, cnn_4, my_gpu) # 8 x 8 x 32 = 2048
+                r.layers.append(max_2)
+                
+                c = r.count_layers()
+                fc_1 = core.HiddenLayer(c, 2048, 128, max_2, my_gpu)
+                r.layers.append(fc_1)
+                
+                c = r.count_layers()
+                fc_2 = core.HiddenLayer(c, 128, 128, fc_1, my_gpu)
+                r.layers.append(fc_2)
+                
+                c = r.count_layers()
+                output = core.OutputLayer(c, 128, 10, fc_2, my_gpu)
+                r.layers.append(output)
+            #
+            elif config==3: # minicing LeNet
+                c = r.count_layers()
+                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
+                r.layers.append(input)
+                
                 c = r.count_layers()
                 cnn_1 = core.Conv_4_Layer(c, 32, 32, 3, 8, input, my_gpu)
                 r.layers.append(cnn_1)
                 
-                # 2 : max : 32 x 32 x 8 > 16 x 16 x 8
                 c = r.count_layers()
-                max_1 = core.MaxLayer(c, 8, 32, 32, cnn_1, my_gpu)
+                max_1 = core.MaxLayer(c, 8, 32, 32, cnn_1, my_gpu) # 16 x 16 x 16 = 8192
                 r.layers.append(max_1)
                 
-                # 3 : FC : (4x4x32) x 64
                 c = r.count_layers()
-                fc_1 = core.HiddenLayer(c, 2048, 64, max_1, my_gpu)
+                cnn_2 = core.Conv_4_Layer(c, 16, 16, 8, 16, max_1, my_gpu)
+                r.layers.append(cnn_2)
+                
+                c = r.count_layers()
+                max_2 = core.MaxLayer(c, 16, 16, 16, cnn_2, my_gpu) # 16 x 8 x 8 = 1024
+                r.layers.append(max_2)
+                
+                c = r.count_layers()
+                fc_1 = core.HiddenLayer(c, 1024, 128, max_2, my_gpu)
                 r.layers.append(fc_1)
                 
-                # 4 : FC : 64 x 64
                 c = r.count_layers()
-                fc_2 = core.HiddenLayer(c, 64, 64, fc_1, my_gpu)
+                fc_2 = core.HiddenLayer(c, 128, 128, fc_1, my_gpu)
                 r.layers.append(fc_2)
                 
-                # 5 : output : 64 x 10
                 c = r.count_layers()
-                output = core.OutputLayer(c, 64, 10, fc_2, my_gpu)
-                r.layers.append(output)
-            #
-            elif config==3:
-                # 0 : input : 32x32x3 = 3072
-                c = r.count_layers()
-                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
-                r.layers.append(input)
-                
-                # 1 : CNN : 32 x 32 x 3 > 32 x 32 x 4
-                c = r.count_layers()
-                cnn_1 = core.Conv_4_Layer(c, 32, 32, 3, 4, input, my_gpu)
-                r.layers.append(cnn_1)
-                
-                # 2 : max : 32 x 32 x 8 > 16 x 16 x 8
-                c = r.count_layers()
-                max_1 = core.MaxLayer(c, 4, 32, 32, cnn_1, my_gpu)
-                r.layers.append(max_1)
-                
-                # 3 : FC : (4x4x32) x 64
-                c = r.count_layers()
-                fc_1 = core.HiddenLayer(c, 1024, 64, max_1, my_gpu)
-                r.layers.append(fc_1)
-                
-                # 4 : FC : 64 x 64
-                c = r.count_layers()
-                fc_2 = core.HiddenLayer(c, 64, 64, fc_1, my_gpu)
-                r.layers.append(fc_2)
-                
-                # 5 : output : 64 x 10
-                c = r.count_layers()
-                output = core.OutputLayer(c, 64, 10, fc_2, my_gpu)
-                r.layers.append(output)
-            #
-            elif config==4:
-                # 0 : input : 32x32x3 = 3072
-                c = r.count_layers()
-                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
-                r.layers.append(input)
-                
-                # 1 : CNN : 32 x 32 x 3 > 32 x 32 x 4
-                c = r.count_layers()
-                cnn_1 = core.Conv_4_Layer(c, 32, 32, 3, 4, input, my_gpu)
-                r.layers.append(cnn_1)
-                
-                # 2 : max : 32 x 32 x 8 > 16 x 16 x 8
-                c = r.count_layers()
-                max_1 = core.MaxLayer(c, 4, 32, 32, cnn_1, my_gpu)
-                r.layers.append(max_1)
-                
-                # 3 : FC : (4x4x32) x 64
-                c = r.count_layers()
-                fc_1 = core.HiddenLayer(c, 1024, 128, max_1, my_gpu)
-                r.layers.append(fc_1)
-                
-                # 4 : FC : 64 x 64
-                c = r.count_layers()
-                fc_2 = core.HiddenLayer(c, 64, 64, fc_1, my_gpu)
-                r.layers.append(fc_2)
-                
-                # 5 : output : 64 x 10
-                c = r.count_layers()
-                output = core.OutputLayer(c, 64, 10, fc_2, my_gpu)
+                output = core.OutputLayer(c, 128, 10, fc_2, my_gpu)
                 r.layers.append(output)
             #
         elif self._package_id==2: # codec test

@@ -107,7 +107,7 @@ class Package:
     def setup_dnn(self, my_gpu, config=0, mode=0):
         r = core.Roster()
         r.set_gpu(my_gpu)
-        self._w_save_path = self._wi_csv_path
+        #self._w_save_path = self._wi_csv_path
 
         if self._package_id==0: # MNIST
             if config==0:
@@ -333,14 +333,14 @@ class Package:
             print("package error")
             return None
         #
-        if os.path.isfile(self.save_path()):
-            r.import_weight(self.save_path())
-        else:
-            r.init_weight()
-            r.export_weight(self.save_path())
+        #if os.path.isfile(self.save_path()):
+        #    r.import_weight(self.save_path())
+        #else:
+        #    r.init_weight()
+        #    r.export_weight(self.save_path())
         #
-        if my_gpu:
-            r.update_weight()
+        #if my_gpu:
+        #    r.update_weight()
         #
         return r
 

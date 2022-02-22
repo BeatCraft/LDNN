@@ -282,7 +282,7 @@ class Package:
                 r.layers.append(cnn_3)
                 
                 c = r.count_layers()
-                max_3 = core.MaxLayer(c, 32, 8, 8, cnn_3, my_gpu) # 4 x 4 x 32 = 512
+                max_3 = core.MaxLayer(c, 32, 8, 8, cnn_3, my_gpu) # 32 x 4 x 4 = 512
                 r.layers.append(max_3)
                 
                 c = r.count_layers()

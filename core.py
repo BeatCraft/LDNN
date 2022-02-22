@@ -827,6 +827,7 @@ class Roster:
         c = self.count_layers()
         pre = self.get_layer_at(0)
         for i in range(1, c):
+            print(c)
             layer = self.get_layer_at(i)
             layer.propagate(pre._gpu_output, debug)
             pre = layer

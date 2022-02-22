@@ -242,11 +242,48 @@ class Train:
         lv_max = int(math.log(w_num/d, 2)) + 1
         
         for i in range(n):
+        
             ce, lv_min, lv_min = self.w_loop(i, 500, d, ce, w_list, lv_min, lv_max, "all")
             #r.export_weight("./wi.csv")
             r.save()
         #
         return 0
+        
+    def stochastic_loop(self, pack, dsize, bsize, n=1):
+        r = self._r
+        w_list = None
+        ce = 0.0
+        ret = 0
+        #
+        #ce = self.evaluate()
+        #print("CE starts with %f" % ce)
+        #
+        w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+        w_num = len(w_list)
+        print(len(w_list))
+        #
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        
+        train_data_batch = pack._train_image_batch
+        train_label_batch = pack._train_label_batch
+        num_class = pack._num_class
+        tbs = len(train_data_batch)
+        num = int(tbs/dsize)
+        for i in range(num):
+            batch_offset = bsize*i
+            print("%d, %d, %d" % (dsize, bsize, i))
+            self.set_batch(dsize, num_class, train_data_batch, train_label_batch, bsize, batch_offset)
+            #r.set_batch(dsize, num_class, train_data_batch, train_label_batch, bsize, batch_offset)
+            ce = self.evaluate()
+            print("CE starts with %f" % ce)
+            ce, lv_min, lv_min = self.w_loop(i, 1, d, ce, w_list, lv_min, lv_max, "all")
+            r.save()
+        #
+        return 0
+    
+    
 
 #def save_img(r, path):
 #    r._gpu.copy(r.output._output_array, r.output._gpu_output)

@@ -222,6 +222,11 @@ def main():
         t.set_batch(data_size, num_class, train_data_batch, train_label_batch, batch_size, batch_offset)
         #
         t.loop()
+        
+    if mode==4: # train
+        t = train.Train(r)
+        data_size = pack._image_size
+        t.stochastic_loop(pack, data_size, batch_size, 1)
     elif mode==1: # test
         test.test_n(r, pack, 100)
     elif mode==2: # denomi

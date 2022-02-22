@@ -730,14 +730,18 @@ class Roster:
     def evaluate(self, debug=0):
         print("Roster::evaluate()")
         self.propagate(debug)
+        print("Roster::evaluate() 1")
         #
         if self._eval_mode==0:
+            print("Roster::evaluate() 2a")
             ce = self.get_cross_entropy()
         elif self._eval_mode ==1:
+            print("Roster::evaluate() 2b")
             self._gpu.mse(self.output._gpu_output, self.input._gpu_output, self._gpu_entropy, self._data_size, self._batch_size)
             self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
             ce = np.sum(self._batch_cross_entropy)/np.float32(self._batch_size)
         #
+        print("Roster::evaluate() 3")
         return ce
     
     def get_cross_entropy(self, debug=0):

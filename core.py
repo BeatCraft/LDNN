@@ -264,6 +264,7 @@ class HiddenLayer(Layer):
         self._scale = 1
     
     def prepare(self, batch_size):
+        print("HiddenLayer::prepare(%d)" % (batch_size))
         self._batch_size = batch_size
         #
         self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
@@ -309,6 +310,8 @@ class OutputLayer(Layer):
         #
 
     def prepare(self, batch_size):
+        print("OutputLayer::prepare(%d)" % (batch_size))
+            
         self._batch_size = batch_size
         #
         self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
@@ -415,7 +418,7 @@ class MaxLayer(Layer):
         return 0
         
     def prepare(self, batch_size):
-        print("MaxLayer::prepare()")
+        print("MaxLayer::prepare(%d)" % (batch_size))
         self._batch_size = batch_size
         self._output_array = np.zeros((self._batch_size, self._ch, self._num_node), dtype=np.float32)
         #

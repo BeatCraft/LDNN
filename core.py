@@ -605,6 +605,7 @@ class Roster:
         else:
             pass
         #
+        print("set_data OK")
         
     def set_scale_input(self, scale):
         self._scale_input = scale

@@ -728,6 +728,7 @@ class Roster:
         return ret
     
     def evaluate(self, debug=0):
+        print("Roster::evaluate()")
         self.propagate(debug)
         #
         if self._eval_mode==0:
@@ -740,6 +741,7 @@ class Roster:
         return ce
     
     def get_cross_entropy(self, debug=0):
+        print("Roster::get_cross_entropy()")
         c = self.count_layers()
         output = self.get_layer_at(c-1)
         self._gpu.cross_entropy(output._gpu_output, self._gpu_labels, self._gpu_entropy, self.num_class, self._batch_size)

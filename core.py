@@ -578,7 +578,7 @@ class Roster:
         self.output = layer
         
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch, size, offset):
-        print("Roster : set_batch(%d, %d, %d, %d)" % (data_size, num_class, size, offset))
+        print("Roster::set_batch(%d, %d, %d, %d)" % (data_size, num_class, size, offset))
         data_array = np.zeros((size, data_size), dtype=np.float32)
         labels = np.zeros((size, num_class), dtype=np.float32)
         for j in range(size):
@@ -589,6 +589,7 @@ class Roster:
         self.set_data(data_array, data_size, labels, size, 1)
         
     def set_data(self, data, data_size, label, batch_size, scale=0):
+        print("Roster::set_data(%d, %d, %d)" % (data_size, batch_size, scale))
         self.reset()
         #
         self._gpu.copy(self._gpu_input, data)

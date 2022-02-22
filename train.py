@@ -225,12 +225,14 @@ class Train:
         return ce, lv_min, lv_max
 
     def loop(self, n=1):
+        print("Train::loop()")
         r = self._r
         w_list = None
         ce = 0.0
         ret = 0
         #
-        ce = self.evaluate()
+        #ce = self.evaluate()
+        ce = r.evaluate()
         print("CE starts with %f" % ce)
         #
         w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])

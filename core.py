@@ -578,6 +578,7 @@ class Roster:
         self.output = layer
         
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch, size, offset):
+        print("Roster : set_batch(%d, %d, %d, %d)" % (data_size, num_class, size, offset))
         data_array = np.zeros((size, data_size), dtype=np.float32)
         labels = np.zeros((size, num_class), dtype=np.float32)
         for j in range(size):

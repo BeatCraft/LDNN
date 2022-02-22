@@ -217,7 +217,10 @@ def main():
         num_class = pack._num_class
         train_data_batch = pack._train_image_batch
         train_label_batch = pack._train_label_batch
-        t.set_batch(data_size, num_class, train_data_batch, train_label_batch, batch_size, batch_offset)
+        batch_offset = 0
+        r.prepare(batch_size, data_size, num_class)
+        r.set_batch(data_size, num_class, train_data_batch, train_label_batch, batch_size, batch_offset)
+        #t.set_batch(data_size, num_class, train_data_batch, train_label_batch, batch_size, batch_offset)
         #
         t.loop()
     if mode==4: # train

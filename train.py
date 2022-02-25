@@ -171,6 +171,40 @@ class Train:
         #
         return ce, ret
 
+
+    def w_loop_2(self, c, n, d, ce, w_list, lv_min, lv_max, label):
+        r = self._r
+        level = lv_min
+        mode = 1
+        #
+        for j in range(n):
+            div = float(d)*float(2**(level))
+            cnt = 0
+            atk = 100#level*10
+            for i in range(atk):
+                ce, ret = self.multi_attack(ce, w_list, 1, div)
+                cnt = cnt + ret
+                print("[%d|%s] %d : H : %02d/%d : %f, %d (%d, %d) %d (%d, %d)" % (c, label, j, i, atk, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
+            #
+            for i in range(atk):
+                ce, ret = self.multi_attack(ce, w_list, 0, div)
+                cnt = cnt + ret
+                print("[%d|%s] %d : C : %02d/%d : %f, %d (%d, %d) %d (%d, %d)" % (c, label, j, i, atk, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
+            #
+            level = level + mode
+            if mode==1:
+                if level>=lv_max:
+                    mode = -1
+                #
+            elif mode==-1:
+                if level<=lv_min:
+                    mode = 1
+                #
+            #
+            r.save()
+        #
+        return ce, lv_min, lv_max
+
     def w_loop(self, c, n, d, ce, w_list, lv_min, lv_max, label):
         r = self._r
         level = lv_min
@@ -180,12 +214,13 @@ class Train:
             div = float(d)*float(2**(level))
             #
             cnt = 0
-            for i in range(100):
+            atk = 50
+            for i in range(atk):
                 ce, ret = self.multi_attack(ce, w_list, 1, div)
                 cnt = cnt + ret
                 print("[%d|%s] %d : H : %d : %f, %d (%d, %d) %d (%d, %d)" % (c, label, j, i, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
             #
-            for i in range(100):
+            for i in range(atk):
                 ce, ret = self.multi_attack(ce, w_list, 0, div)
                 cnt = cnt + ret
                 print("[%d|%s] %d : C : %d : %f, %d (%d, %d) %d (%d, %d)" % (c, label, j, i, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))

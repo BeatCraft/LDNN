@@ -270,31 +270,27 @@ class Package:
                 r.layers.append(max_1)
                 
                 c = r.count_layers()
-                cnn_2 = core.Conv_4_Layer(c, 16, 16, 8, 16, max_1, my_gpu)
+                cnn_2 = core.Conv_4_Layer(c, 16, 16, 8, 8, max_1, my_gpu)
                 r.layers.append(cnn_2)
                 
                 c = r.count_layers()
-                max_2 = core.MaxLayer(c, 16, 16, 16, cnn_2, my_gpu) # 16 x 8 x 8 = 1024
+                max_2 = core.MaxLayer(c, 8, 16, 16, cnn_2, my_gpu) # 8 x 8 x 8 = 512
                 r.layers.append(max_2)
                 
                 c = r.count_layers()
-                cnn_3 = core.Conv_4_Layer(c, 8, 8, 16, 32, max_2, my_gpu)
+                cnn_3 = core.Conv_4_Layer(c, 8, 8, 8, 8, max_2, my_gpu)
                 r.layers.append(cnn_3)
                 
                 c = r.count_layers()
-                max_3 = core.MaxLayer(c, 32, 8, 8, cnn_3, my_gpu) # 32 x 4 x 4 = 512
+                max_3 = core.MaxLayer(c, 8, 8, 8, cnn_3, my_gpu) # 8 x 4 x 4 = 128
                 r.layers.append(max_3)
                 
                 c = r.count_layers()
-                fc_1 = core.HiddenLayer(c, 512, 128, max_3, my_gpu)
+                fc_1 = core.HiddenLayer(c, 128, 128, max_3, my_gpu)
                 r.layers.append(fc_1)
                 
                 c = r.count_layers()
-                fc_2 = core.HiddenLayer(c, 128, 128, fc_1, my_gpu)
-                r.layers.append(fc_2)
-                
-                c = r.count_layers()
-                output = core.OutputLayer(c, 128, 10, fc_2, my_gpu)
+                output = core.OutputLayer(c, 128, 10, fc_1, my_gpu)
                 r.layers.append(output)
             #
             elif config==4: # minicing LeNet

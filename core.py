@@ -576,7 +576,8 @@ class Roster:
             layer.prepare(batch_size)
         #
         self.output = layer
-        
+    
+    # batch for classification
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch, size, offset):
         print("Roster::set_batch(%d, %d, %d, %d)" % (data_size, num_class, size, offset))
         data_array = np.zeros((size, data_size), dtype=np.float32)
@@ -587,6 +588,35 @@ class Roster:
             labels[j][k] = 1.0
         #
         self.set_data(data_array, data_size, labels, size, 1)
+        
+    def set_batch_data(self, data_size, train_data_batch, size, offset, scale=0):
+        print("Roster::set_batch_data(%d, %d, %d, %d)" % (data_size, size, offset, scale))
+        
+        data_array = np.zeros((size, data_size), dtype=np.float32)
+        for j in range(size):
+            data_array[j] = train_data_batch[offset+j]
+        #
+        self.reset()
+        self._gpu.copy(self._gpu_input, data_array)
+        if self._scale_input==0:
+            self._gpu.copy(self.input._gpu_output, self._gpu_input)
+        elif self._scale_input==1:
+            self._gpu.scale(self._gpu_input, self.input._gpu_output,
+                            data_size, float(255.0), self.input._num_node, batch_size, 0)
+        elif self._scale_input==2:
+            self._gpu.scale_exp(self._gpu_input, self.input._gpu_output, data_size, self.input._num_node, batch_size, 0)
+        else:
+            pass
+        #
+        
+    def set_batch_label(self, data_size, train_label_batch, size, offset, scale=0):
+        print("Roster::set_batch_label(%d, %d, %d, %d)" % (data_size, size, offset, scale))
+        labels = np.zeros((size, data_size), dtype=np.float32)
+        for j in range(size):
+            labels[j] = train_label_batch[offset+j]
+        #
+        self.reset()
+        self._gpu.copy(self._gpu_labels, labels)
         
     def set_data(self, data, data_size, label, batch_size, scale=0):
         print("Roster::set_data(%d, %d, %d)" % (data_size, batch_size, scale))

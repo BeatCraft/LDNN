@@ -291,6 +291,7 @@ class HiddenLayer(Layer):
             self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
         #
         if debug:
+            print("hidden")
             self._gpu.copy(self._output_array, self._gpu_output)
             print((self._output_array[0]))
         #
@@ -337,10 +338,16 @@ class OutputLayer(Layer):
         activation = 1
         self._gpu.sum(self._gpu_product, self._gpu_output,
                       self._num_input, self._num_node, activation, self._batch_size)
+        if debug:
+            print("output")
+            self._gpu.copy(self._output_array, self._gpu_output)
+            print((self._output_array[0]))
+        #
+        
         # softmax
         self._gpu.softmax(self._gpu_output, self._num_node, self._batch_size)
         if debug:
-            print("output")
+            print("softmax")
             self._gpu.copy(self._output_array, self._gpu_output)
             print((self._output_array[0]))
         #

@@ -206,7 +206,7 @@ def main():
     if package_id==0 or package_id==1: # MNIST, cifar-10
         r.set_scale_input(1)
     #
-    r.set_path("../ldnn_config/cifar-10-batches-py/wi.csv")
+    r.set_path("./wi.csv")
     r.load()
     r.update_weight()
 

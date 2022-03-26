@@ -115,23 +115,23 @@ class Package:
                 #mode = r.mode()
                 # 0 : input
                 c = r.count_layers()
-                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu, mode)
+                input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
                 r.layers.append(input)
                 # 1 : hidden : 28 x 28 x 1 = 784
                 c = r.count_layers()
-                hidden_1 = core.HiddenLayer(c, 784, 64, input, my_gpu, mode)
+                hidden_1 = core.HiddenLayer(c, 784, 64, input, my_gpu)
                 r.layers.append(hidden_1)
                 # 2 : hidden : 64
                 c = r.count_layers()
-                hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, my_gpu, mode)
+                hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, my_gpu)
                 r.layers.append(hidden_2)
                 # 3 : hidden : 64
                 c = r.count_layers()
-                hidden_3 = core.HiddenLayer(c, 64, 64, hidden_2, my_gpu, mode)
+                hidden_3 = core.HiddenLayer(c, 64, 64, hidden_2, my_gpu)
                 r.layers.append(hidden_3)
                 # 3 : output
                 c = r.count_layers()
-                output = core.OutputLayer(c, 64, 10, hidden_3, my_gpu, mode)
+                output = core.OutputLayer(c, 64, 10, hidden_3, my_gpu)
                 r.layers.append(output)
             elif config==1:
                 print("CNN")

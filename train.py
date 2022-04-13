@@ -260,7 +260,7 @@ class Train:
         #
         return ce, lv_min, lv_max
 
-    def loop(self, n=1):
+    def loop(self, n=1, k=500):
         print("Train::loop()")
         r = self._r
         w_list = None
@@ -280,7 +280,7 @@ class Train:
         lv_max = int(math.log(w_num/d, 2)) + 1
         #
         for i in range(n):
-            ce, lv_min, lv_min = self.w_loop(i, 500, d, ce, w_list, lv_min, lv_max, "all")
+            ce, lv_min, lv_min = self.w_loop(i, k, d, ce, w_list, lv_min, lv_max, "all")
             r.save()
         #
         return 0

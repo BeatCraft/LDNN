@@ -587,7 +587,7 @@ class Conv_4_Layer(Layer):
         #
 
     def update_weight(self):
-        if self_gpu:
+        if self._gpu:
             if self._gpu.type==0:
                 self._gpu.copy(self._gpu_weight, self._weight_matrix)
             elif self._gpu.type==1:
@@ -601,7 +601,7 @@ class Conv_4_Layer(Layer):
         self._cache = 0
         
     def propagate(self, array_in, debug=0):
-        if self_gpu:
+        if self._gpu:
             if self._cache:
                 pass
             else:

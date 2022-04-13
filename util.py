@@ -197,6 +197,22 @@ def exportPng(r, num_of_processed):
     save_name = "./%05d.png" % (num_of_processed)
     img.save(save_name)
 
+def narray2Image(p_1d, x, y):
+    print(x, y)
+    image = np.zeros(x*y*3, dtype='uint8')
+    print(image.shape)
+    image = image.reshape([y, x, 3])
+    print(image.shape)
+    for h in range(y):
+        for w in range(x):
+            image[h][w][0] = p_1d[y*h+w]
+            image[h][w][1] = p_1d[y*x+y*h+w]
+            image[h][w][2] = p_1d[y*x*2+y*h+w]
+        #
+    #
+    return Image.fromarray(image)
+    #return Image.fromarray(np.uint8(image))
+
 def list_to_csv(path, data_list):
     with open(path, 'wb') as file:
         wr = csv.writer(file, quoting=csv.QUOTE_ALL)

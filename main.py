@@ -15,9 +15,10 @@ import multiprocessing as mp
 import numpy as np
 import struct
 import pickle
-import pyopencl as cl
+#import pyopencl as cl
+import cupy as cp 
 #
-from PIL import Image
+#from PIL import Image
 #
 # LDNN Modules
 #
@@ -25,6 +26,7 @@ import util
 import package
 import core
 import gpu
+import gdx
 import train
 import test
 #
@@ -133,9 +135,8 @@ def setup_dnn(my_gpu, path, config=0, mode=0):
         setup_fc(r, 28*28)
     elif config==1: # cnn
         setup_cnn(r)
-    elif config==2: # auto-encoder
-        setup_autoencoder(r, 28*28)
     #
+    
     if os.path.isfile(path):
         r.import_weight(path)
     else:
@@ -146,8 +147,7 @@ def setup_dnn(my_gpu, path, config=0, mode=0):
         r.update_weight()
     #
     return r
-    
-    
+       
 def save_array_to_png(array, w, h, path): # uint8, 1d, RGB
     data_in = np.reshape(array, (3, w*h))
     r = data_in[0]
@@ -196,12 +196,12 @@ def main():
     print("mode=%d" % (mode))
     print("batch_size=%d" % (batch_size))
     #
-    my_gpu = gpu.Gpu(platform_id, device_id)
-    my_gpu.set_kernel_code()
-    #
+    #my_gpu = gpu.Gpu(platform_id, device_id)
+    my_gpu = gdx.Gdx(1)
+
     pack = package.Package(package_id)
     pack.load_batch()
-    #
+
     r = pack.setup_dnn(my_gpu, config, mode)
     if package_id==0 or package_id==1: # MNIST, cifar-10
         r.set_scale_input(1)
@@ -209,6 +209,17 @@ def main():
     r.set_path("./wi.csv")
     r.load()
     r.update_weight()
+    #
+    #data_size = pack._image_size
+    #num_class = pack._num_class
+    #r.prepare(100, data_size, num_class)
+
+    #print(cp.asnumpy(r.output._gpu_weighit))
+    #print(r.output._gpu_weight[0])
+    #print(type(r.output._gpu_weight))
+    #print(len(my_gpu._bufs))
+    #print(cp.asnumpy(my_gpu._bufs[2][0]))
+    #return 0
 
     if mode==0: # train
         print("batch_offset=%d" % (batch_offset))
@@ -220,46 +231,13 @@ def main():
         batch_offset = 0
         r.prepare(batch_size, data_size, num_class)
         r.set_batch(data_size, num_class, train_data_batch, train_label_batch, batch_size, batch_offset)
-        #t.set_batch(data_size, num_class, train_data_batch, train_label_batch, batch_size, batch_offset)
-        #
         t.loop()
     if mode==4: # train
         t = train.Train(r)
         data_size = pack._image_size
         t.stochastic_loop(pack, data_size, batch_size, 1)
     elif mode==1: # test
-        test.test_n(r, pack, 100)
-    elif mode==2: # denomi
-        test.test_n(r, pack, 500)
-        
-        r.denominate()
-        r.update_weight()
-        path = pack.save_path()
-        r.export_weight(path)
-        
-        test.test_n(r, pack, 500)
-        
-    elif mode==3: # test for auto-encoder
-        t = train.Train(r)
-        data_size = pack._image_size
-        num_class = pack._num_class
-        train_data_batch = pack._train_image_batch
-        train_label_batch = pack._train_label_batch
-        t.set_batch(data_size, num_class, train_data_batch, train_label_batch, 10, 0)
-        r.propagate()
-        r._gpu.copy(r.output._output_array, r.output._gpu_output)
-        #print(r.output._output_array)
-        #print(r.output._output_array.shape)
-        
-        array_in = train_data_batch[0]
-        array_in = np.array(array_in, dtype=np.uint8)
-        #save_array_to_png(array_in, 32, 32, "./in.png")
-        save_array_gray_to_png(array_in, 28, 28, "./in.png")
-
-        array_out = r.output._output_array[0]*255
-        array_out = np.array(array_out, dtype=np.uint8)
-        #save_array_to_png(array_out, 32, 32, "./test.png")
-        save_array_gray_to_png(array_out, 28, 28, "./test.png")
+        test.test_n(r, pack, 1000)
     else:
         print("mode error : %d" % (mode))
         return 0

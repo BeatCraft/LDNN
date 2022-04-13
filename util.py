@@ -1,12 +1,15 @@
 #! c:/Python26/python.exe
 # -*- coding: utf-8 -*-
 
-import os, sys, time, math
+import os
+import sys
+import time
 from stat import *
-import random
-import copy
-import struct
+#import random
+#import copy
+#import struct
 import pickle
+import math
 import numpy as np
 import csv
 
@@ -18,7 +21,7 @@ from PIL import PngImagePlugin
 import zlib
 
 # LDNN
-import core
+#import core
 
 
 #
@@ -239,37 +242,6 @@ def get_key_input(prompt):
     return c
 
 def check_weight_distribution(path):
-    w_list = csv_to_list(path)
-    w_total = len(w_list)
-    print(w_total)
-    if w_total<=0:
-        print("error")
-        return 0
-    #
-
-    v_list = []
-    num_list = []
-    total = 0.0
-    for i in range(core.WEIGHT_INDEX_SIZE):
-        key = str(i)
-        num =  w_list.count(key)
-        num_list.append(num)
-        v = float(num)/w_total*100.0
-        print("[%02d] %d : %f" % (i, num, v))
-        v_list.append(v)
-        total = total + v
-    #
-
-    ave = total / float(len(v_list))
-    print("average : %f" % (ave))
-
-    for i in range(core.WEIGHT_INDEX_SIZE):
-        dif = v_list[i] - ave
-        print("[%02d] %f" % (i, dif))
-
-    for i in range(core.WEIGHT_INDEX_SIZE):
-        print(num_list[i])
-    #
     return 0
     
 def echo(data):

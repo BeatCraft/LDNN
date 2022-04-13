@@ -117,6 +117,7 @@ class Package:
                 c = r.count_layers()
                 input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
                 r.layers.append(input)
+                r.input = input
                 # 1 : hidden : 28 x 28 x 1 = 784
                 c = r.count_layers()
                 hidden_1 = core.HiddenLayer(c, 784, 64, input, my_gpu)
@@ -133,6 +134,7 @@ class Package:
                 c = r.count_layers()
                 output = core.OutputLayer(c, 64, 10, hidden_3, my_gpu)
                 r.layers.append(output)
+                r.output = output
             elif config==1:
                 print("CNN")
                 # 0 : input 28 x 28 x 1 = 784
@@ -170,22 +172,27 @@ class Package:
             #
         elif self._package_id==1: # cifa-10
             if config==0:
-                # 0 : input : 3072
                 c = r.count_layers()
                 input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)
                 r.layers.append(input)
-                # 1 : hidden : 3072 x 128
+                r.input = input
+
                 c = r.count_layers()
                 hidden_1 = core.HiddenLayer(c, 3072, 256, input, my_gpu)
                 r.layers.append(hidden_1)
-                # 2 : hidden : 128 x 128
+                
                 c = r.count_layers()
-                hidden_2 = core.HiddenLayer(c, 256, 128, hidden_1, my_gpu)
+                hidden_2 = core.HiddenLayer(c, 256, 256, hidden_1, my_gpu)
                 r.layers.append(hidden_2)
-                # 3 : output : 64 x 10ー
+
                 c = r.count_layers()
-                output = core.OutputLayer(c, 128, 10, hidden_2, my_gpu)
+                hidden_3 = core.HiddenLayer(c, 256, 256, hidden_2, my_gpu)
+                r.layers.append(hidden_3)
+
+                c = r.count_layers()
+                output = core.OutputLayer(c, 256, 10, hidden_3, my_gpu)
                 r.layers.append(output)
+                r.output = output
             elif config==1:
                 c = r.count_layers()
                 input = core.InputLayer(c, self._image_size, self._image_size, None, my_gpu)

@@ -41,7 +41,8 @@ class Train:
         r = self._r
         ce = r.evaluate()
         return ce
-        
+       
+
         r.propagate()
         #
         if mode==0:
@@ -253,7 +254,7 @@ class Train:
                 level = level + mode
             #
             #r.export_weight("./wi.csv")
-            r.save()
+            #r.save()
             #path = "./test-%04d.png" % (j)
             #save_img(r, path)
         #

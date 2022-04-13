@@ -2,31 +2,28 @@
 # -*- coding: utf-8 -*-
 #
 
+import os
+import sys
+import time
+#, math
+#from stat import *
+#import random
+#import copy
+#import multiprocessing as mp
+import math
+import numpy as np
+#import cupy as cp
+#import struct
+#import pickle
+
 #
 # LDNN : lesser's Deep Neural Network
 #
-
-import os, sys, time, math
-from stat import *
-import random
-import copy
-import math
-import multiprocessing as mp
-import numpy as np
-import struct
-import pickle
-
 import core
 import util
-import package
-import gpu
-#
-#
-#
+
 sys.setrecursionlimit(10000)
-#
-#
-#
+
 def print_result(ca, eval_size, num_class, dist, rets, oks):
     print("---------------------------------")
     print(("result : %d / %d" % (ca, eval_size)))
@@ -40,56 +37,59 @@ def print_result(ca, eval_size, num_class, dist, rets, oks):
     #
     print("---------------------------------")
     
-def test_n(r, pack, n):
-    pack.load_batch()
-    data_size = pack._image_size
-    num_class = pack._num_class
-    eval_size = pack._test_batch_size
+def classification(r, data_size, num_class, batch_size, batch_image, batch_label, n):
+    #test_image_batch = util.pickle_load(image_batch_path)
+    #test_label_batch = util.pickle_load(label_batch_path)
+    
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
-    print((">>test(%d) = %d" % (n, eval_size)))
+    print((">>test(%d) = %d" % (n, batch_size)))
     print(num_class)
     #
-    it, left = divmod(eval_size, n)
+    it, left = divmod(batch_size, n)
+    #
+    #it = 1
+    #
     if left>0:
         print(("error : n(=%d) is not appropriate" % (n)))
     #
     start_time = time.time()
-    #
-    it = 1
     #
     r.prepare(n, data_size, num_class)
     data_array = np.zeros((n, data_size), dtype=np.float32)
     class_array = np.zeros(n, dtype=np.int32)
     for i in range(it):
         for j in range(n):
-            data_array[j] = pack._test_image_batch[i*n+j]
-            class_array[j] = pack._test_label_batch[i*n+j]
+            data_array[j] = batch_image[i*n+j]
+            class_array[j] = batch_label[i*n+j]
         #
         r.set_batch(data_size, num_class, data_array, class_array, n, 0)
-        #scale = 1
-        #r.set_data(data_array, data_size, class_array_2, n, scale)
-        r.propagate(1)
+        r.propagate(0)
         #
         #infs = r.get_inference()
-        answes = r.get_answer()
+        answers = r.get_answer()
+        #print(answers)
         for j in range(n):
-            ans = answes[j]
+            ans = answers[j]
             label = class_array[j]
             rets[ans] = rets[ans] + 1
             dist[label] = dist[label] + 1
+            #print("%d, %d" % (ans, label))
             if ans == label:
                 oks[ans] = oks[ans] + 1
             #
         #
     #
     ca = sum(oks)
-    print_result(ca, eval_size, num_class, dist, rets, oks)
+    print_result(ca, batch_size, num_class, dist, rets, oks)
     #
     elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
     print(("time = %s" % (t)))
+    print(r.get_cross_entropy())
+
+    print("done")
 #
 #
 #

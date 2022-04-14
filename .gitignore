@@ -20,3 +20,5 @@ codec-test/tes*/
 *.jpg
 *.png
 *.auto
+sh/
+experimental_bombs/

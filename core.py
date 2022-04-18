@@ -241,6 +241,9 @@ class InputLayer(Layer):
                 if self._gpu.type==0:
                     self._gpu.copy(self._output_array, self._gpu_output)
                     print((self._output_array[0]))
+                elif self._gpu.type==1:
+                    pass
+                    #self._gpu_output
                 #
             #
         #
@@ -272,7 +275,7 @@ class HiddenLayer(Layer):
                 self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
             #
         else:
-            pass
+            print("error")
         #
         self._scale = 1
     
@@ -422,10 +425,10 @@ class RegressionOutputLayer(Layer):
             if self._gpu.type==0:
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
             elif self._gpu.type==1:
-                pass
+                print("error")
             #
         else:
-            pass
+            print("error")
         #
         
     def prepare(self, batch_size):
@@ -441,7 +444,7 @@ class RegressionOutputLayer(Layer):
                 pass
             #
         else:
-            pass
+            print("error")
         #
     
     def update_weight(self):
@@ -452,7 +455,7 @@ class RegressionOutputLayer(Layer):
                 pass
             #
         else:
-            pass
+            print("error")
         #
 
     def propagate(self, array_in, debug=0):
@@ -519,10 +522,10 @@ class MaxLayer(Layer):
             if self._gpu.type==0:
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
             elif self._gpu.type==1:
-                pass
+                self._gpu_output = self._gpu.allocateArray(self._output_array)
             #
         else:
-            pass
+            print("error")
         #
         
     def propagate(self, array_in, debug=0):
@@ -532,10 +535,14 @@ class MaxLayer(Layer):
                                     self._ch, self._x, self._y,
                                     self._batch_size, self._num_input)
             elif self._gpu.type==1:
-                pass
+                #print("[%d] propagate max on gdx" % (self._index))
+                #
+                # GDX
+                #
+                self._gpu.max(array_in, self._gpu_output, self._ch, self._x, self._y, self._batch_size, self._num_input)
             #
         else:
-            pass
+            print("error")
         #
 
 class Conv_4_Layer(Layer):
@@ -560,10 +567,10 @@ class Conv_4_Layer(Layer):
             if self._gpu.type==0:
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
             elif self._gpu.type==1:
-                pass
+                self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
             #
         else:
-            pass
+            print("error")
         #
         self._cache = 0 # cache for padding
         
@@ -580,10 +587,11 @@ class Conv_4_Layer(Layer):
                 self._gpu_padded = self._gpu.dev_malloc(self._padded_array)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
             elif self._gpu.type==1:
-                pass
+                self._gpu_padded = self._gpu.allocateArray(self._padded_array)
+                self._gpu_output = self._gpu.allocateArray(self._output_array)
             #
         else:
-            pass
+            print("error")
         #
 
     def update_weight(self):
@@ -591,7 +599,7 @@ class Conv_4_Layer(Layer):
             if self._gpu.type==0:
                 self._gpu.copy(self._gpu_weight, self._weight_matrix)
             elif self._gpu.type==1:
-                pass
+                self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
             #
         else:
             pass
@@ -608,7 +616,13 @@ class Conv_4_Layer(Layer):
                 if self._gpu.type==0:
                     self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
                 elif self._gpu.type==1:
-                    pass
+                    #print("[%d] propagate convolusion on gdx" % (self._index))
+                    #print(array_in[0])
+                    #
+                    # GDX
+                    #
+                    self._gpu.padding(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
+                    #print(self._gpu_padded[0])
                 #
                 if self._index==1:
                     self._cache = 1 # cache for padding
@@ -621,7 +635,10 @@ class Conv_4_Layer(Layer):
                 self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output,
                                             self._w, self._h, self._ch, self._filter, self._batch_size)
             elif self._gpu.type==1:
-                pass
+                #
+                # GDX
+                #
+                self._gpu.convolusion(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
             #
             # scale
             size = self._filter * self._w * self._h
@@ -632,7 +649,10 @@ class Conv_4_Layer(Layer):
                     print((self._output_array))
                 #
             elif self._gpu.type==1:
-                pass
+                #
+                # GDX
+                #
+                self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
         else:
             pass
         #
@@ -760,6 +780,7 @@ class Roster:
             if self._scale_input==0:
                 pass
             elif self._scale_input==1:
+                #print("OK")
                 self._gpu_input = self._gpu.allocateArray(data)
                 self._gpu_labels = self._gpu.allocateArray(label)
                 self._gpu_input = self._gpu_input / 255.0

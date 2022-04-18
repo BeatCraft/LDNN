@@ -18,7 +18,7 @@ import util
 import core
 import gdx
 import train
-import mnist
+#import mnist
 
 sys.setrecursionlimit(10000)
 
@@ -188,7 +188,7 @@ class worker(object):
         lv_max = int(math.log(w_num/d, 2)) + 1
 
         for i in range(n):
-            ce, lv_min, lv_min = self.w_loop(i, 500, d, ce, w_list, lv_min, lv_max, "all")
+            ce, lv_min, lv_min = self.w_loop(i, 100, d, ce, w_list, lv_min, lv_max, "all")
             if self._rank==0:
                 self.r.save()
             #

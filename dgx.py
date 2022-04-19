@@ -14,8 +14,7 @@ void calc_cnn_max(
     float* output,
     const int ch,
     const int w,
-    const int h,
-    const int batch_stride)
+    const int h)
 {
     //int bi = blockDim.x;
     //int x = blockIdx.x;
@@ -256,12 +255,12 @@ void calc_entropy(const double* x, const float *a, double* y, int size) {
 }
 ''', 'calc_entropy')
 
-class Gdx(gpu.Gpu):
+class Dgx(gpu.Gpu):
     def __init__(self, device_id):
         super(gpu.Gpu, self).__init__()
-        self.name = "GDX V100"
+        self.name = "nvidia DGX V100"
         self.id = device_id
-        # -1:unknown, 0:OpenCL, 1:CuPy/GDX
+        # -1:unknown, 0:OpenCL, 1:CuPy/DGX
         self.type = 1
 
     def allocateArray(self, np_array):
@@ -291,8 +290,8 @@ class Gdx(gpu.Gpu):
     def convolusion(self, buf_x, weight, buf_y, w, h, ch, filter, batch_size):
         calc_cnn_roll((batch_size,), (w, h,), (buf_x, weight, buf_y, w, h, ch, filter))
         
-    def max(self, buf_x, buf_y, ch, w, h, batch_size, batch_stride):
-        calc_cnn_max((batch_size,), (w, h,), (buf_x, buf_y, ch, w, h, batch_stride))
+    def max(self, buf_x, buf_y, ch, w, h, batch_size):
+        calc_cnn_max((batch_size,), (w, h,), (buf_x, buf_y, ch, w, h))
         
 def main():
     return 0

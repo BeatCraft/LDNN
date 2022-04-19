@@ -25,6 +25,7 @@ sys.setrecursionlimit(10000)
 class Train:
     def __init__(self, r):
         self._r = r
+        self.mode = 0
         
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch,  batch_size, batch_offset):
         self._bacth_size = batch_size
@@ -39,20 +40,24 @@ class Train:
     
     def evaluate(self, mode=0):
         r = self._r
-        ce = r.evaluate()
-        return ce
-       
-
-        r.propagate()
-        #
-        if mode==0:
-            ce = r.get_cross_entropy()
-        elif mode ==1:
+                
+        if self.mode==0 or self.mode==1:
+            ce = r.evaluate()
+            return ce
+        elif self.mode==2 or self.mode==3:
+            r.propagate()
+            layer = r.get_layer_at(4) # 2, 4
+            ent = layer.mse(0)
+            return ent
+        elif self.mode==4:
+            r.propagate()
             r._gpu.mse(r.output._gpu_output, r.input._gpu_output, r._gpu_entropy, self._data_size, self._bacth_size)
             r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
             ce = np.sum(r._batch_cross_entropy)/np.float32(batch_size)
+            return ce
         #
-        return ce
+        
+        return 0.0
     
     def make_w_list(self, type_list=None):
         r = self._r
@@ -162,14 +167,24 @@ class Train:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
+        
         ce_alt = self.evaluate()
         ret = 0
-        if ce_alt<ce:
-            ce = ce_alt
-            ret = 1
-        else:
-            self.undo_attack(attack_list)
+        if self.mode==0 or self.mode==1 or self.mode==4:
+            if ce_alt<ce:
+                ce = ce_alt
+                ret = 1
+            else:
+                self.undo_attack(attack_list)
+        elif self.mode==2 or self.mode==3:
+            if ce_alt>ce:
+                ce = ce_alt
+                ret = 1
+            else:
+                self.undo_attack(attack_list)
+            #
         #
+        
         return ce, ret
 
 
@@ -260,25 +275,48 @@ class Train:
         #
         return ce, lv_min, lv_max
 
-    def loop(self, n=1, k=500):
+    def loop(self, n=1, k=500, mode=0):
         print("Train::loop()")
         r = self._r
         w_list = None
         ce = 0.0
         ret = 0
+
+        if mode==0: # all
+            ce = self.evaluate(0)
+            w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+            d = 100
+        elif mode==1: # FC
+            ce = self.evaluate(0)
+            w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+            d = 100
+            idx = 1 # 1 or 3 for now
+            layer = r.get_layer_at(idx)
+            layer.lock = True
+            idx = 3 # 1 or 3 for now
+            layer = r.get_layer_at(idx)
+            layer.lock = True
+        elif mmode==2: # CNNs
+            ce = self.evaluate(2)
+            w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
+            d = 1
+        elif mmode==3: # CNN layer
+            idx = 1 # 1 or 3 for now
+            layer = r.get_layer_at(idx)
+            for ni in range(layer._num_node):
+                for ii in range(layer._num_input):
+                    w_list.append((idx, ni, ii))
+                #
+            #
+            d = 1
         #
-        #ce = self.evaluate()
-        ce = r.evaluate()
+        
         print("CE starts with %f" % ce)
-        #
-        w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
         w_num = len(w_list)
-        print(len(w_list))
-        #
-        d = 100
+        print("wi", len(w_list))
+    
         lv_min = 0
         lv_max = int(math.log(w_num/d, 2)) + 1
-        #
         for i in range(n):
             ce, lv_min, lv_min = self.w_loop(i, k, d, ce, w_list, lv_min, lv_max, "all")
             r.save()
@@ -319,14 +357,3 @@ class Train:
         #
         return 0
     
-    
-
-#def save_img(r, path):
-#    r._gpu.copy(r.output._output_array, r.output._gpu_output)
-#    print(r.output._output_array)
-#    imgArray = np.reshape(r.output._output_array, (480, 640))
-#    imgArray = imgArray*255
-#    imgArray = np.array(imgArray, dtype=np.uint8)
-#    print(imgArray)
-#    pilImg = Image.fromarray(np.uint8(imgArray))
-#    pilImg.save(path)

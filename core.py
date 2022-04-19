@@ -497,6 +497,7 @@ class MaxLayer(Layer):
         num_node = self._x*self._y
         super(MaxLayer, self).__init__(i, LAYER_TYPE_MAX, num_input, num_node, pre, gpu)
         #
+        self.lock = False
     
     def set_weight_index(self, ni, ii, wi):
         pass
@@ -517,10 +518,13 @@ class MaxLayer(Layer):
         print("MaxLayer::prepare(%d)" % (batch_size))
         self._batch_size = batch_size
         self._output_array = np.zeros((self._batch_size, self._ch, self._num_node), dtype=np.float32)
+        self._mse_array = np.zeros((self._batch_size,), dtype=np.float32)
+        
         #
         if self._gpu:
             if self._gpu.type==0:
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
+                self._gpu_mse = self._gpu.dev_malloc(self._mse_array)
             elif self._gpu.type==1:
                 self._gpu_output = self._gpu.allocateArray(self._output_array)
             #
@@ -528,18 +532,31 @@ class MaxLayer(Layer):
             print("error")
         #
         
+    def mse(self, debug=0):
+        self._gpu.layer_mse_batch(self._gpu_output, self._gpu_mse, self._ch, self._x, self._y, self._batch_size)
+        self._gpu.copy(self._mse_array, self._gpu_mse)
+        avg = np.sum(self._mse_array)/float(self._batch_size)
+        if debug==1:
+            #self._gpu.copy(self._mse_array, self._gpu_mse)
+            print(avg)
+        #
+        return avg
+        
     def propagate(self, array_in, debug=0):
+        if self.lock:
+            return
+        #
+        
         if self._gpu:
             if self._gpu.type==0:
                 self._gpu.max_batch(array_in, self._gpu_output,
-                                    self._ch, self._x, self._y,
-                                    self._batch_size, self._num_input)
+                                    self._ch, self._x, self._y, self._batch_size)
             elif self._gpu.type==1:
                 #print("[%d] propagate max on gdx" % (self._index))
                 #
                 # GDX
                 #
-                self._gpu.max(array_in, self._gpu_output, self._ch, self._x, self._y, self._batch_size, self._num_input)
+                self._gpu.max(array_in, self._gpu_output, self._ch, self._x, self._y, self._batch_size)
             #
         else:
             print("error")
@@ -573,6 +590,7 @@ class Conv_4_Layer(Layer):
             print("error")
         #
         self._cache = 0 # cache for padding
+        self.lock = False
         
     def prepare(self, batch_size):
         print(("Conv_4_Layer::prepare(%d)" %(batch_size)))
@@ -609,6 +627,10 @@ class Conv_4_Layer(Layer):
         self._cache = 0
         
     def propagate(self, array_in, debug=0):
+        if self.lock:
+            return
+        #
+        
         if self._gpu:
             if self._cache:
                 pass

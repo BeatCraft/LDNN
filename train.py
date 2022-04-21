@@ -26,6 +26,7 @@ class Train:
     def __init__(self, r):
         self._r = r
         self.mode = 0
+        self.mse_idex = -1
         
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch,  batch_size, batch_offset):
         self._bacth_size = batch_size
@@ -38,15 +39,15 @@ class Train:
     def set_path(path):
         self._path = path
     
-    def evaluate(self, mode=0):
+    def evaluate(self):#, mode=0, idx=0):
         r = self._r
-                
+
         if self.mode==0 or self.mode==1:
             ce = r.evaluate()
             return ce
         elif self.mode==2 or self.mode==3:
             r.propagate()
-            layer = r.get_layer_at(4) # 2, 4
+            layer = r.get_layer_at(mse_idex) # 2, 4
             ent = layer.mse(0)
             return ent
         elif self.mode==4:
@@ -275,19 +276,21 @@ class Train:
         #
         return ce, lv_min, lv_max
 
-    def loop(self, n=1, k=500, mode=0):
+    def loop(self, n=1, k=500):#, mode=0):
         print("Train::loop()")
         r = self._r
         w_list = None
         ce = 0.0
         ret = 0
 
-        if mode==0: # all
-            ce = self.evaluate(0)
+        #self.mode = mode
+        ce = self.evaluate()
+        if self.mode==0: # all
+            #ce = self.evaluate()
             w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
             d = 100
-        elif mode==1: # FC
-            ce = self.evaluate(0)
+        elif self.mode==1: # FC
+            #ce = self.evaluate()
             w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
             d = 100
             idx = 1 # 1 or 3 for now
@@ -296,13 +299,13 @@ class Train:
             idx = 3 # 1 or 3 for now
             layer = r.get_layer_at(idx)
             layer.lock = True
-        elif mmode==2: # CNNs
-            ce = self.evaluate(2)
+        elif self.mode==2: # CNNs
+            #ce = self.evaluate()
             w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
             d = 1
-        elif mmode==3: # CNN layer
-            idx = 1 # 1 or 3 for now
-            layer = r.get_layer_at(idx)
+        elif self.mode==3: # CNN layer
+            #idx = 1 # 1 or 3 for now
+            layer = r.get_layer_at(self.mse_idx)
             for ni in range(layer._num_node):
                 for ii in range(layer._num_input):
                     w_list.append((idx, ni, ii))

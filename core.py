@@ -527,20 +527,36 @@ class MaxLayer(Layer):
                 self._gpu_mse = self._gpu.dev_malloc(self._mse_array)
             elif self._gpu.type==1:
                 self._gpu_output = self._gpu.allocateArray(self._output_array)
+                self._gpu_mse = self._gpu.allocateArray(self._mse_array)
             #
         else:
             print("error")
         #
         
     def mse(self, debug=0):
-        self._gpu.layer_mse_batch(self._gpu_output, self._gpu_mse, self._ch, self._x, self._y, self._batch_size)
-        self._gpu.copy(self._mse_array, self._gpu_mse)
-        avg = np.sum(self._mse_array)/float(self._batch_size)
-        if debug==1:
-            #self._gpu.copy(self._mse_array, self._gpu_mse)
-            print(avg)
+        if self._gpu:
+            pass
+        else:
+            return 0.0
         #
-        return avg
+
+        if self._gpu.type==0:
+            self._gpu.layer_mse_batch(self._gpu_output, self._gpu_mse, self._ch, self._x, self._y, self._batch_size)
+            self._gpu.copy(self._mse_array, self._gpu_mse)
+            avg = np.sum(self._mse_array)/float(self._batch_size)
+            if debug==1:
+                #self._gpu.copy(self._mse_array, self._gpu_mse)
+                print(avg)
+            #
+            return avg
+        elif self._gpu.type==1:
+            #print("aaa")
+            self._gpu.layer_mse(self._gpu_output, self._gpu_mse, self._ch, self._x, self._y, self._batch_size)
+            mses = cp.asnumpy(self._gpu_mse)
+            #print(mses)
+            return np.sum(mses)/float(self._batch_size)
+        #
+        return 0.0
         
     def propagate(self, array_in, debug=0):
         if self.lock:

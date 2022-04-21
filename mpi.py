@@ -16,7 +16,7 @@ import cupyx
 sys.path.append(os.path.join(os.path.dirname(__file__), '../ldnn'))
 import util
 import core
-import gdx
+import dgx
 import train
 #import mnist
 
@@ -29,6 +29,8 @@ class worker(object):
         self._rank = rank
         self._size = size
         self.r = r
+        self.mode = 0
+        self.mse_idx = 2
         #
         #self._processor_name = MPI.Get_processor_name()
         #cp.cuda.Device(self._rank).use()
@@ -45,7 +47,21 @@ class worker(object):
         self.train = train.Train(self.r)
 
     def evaluate(self):
-        ce = self.r.evaluate()
+        r = self.r
+        ce = 0.0
+        if self.mode==0 or self.mode==1:
+            ce = r.evaluate()
+        elif self.mode==2 or self.mode==3:
+            r.propagate()
+            layer = r.get_layer_at(self.mse_idex)
+            ce = layer.mse(0)
+        elif self.mode==4: # regression
+            r.propagate()
+            r._gpu.mse(r.output._gpu_output, r.input._gpu_output, r._gpu_entropy, self._data_size, self._bacth_size)
+            r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
+            ce = np.sum(r._batch_cross_entropy)/np.float32(batch_size)
+        #
+        #ce = self.r.evaluate()
         
         ce_list = self._com.gather(ce, root=0)
         sum = 0.0
@@ -89,11 +105,20 @@ class worker(object):
         #
         ce_alt = self.evaluate()
         ret = 0
-        if ce_alt<ce:
-            ce = ce_alt
-            ret = 1
-        else:
-            self.train.undo_attack(attack_list)
+        if self.mode==0 or self.mode==1:
+            if ce_alt<ce:
+                ce = ce_alt
+                ret = 1
+            else:
+                self.train.undo_attack(attack_list)
+            #
+        elif self.mode==2 or self.mnode==3:
+            if ce_alt>ce:
+                ce = ce_alt
+                ret = 1
+            else:
+                self.train.undo_attack(attack_list)
+            #
         #
         return ce, ret
 
@@ -164,22 +189,43 @@ class worker(object):
         return ce, lv_min, lv_max
 
     def loop(self, n=1):
+        r = self.r
         w_list = None
         ce = 0.0
         ret = 0
+        d = 100
 
         ce = self.evaluate()
-        #r = self.r
-
-        #for i in range(n):
-        #    ce = self.evaluate()
-        #    print("[%d][%d]CE=%f" % (i, self._rank, ce))
-        #
         if self._rank==0:
-            w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+            if self.mode==0: # all
+                w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+                d = 100
+            elif self.mode==1: # FC
+                w_list = self.train.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+                d = 100
+                idx = 1 # 1 or 3 for now
+                layer = r.get_layer_at(idx)
+                layer.lock = True
+                idx = 3 # 1 or 3 for now
+                layer = r.get_layer_at(idx)
+                layer.lock = True
+            elif self.mode==2: # CNNs
+                w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4])
+                d = 1
+            elif self.mode==3: # CNN layer
+                w_list = []
+                layer = r.get_layer_at(self.mse_idx)
+                for ni in range(layer._num_node):
+                    for ii in range(layer._num_input):
+                        w_list.append((idx, ni, ii))
+                    #
+                #
+                d = 1
+            #
         else:
              w_list = []
         #
+
         w_list = self._com.bcast(w_list, root=0)
         w_num = len(w_list)
         print("rank=%d, w=%d" % (self._rank, w_num))

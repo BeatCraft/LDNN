@@ -7,6 +7,34 @@ import cupyx
 
 import gpu
 
+calc_layer_mse = cp.RawKernel(r'''
+extern "C" __global__
+void calc_layer_mse(
+    const float* input,
+    float* output,
+    const int ch,
+    const int w,
+    const int h)
+{
+    //int bi = get_global_id(0);
+    int bi = blockIdx.x;
+    
+    int ch_stride = w*h;
+    int input_offset = ch_stride*ch*bi;
+
+    for (int c=1;c<ch;c++){
+        int ch_start = input_offset + (ch_stride*c);
+        float sum_d = 0.0;
+        for (int i=0;i<ch_stride;i++){
+            float d = input[input_offset+i] - input[ch_start+i];
+            sum_d += (d*d);
+        }
+        output[bi] = sum_d/float(ch_stride);
+    }
+}
+''', 'calc_layer_mse')
+
+
 calc_cnn_max = cp.RawKernel(r'''
 extern "C" __global__
 void calc_cnn_max(
@@ -292,7 +320,11 @@ class Dgx(gpu.Gpu):
         
     def max(self, buf_x, buf_y, ch, w, h, batch_size):
         calc_cnn_max((batch_size,), (w, h,), (buf_x, buf_y, ch, w, h))
-        
+
+    def layer_mse(self, buf_x, buf_y, ch, w, h, batch_size):
+        calc_layer_mse((batch_size,), (1,), (buf_x, buf_y, ch, w, h))
+    
+    
 def main():
     return 0
 

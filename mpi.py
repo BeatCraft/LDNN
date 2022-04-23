@@ -30,6 +30,8 @@ class worker(object):
         self._size = size
         self.r = r
         self.mode = 0
+        self.mode_w = 0
+        self.mode_e = 0
         self.mse_idx = 2
         #
         #self._processor_name = MPI.Get_processor_name()
@@ -49,13 +51,13 @@ class worker(object):
     def evaluate(self):
         r = self.r
         ce = 0.0
-        if self.mode==0 or self.mode==1:
+        if self.mode_e==0 or self.mode_e==1:
             ce = r.evaluate()
-        elif self.mode==2 or self.mode==3:
+        elif self.mode_e==2 or self.mode_e==3:
             r.propagate()
-            layer = r.get_layer_at(self.mse_idex)
+            layer = r.get_layer_at(self.mse_idx)
             ce = layer.mse(0)
-        elif self.mode==4: # regression
+        elif self.mode_e==4: # regression
             r.propagate()
             r._gpu.mse(r.output._gpu_output, r.input._gpu_output, r._gpu_entropy, self._data_size, self._bacth_size)
             r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
@@ -105,14 +107,14 @@ class worker(object):
         #
         ce_alt = self.evaluate()
         ret = 0
-        if self.mode==0 or self.mode==1:
+        if self.mode_e==0 or self.mode_e==1:
             if ce_alt<ce:
                 ce = ce_alt
                 ret = 1
             else:
                 self.train.undo_attack(attack_list)
             #
-        elif self.mode==2 or self.mnode==3:
+        elif self.mode_e==2 or self.mnode_e==3:
             if ce_alt>ce:
                 ce = ce_alt
                 ret = 1
@@ -188,31 +190,40 @@ class worker(object):
         #
         return ce, lv_min, lv_max
 
-    def loop(self, n=1):
+    def loop(self, n=1, m=100):
         r = self.r
         w_list = None
         ce = 0.0
         ret = 0
         d = 100
+        wtype = "all"
+        lv_min = 0
+        lv_max = 0
+        w_num = 0
 
         ce = self.evaluate()
         if self._rank==0:
-            if self.mode==0: # all
+            if self.mode_w==0: # all
                 w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-                d = 100
-            elif self.mode==1: # FC
+                #d = 100
+                #lv_max = int(math.log(w_num/d, 2)) + 1
+            elif self.mode_w==1: # FC
                 w_list = self.train.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-                d = 100
-                idx = 1 # 1 or 3 for now
-                layer = r.get_layer_at(idx)
-                layer.lock = True
-                idx = 3 # 1 or 3 for now
-                layer = r.get_layer_at(idx)
-                layer.lock = True
-            elif self.mode==2: # CNNs
+                #d = 100
+                #lv_max = int(math.log(w_num/d, 2)) + 1
+                #idx = 1 # 1 or 3 for now
+                #layer = r.get_layer_at(idx)
+                #layer.lock = True
+                #idx = 3 # 1 or 3 for now
+                #layer = r.get_layer_at(idx)
+                #layer.lock = True
+                wtype = "fc"
+            elif self.mode_w==2: # CNNs
                 w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4])
-                d = 1
-            elif self.mode==3: # CNN layer
+                #d = 1
+                #lv_max = 2
+                wtype = "cnn"
+            elif self.mode_w==3: # CNN layer
                 w_list = []
                 layer = r.get_layer_at(self.mse_idx)
                 for ni in range(layer._num_node):
@@ -220,7 +231,7 @@ class worker(object):
                         w_list.append((idx, ni, ii))
                     #
                 #
-                d = 1
+                #d = 1
             #
         else:
              w_list = []
@@ -229,12 +240,18 @@ class worker(object):
         w_list = self._com.bcast(w_list, root=0)
         w_num = len(w_list)
         print("rank=%d, w=%d" % (self._rank, w_num))
-        d = 100
-        lv_min = 0
         lv_max = int(math.log(w_num/d, 2)) + 1
+        
+        if self.mode_w==2: # CNN
+            lv_max = 2
+        #
+
+        #d = 100
+        #lv_min = 0
+        #lv_max = int(math.log(w_num/d, 2)) + 1
 
         for i in range(n):
-            ce, lv_min, lv_min = self.w_loop(i, 100, d, ce, w_list, lv_min, lv_max, "all")
+            ce, lv_min, lv_min = self.w_loop(i, m, d, ce, w_list, lv_min, lv_max, wtype)
             if self._rank==0:
                 self.r.save()
             #

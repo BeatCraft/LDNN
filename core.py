@@ -49,41 +49,12 @@ WEIGHT_INDEX_MIN = 0
 #
 class Weight:
     def __init__(self, li, ni, ii, wi):
-        self._li = li
-        self._ni = ni
-        self._ii = ii
-        self._wi = wi
-        self._wi_alt = wi
-    
-    def set_all(self, li, ni, ii, wi):
-        self._li = li
-        self._ni = ni
-        self._ii = ii
-        self._wi = wi
-    
-    def set_index(self, li, ni, ii):
-        self._li = li
-        self._ni = ni
-        self._ii = ii
-    
-    def set_wi(self, wi):
-        self._wi_alt = self._wi
-        self._wi = wi
-    
-    def alternate_wi(self):
-        temp = self._wi
-        self._wi = self._wi_alt
-        self._wi_alt = temp
-        return self._wi
-
-    def get_all(self):
-        return self._li, self._ni, self._ii, self._wi
-    
-    def get_index(self):
-        return self._li, self._ni, self._ii
-
-    def get_wi(self):
-        return self._wi
+        self.li = li
+        self.ni = ni
+        self.ii = ii
+        self.wi = wi
+        self.wi_alt = wi
+        self.mark = 0
 #
 #
 #
@@ -152,6 +123,11 @@ class Layer(object):
 
     def propagate(self, array_in, debug=0):
         pass
+    
+    def getWeight(self, ni, ii):
+        wi = self._weight_index_matrix[ni][ii]
+        w = Weight(self._index, ni, ii, wi)
+        return w
     
     def get_weight_index(self, ni, ii):
         return self._weight_index_matrix[ni][ii]
@@ -788,13 +764,14 @@ class Roster:
         labels = np.zeros((size, num_class), dtype=np.float32)
         for j in range(size):
             data_array[j] = train_data_batch[offset+j]
-            k = train_label_batch[offset+j]
+            k = int(train_label_batch[offset+j])
+            #print(k)
             labels[j][k] = 1.0
         #
         self.set_data(data_array, data_size, labels, size, 1)
                 
     def set_data(self, data, data_size, label, batch_size, scale=0):
-        print("Roster::set_data(%d, %d, %d)" % (data_size, batch_size, scale))
+        print("Roster::set_data(%d, %d, scale=%d)" % (data_size, batch_size, scale))
         if self._gpu:
             pass
         else:

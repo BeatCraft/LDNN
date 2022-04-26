@@ -259,47 +259,51 @@ class worker(object):
         return 0
 
 
-    def loop_k(self, m, n=1):
-        #print(m)
+    def loop_k(self, w_list, wtype, m, n=1):
         r = self.r
-        w_list = None
-        ce = 0.0
-        ret = 0
-        d = 100
-        wtype = "all"
-        lv_min = 0
-        lv_max = 0
-        w_num = 0
-
-        ce = self.evaluate()
-        if self._rank==0:
-            if self.mode_w==0: # all
-                w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-            elif self.mode_w==1: # FC
-                w_list = self.train.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-                wtype = "fc"
-            elif self.mode_w==2: # CNNs
-                w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4])
-                wtype = "cnn"
-            elif self.mode_w==3: # CNN layer
-                w_list = []
-                layer = r.get_layer_at(self.mse_idx)
-                for ni in range(layer._num_node):
-                    for ii in range(layer._num_input):
-                        w_list.append((idx, ni, ii))
-                    #
-                #
-                wtype = "cnn"
-            #
-        else:
-             w_list = []
-        #
-
-        w_list = self._com.bcast(w_list, root=0)
-        w_num = len(w_list)
-        print("rank=%d, w=%d" % (self._rank, w_num))
         
+        #w_list = None
+        #ce = 0.0
+        ce = self.evaluate()
+        ret = 0
+        w_num = len(w_list)
+        d = 100
+        #wtype = "all"
+        #lv_max = 0
+        #w_num = 0
+        #w_list = self._com.bcast(w_list, root=0)
+        lv_min = 0
         lv_max = int(math.log(w_num/d, 2)) + 1
+        atk = 50
+        total = 0
+        
+        #if self._rank==0:
+        #    if self.mode_w==0: # all
+        #        w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+        #    elif self.mode_w==1: # FC
+        #        w_list = self.train.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
+        #        wtype = "fc"
+        #    elif self.mode_w==2: # CNNs
+        #        w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4])
+        #        wtype = "cnn"
+        #    elif self.mode_w==3: # CNN layer
+        #        w_list = []
+        #        layer = r.get_layer_at(self.mse_idx)
+        #        for ni in range(layer._num_node):
+        #            for ii in range(layer._num_input):
+        #                w_list.append((idx, ni, ii))
+        #            #
+        #        #
+        #        wtype = "cnn"
+        #    #
+        #else:
+        #     w_list = []
+        #
+        #w_list = self._com.bcast(w_list, root=0)
+        #w_num = len(w_list)
+        #print("rank=%d, w=%d" % (self._rank, w_num))
+        
+        #lv_max = int(math.log(w_num/d, 2)) + 1
         #if self.mode_w==2: # CNN
         #    lv_max = 2
         #
@@ -310,11 +314,9 @@ class worker(object):
         #        self.r.save()
         #    #
         #
+        #total = 0
         
-        atk = 50
-        total = 0
         for j in range(n):
-            #total = 0
             for lv in range(lv_min, lv_max+1):
                 div = float(d*(2**lv))
                 total = 0
@@ -322,11 +324,12 @@ class worker(object):
                     ce, ret = self.multi_attack(ce, w_list, 1, div)
                     total += ret
                     if self._rank==0:
-                        print(m, "[", j, "] lv", lv, "i", i, "ce", ce, total)
+                        #print(m, "[", j, "] lv", lv, "i", i, "ce", ce, total)
+                        print(m, wtype, "[", j, "] lv", lv, "i", i, "ce", ce, total)
                     #
                 #
             #
-            total = 0
+            
             for lv in range(lv_max, -1, -1):
                 div = float(d*(2**lv))
                 total = 0
@@ -334,7 +337,8 @@ class worker(object):
                     ce, ret = self.multi_attack(ce, w_list, 0, div)
                     total += ret
                     if self._rank==0:
-                        print(m, "[", j, "] lv", lv, "i", i, "ce", ce, total)
+                        #print(m, "[", j, "] lv", lv, "i", i, "ce", ce, total)
+                        print(m, wtype, "[", j, "] lv", lv, "i", i, "ce", ce, total)
                     #
                 #
             #

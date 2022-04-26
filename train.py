@@ -150,8 +150,7 @@ class Train:
                 llist.append(w.li)
             #
         #
-        #c = r.count_layers()
-        #for li in range(c):
+
         for li in llist:
             layer = r.get_layer_at(li)
             layer.update_weight()
@@ -173,8 +172,7 @@ class Train:
                 llist.append(w.li)
             #
         #
-        #c = r.count_layers()
-        #for li in range(c):
+
         for li in llist:
             layer = r.get_layer_at(li)
             layer.update_weight()
@@ -398,7 +396,7 @@ class Train:
         
         for j in range(n):
             for lv in range(lv_min, lv_max+1):
-                div = 2**lv #float(d*(2**lv))
+                div = 2**lv
                 total = 0
                 for i in range(atk):
                     ce, ret = self.multi_attack(ce, w_list, 1, div)
@@ -408,7 +406,7 @@ class Train:
             #
             total = 0
             for lv in range(lv_max, -1, -1):
-                div = 2**lv #float(d*(2**lv))
+                div = 2**lv
                 total = 0
                 for i in range(atk):
                     ce, ret = self.multi_attack(ce, w_list, 0, div)

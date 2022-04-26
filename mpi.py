@@ -7,24 +7,18 @@ import time
 import math
 #
 from mpi4py import MPI
-import cupy as cp
-import cupyx
+#import cupy as cp
+#import cupyx
 
-#
-# LDNN Modules
-#
-sys.path.append(os.path.join(os.path.dirname(__file__), '../ldnn'))
 import util
 import core
 import dgx
 import train
-#import mnist
 
 sys.setrecursionlimit(10000)
 
 class worker(object):
-    #def __init__(self, com, rank, size, config_id, path, data_size, num_class, train_data_batch, train_label_batch, batch_offset, batch_size):
-    def __init__(self, com, rank, size, r):#, data_size, num_class, train_data_batch, train_label_batch, batch_offset, batch_size):
+    def __init__(self, com, rank, size, r):
         self._com = com
         self._rank = rank
         self._size = size
@@ -33,38 +27,24 @@ class worker(object):
         self.mode_w = 0
         self.mode_e = 0
         self.mse_idx = 2
-        #
-        #self._processor_name = MPI.Get_processor_name()
-        #cp.cuda.Device(self._rank).use()
-        #my_gpu = gdx.Gdx(self._rank)
-        #self.r = mnist.setup_dnn(my_gpu, config_id)
-        #self.r.set_scale_input(1)
-        #self.r.set_path(path)
-        #self.r.load()
-        #self.r.update_weight()
-        
-        #self.r.prepare(batch_size, data_size, num_class)
-        #self.r.set_batch(data_size, num_class, train_data_batch, train_label_batch, batch_size, batch_offset)
         
         self.train = train.Train(self.r)
 
     def evaluate(self):
         r = self.r
+
         ce = 0.0
-        if self.mode_e==0 or self.mode_e==1:
+        if self.mode_e==0: # classification
             ce = r.evaluate()
-        elif self.mode_e==2 or self.mode_e==3:
-            r.propagate()
-            layer = r.get_layer_at(self.mse_idx)
-            ce = layer.mse(0)
-        elif self.mode_e==4: # regression
+        elif self.mode_e==1: # regression
             r.propagate()
             r._gpu.mse(r.output._gpu_output, r.input._gpu_output, r._gpu_entropy, self._data_size, self._bacth_size)
             r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
             ce = np.sum(r._batch_cross_entropy)/np.float32(batch_size)
+        else:
+            print("evaluate() N/A")
         #
-        #ce = self.r.evaluate()
-        
+
         ce_list = self._com.gather(ce, root=0)
         sum = 0.0
         if self._rank==0:
@@ -81,7 +61,7 @@ class worker(object):
         ce_avg = self._com.scatter(ce_avg_list, root=0)
         return ce_avg
 
-    def multi_attack(self, ce, w_list, mode=1, div=0):
+    def multi_attack(self, ce, w_list, mode, div):
         r = self.r
         #
         if self._rank==0:
@@ -90,255 +70,87 @@ class worker(object):
             attack_list = []
         #
         attack_list = self._com.bcast(attack_list, root=0)
-        w_num = len(w_list)
-        for wt in attack_list:
-            li = wt[0]
-            ni = wt[1]
-            ii = wt[2]
-            wi = wt[3]
-            wi_alt = wt[4]
-            layer = r.get_layer_at(li)
-            layer.set_weight_index(ni, ii, wi_alt)
+
+        if self._rank==0:
+            pass
+        else:
+            for i in attack_list:
+                w = w_list[i]
+                if mode>0:
+                    w.wi_alt = w.wi + 1
+                else:
+                    w.wi_alt = w.wi - 1
+                #
+            #
         #
-        c = r.count_layers()
-        for li in range(c):
+
+        llist = []
+        for i in attack_list:
+            w = w_list[i]
+            #print(w.li, w.ni, w.ii, w.wi, w.wi_alt)
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
+        
+        for li in llist:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
+
         ce_alt = self.evaluate()
         ret = 0
-        if self.mode_e==0 or self.mode_e==1:
-            if ce_alt<ce:
-                ce = ce_alt
-                ret = 1
-            else:
-                self.train.undo_attack(attack_list)
-            #
-        elif self.mode_e==2 or self.mnode_e==3:
-            if ce_alt>ce:
-                ce = ce_alt
-                ret = 1
-            else:
-                self.train.undo_attack(attack_list)
-            #
-        #
-        return ce, ret
-
-    def w_loop(self, c, n, d, ce, w_list, lv_min, lv_max, label):
-        level = lv_min
-        mode = 1
-        r = self.r
-
-        for j in range(n):
-            #
-            div = float(d)*float(2**(level))
-            #
-            cnt = 0
-            for i in range(50):
-                ce, ret = self.multi_attack(ce, w_list, 1, div)
-                cnt = cnt + ret
-                #if self._rank==0:
-                #    print("[%d|%s] %d : H : %d : %f, %d (%d, %d) %d (%d, %d)" %
-                #            (c, label, j, i, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
-                #
-            #
-
-            if self._rank==0:
-                 print("[%d|%s] %d : H : %f, %d (%d, %d) %d (%d, %d)" % 
-                         (c, label, j, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
-            #
-
-            for i in range(50):
-                ce, ret = self.multi_attack(ce, w_list, 0, div)
-                cnt = cnt + ret
-                #if self._rank==0:
-                #    print("[%d|%s] %d : C : %d : %f, %d (%d, %d) %d (%d, %d)" %
-                #            (c, label, j, i, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
-                #
-            #
-            if self._rank==0:
-                print("[%d|%s] %d : C : %f, %d (%d, %d) %d (%d, %d)" % 
-                        (c, label, j, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
-            #
-            if mode==1:
-                if level==lv_max:
-                    if level==lv_min:
-                        mode = 0
-                    else:
-                        mode = -1
-                elif level<lv_max-1:
-                    if cnt==0:
-                        if level==lv_min:
-                            lv_min = lv_min + 1
-                        #
-                    #
-                #
-                level = level + mode
-            elif mode==-1:
-                if level==lv_min:
-                    if level==lv_max:
-                        mode = 0
-                    else:
-                        mode = 1
-                        if cnt==0:
-                            lv_min = lv_min + 1
-                        #
-                    #
-                #
-                level = level + mode
-            #
-        #
-        return ce, lv_min, lv_max
-
-    def loop(self, n=1, m=100):
-        r = self.r
-        w_list = None
-        ce = 0.0
-        ret = 0
-        d = 100
-        wtype = "all"
-        lv_min = 0
-        lv_max = 0
-        w_num = 0
-
-        ce = self.evaluate()
-        if self._rank==0:
-            if self.mode_w==0: # all
-                w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-                #d = 100
-                #lv_max = int(math.log(w_num/d, 2)) + 1
-            elif self.mode_w==1: # FC
-                w_list = self.train.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-                #d = 100
-                #lv_max = int(math.log(w_num/d, 2)) + 1
-                #idx = 1 # 1 or 3 for now
-                #layer = r.get_layer_at(idx)
-                #layer.lock = True
-                #idx = 3 # 1 or 3 for now
-                #layer = r.get_layer_at(idx)
-                #layer.lock = True
-                wtype = "fc"
-            elif self.mode_w==2: # CNNs
-                w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4])
-                #d = 1
-                #lv_max = 2
-                wtype = "cnn"
-            elif self.mode_w==3: # CNN layer
-                w_list = []
-                layer = r.get_layer_at(self.mse_idx)
-                for ni in range(layer._num_node):
-                    for ii in range(layer._num_input):
-                        w_list.append((idx, ni, ii))
-                    #
-                #
-                #d = 1
+        if ce_alt<ce:
+            ce = ce_alt
+            ret = 1
+            for i in attack_list:
+                w = w_list[i]
+                w.wi = w.wi_alt
             #
         else:
-             w_list = []
+            self.train.undo_attack(w_list, attack_list)
         #
 
-        w_list = self._com.bcast(w_list, root=0)
-        w_num = len(w_list)
-        print("rank=%d, w=%d" % (self._rank, w_num))
-        lv_max = int(math.log(w_num/d, 2)) + 1
+        return ce, ret
         
-        if self.mode_w==2: # CNN
-            lv_max = 2
-        #
-
-        #d = 100
-        #lv_min = 0
-        #lv_max = int(math.log(w_num/d, 2)) + 1
-
-        for i in range(n):
-            ce, lv_min, lv_min = self.w_loop(i, m, d, ce, w_list, lv_min, lv_max, wtype)
-            if self._rank==0:
-                self.r.save()
-            #
-        #
-        return 0
-
-
     def loop_k(self, w_list, wtype, m, n=1):
         r = self.r
         
-        #w_list = None
-        #ce = 0.0
         ce = self.evaluate()
+        print(self._rank, ce)
         ret = 0
         w_num = len(w_list)
         d = 100
-        #wtype = "all"
-        #lv_max = 0
-        #w_num = 0
-        #w_list = self._com.bcast(w_list, root=0)
         lv_min = 0
         lv_max = int(math.log(w_num/d, 2)) + 1
         atk = 50
         total = 0
         
-        #if self._rank==0:
-        #    if self.mode_w==0: # all
-        #        w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-        #    elif self.mode_w==1: # FC
-        #        w_list = self.train.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-        #        wtype = "fc"
-        #    elif self.mode_w==2: # CNNs
-        #        w_list = self.train.make_w_list([core.LAYER_TYPE_CONV_4])
-        #        wtype = "cnn"
-        #    elif self.mode_w==3: # CNN layer
-        #        w_list = []
-        #        layer = r.get_layer_at(self.mse_idx)
-        #        for ni in range(layer._num_node):
-        #            for ii in range(layer._num_input):
-        #                w_list.append((idx, ni, ii))
-        #            #
-        #        #
-        #        wtype = "cnn"
-        #    #
-        #else:
-        #     w_list = []
-        #
-        #w_list = self._com.bcast(w_list, root=0)
-        #w_num = len(w_list)
-        #print("rank=%d, w=%d" % (self._rank, w_num))
-        
-        #lv_max = int(math.log(w_num/d, 2)) + 1
-        #if self.mode_w==2: # CNN
-        #    lv_max = 2
-        #
-
-        #for i in range(n):
-        #    ce, lv_min, lv_min = self.w_loop(i, m, d, ce, w_list, lv_min, lv_max, wtype)
-        #    if self._rank==0:
-        #        self.r.save()
-        #    #
-        #
-        #total = 0
-        
         for j in range(n):
             for lv in range(lv_min, lv_max+1):
-                div = float(d*(2**lv))
+                div = 2**lv
                 total = 0
                 for i in range(atk):
                     ce, ret = self.multi_attack(ce, w_list, 1, div)
                     total += ret
                     if self._rank==0:
-                        #print(m, "[", j, "] lv", lv, "i", i, "ce", ce, total)
-                        print(m, wtype, "[", j, "] lv", lv, "i", i, "ce", ce, total)
+                        print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
                     #
                 #
             #
             
             for lv in range(lv_max, -1, -1):
-                div = float(d*(2**lv))
+                div = 2**lv
                 total = 0
                 for i in range(atk):
                     ce, ret = self.multi_attack(ce, w_list, 0, div)
                     total += ret
                     if self._rank==0:
-                        #print(m, "[", j, "] lv", lv, "i", i, "ce", ce, total)
-                        print(m, wtype, "[", j, "] lv", lv, "i", i, "ce", ce, total)
+                        print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
                     #
                 #
             #

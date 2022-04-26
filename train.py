@@ -112,23 +112,13 @@ class Train:
             #
         #
         return wi, wi_alt
-        
-    def make_attack_list(self, div, mode, w_list):
+       
+    def make_attack_list(self, attack_num, mode, w_list):
         r = self._r
         w_num = len(w_list)
-        attack_num = int(w_num/div)
-        if attack_num<1:
-            attack_num = 1
-        #
+        
         attack_list = []
-        for i in range(attack_num*10):
-            #if i>=attack_num:
-            #    break
-            #
-            if len(attack_list)>=attack_num:
-                break
-            #
-            
+        while len(attack_list)<attack_num:
             attack_i = random.randrange(w_num)
             w = w_list[attack_i]
             if mode>0: # heat
@@ -142,33 +132,27 @@ class Train:
                     attack_list.append(attack_i)
                 #
             #
-            #li = w[0]
-            #ni = w[1]
-            #ii = w[2]
-            #wi, wi_alt = self.weight_ops(attack_i, mode, w_list)
-            #if wi!=wi_alt:
-            #    attack_list.append((li, ni, ii, wi, wi_alt))
-            #
         #
         return attack_list
 
     def undo_attack(self, w_list, attack_list):
         r = self._r
-        #for wt in attack_list:
+       
+        llist = []
         for i in attack_list:
             w = w_list[i]
-            #li = wt[0]
-            #ni = wt[1]
-            #ii = wt[2]
-            #wi = wt[3]
-            #wi_alt = wt[4]
-            #
             layer = r.get_layer_at(w.li)
             layer.set_weight_index(w.ni, w.ii, w.wi)
             w.wi_alt = w.wi # ?
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
         #
-        c = r.count_layers()
-        for li in range(c):
+        #c = r.count_layers()
+        #for li in range(c):
+        for li in llist:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
@@ -176,20 +160,22 @@ class Train:
     def multi_attack(self, ce, w_list, mode=1, div=0):
         r = self._r
         attack_list = self.make_attack_list(div, mode, w_list)
-        
+       
+        llist = []
         w_num = len(attack_list)
         for i in attack_list:
             w = w_list[i]
-            #li = wt[0]
-            #ni = wt[1]
-            #ii = wt[2]
-            #wi = wt[3]
-            #wi_alt = wt[4]
             layer = r.get_layer_at(w.li)
             layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
         #
-        c = r.count_layers()
-        for li in range(c):
+        #c = r.count_layers()
+        #for li in range(c):
+        for li in llist:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
@@ -412,22 +398,22 @@ class Train:
         
         for j in range(n):
             for lv in range(lv_min, lv_max+1):
-                div = float(d*(2**lv))
+                div = 2**lv #float(d*(2**lv))
                 total = 0
                 for i in range(atk):
                     ce, ret = self.multi_attack(ce, w_list, 1, div)
                     total += ret
-                    print(m, wtype, "[", j, "] lv", lv, "i", i, "ce", ce, total)
+                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
                 #
             #
             total = 0
             for lv in range(lv_max, -1, -1):
-                div = float(d*(2**lv))
+                div = 2**lv #float(d*(2**lv))
                 total = 0
                 for i in range(atk):
                     ce, ret = self.multi_attack(ce, w_list, 0, div)
                     total += ret
-                    print(m, wtype, "[", j, "] lv", lv, "i", i, "ce", ce, total)
+                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
                 #
             #
             r.save()

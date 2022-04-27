@@ -123,12 +123,15 @@ class Train:
             w = w_list[attack_i]
             if mode>0: # heat
                 if w.wi<core.WEIGHT_INDEX_MAX:
-                    w.wi_alt = w.wi + 1
+                    #w.wi_alt = w.wi + 1
+                    w.wi_alt = random.randint(w.wi, core.WEIGHT_INDEX_MAX)
                     attack_list.append(attack_i)
-                #
+                
+                
             else:
                 if w.wi>core.WEIGHT_INDEX_MIN:
-                    w.wi_alt = w.wi - 1
+                    #w.wi_alt = w.wi - 1
+                    w.wi_alt = random.randint(core.WEIGHT_INDEX_MIN, w.wi)
                     attack_list.append(attack_i)
                 #
             #
@@ -382,7 +385,7 @@ class Train:
         #
         return 0
 
-    def loop_k(self, w_list, wtype, m, n=1):
+    def loop_k(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
         r = self._r
         
         ce = self.evaluate()
@@ -391,14 +394,14 @@ class Train:
         d = 100
         lv_min = 0
         lv_max = int(math.log(w_num/d, 2)) + 1
-        atk = 50
+        #atk = 50
         total = 0
         
         for j in range(n):
             for lv in range(lv_min, lv_max+1):
                 div = 2**lv
                 total = 0
-                for i in range(atk):
+                for i in range(atk - int(atk*atk_r*lv)):
                     ce, ret = self.multi_attack(ce, w_list, 1, div)
                     total += ret
                     print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
@@ -408,7 +411,7 @@ class Train:
             for lv in range(lv_max, -1, -1):
                 div = 2**lv
                 total = 0
-                for i in range(atk):
+                for i in range(atk - int(atk*atk_r*lv)):
                     ce, ret = self.multi_attack(ce, w_list, 0, div)
                     total += ret
                     print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)

@@ -66,22 +66,33 @@ class worker(object):
         #
         if self._rank==0:
             attack_list = self.train.make_attack_list(div, mode, w_list)
-        else:
-            attack_list = []
-        #
-        attack_list = self._com.bcast(attack_list, root=0)
-
-        if self._rank==0:
-            pass
-        else:
+            alt_list = []
             for i in attack_list:
                 w = w_list[i]
-                if mode>0:
-                    w.wi_alt = w.wi + 1
-                else:
-                    w.wi_alt = w.wi - 1
-                #
+                alt_list.append(w.wi_alt)
+                #print("w.wi_alt=", w.wi_alt)
             #
+            #print(alt_list)
+        else:
+            attack_list = []
+            alt_list = []
+        #
+        attack_list = self._com.bcast(attack_list, root=0)
+        alt_list = self._com.bcast(alt_list, root=0)
+
+        #print(alt_list)
+
+        idx = 0
+        for i in attack_list:
+            w = w_list[i]
+            w.wi_alt = alt_list[idx]
+            #try:
+            #    w.wi_alt = alt_list[idx]
+            #except:
+            #    print("debug: ", self._rank, i)
+            #    exit()
+            #
+            idx += 1
         #
 
         llist = []
@@ -89,6 +100,7 @@ class worker(object):
             w = w_list[i]
             #print(w.li, w.ni, w.ii, w.wi, w.wi_alt)
             layer = r.get_layer_at(w.li)
+            
             layer.set_weight_index(w.ni, w.ii, w.wi_alt)
             if w.li in llist:
                 pass
@@ -117,7 +129,8 @@ class worker(object):
 
         return ce, ret
         
-    def loop_k(self, w_list, wtype, m, n=1):
+    #def loop_k(self, w_list, wtype, m, n=1):
+    def loop_k(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
         r = self.r
         
         ce = self.evaluate()
@@ -127,14 +140,14 @@ class worker(object):
         d = 100
         lv_min = 0
         lv_max = int(math.log(w_num/d, 2)) + 1
-        atk = 50
+        #atk = 50
         total = 0
         
         for j in range(n):
             for lv in range(lv_min, lv_max+1):
                 div = 2**lv
                 total = 0
-                for i in range(atk):
+                for i in range(atk - int(atk*atk_r*lv)):
                     ce, ret = self.multi_attack(ce, w_list, 1, div)
                     total += ret
                     if self._rank==0:
@@ -146,7 +159,7 @@ class worker(object):
             for lv in range(lv_max, -1, -1):
                 div = 2**lv
                 total = 0
-                for i in range(atk):
+                for i in range(atk - int(atk*atk_r*lv)):
                     ce, ret = self.multi_attack(ce, w_list, 0, div)
                     total += ret
                     if self._rank==0:

@@ -126,8 +126,7 @@ class Train:
                     #w.wi_alt = w.wi + 1
                     w.wi_alt = random.randint(w.wi, core.WEIGHT_INDEX_MAX)
                     attack_list.append(attack_i)
-                
-                
+                #
             else:
                 if w.wi>core.WEIGHT_INDEX_MIN:
                     #w.wi_alt = w.wi - 1

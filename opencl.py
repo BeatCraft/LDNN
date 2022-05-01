@@ -108,7 +108,7 @@ __kernel void layer_mse_batch(
             float d = input[input_offset+i] - input[ch_start+i];
             sum_d += (d*d);
         }
-        output[bi] = sum_d/float(ch_stride);
+        output[bi] = sum_d/(float)ch_stride;
     }
 }
 

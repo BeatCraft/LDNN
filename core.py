@@ -8,11 +8,15 @@ import copy
 #import multiprocessing as mp
 import pickle
 import numpy as np
+
 if sys.platform.startswith('darwin'):
     pass
 else:
-    import cupy as cp
-    import cupyx
+    import plat
+    if plat.ID==2:
+        import cupy as cp
+        import cupyx
+    #
 #
 import csv
 from PIL import Image

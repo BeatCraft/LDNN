@@ -34,9 +34,13 @@ class worker(object):
         r = self.r
 
         ce = 0.0
-        if self.mode_e==0: # classification
+        if self.mode_e==0 or self.mode_e==1: # classification
             ce = r.evaluate()
-        elif self.mode_e==1: # regression
+        if self.mode_e==2 or self.mode_e==3: # CNN single
+            r.propagate()
+            layer = r.get_layer_at(mse_idex)
+            ent = layer.mse(0)
+        elif self.mode_e==4: # regression
             r.propagate()
             r._gpu.mse(r.output._gpu_output, r.input._gpu_output, r._gpu_entropy, self._data_size, self._bacth_size)
             r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
@@ -141,31 +145,44 @@ class worker(object):
         lv_min = 0
         lv_max = int(math.log(w_num/d, 2)) + 1
         #atk = 50
-        total = 0
+        
         
         for j in range(n):
-            for lv in range(lv_min, lv_max+1):
-                div = 2**lv
-                total = 0
-                for i in range(atk - int(atk*atk_r*lv)):
-                    ce, ret = self.multi_attack(ce, w_list, 1, div)
-                    total += ret
-                    if self._rank==0:
-                        print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
-                    #
-                #
+            total = 0
+            #for lv in range(lv_min, lv_max+1):
+            #    div = 2**lv
+            #    total = 0
+            #    for i in range(atk - int(atk*atk_r*lv)):
+            #        ce, ret = self.multi_attack(ce, w_list, 1, div)
+            #        total += ret
+            #        if self._rank==0:
+            #            print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
+            #        #
+            #    #
             #
-            
+           
             for lv in range(lv_max, -1, -1):
                 div = 2**lv
                 total = 0
-                for i in range(atk - int(atk*atk_r*lv)):
+                #for i in range(atk - int(atk*atk_r*lv)):
+                i = 0
+                while 1:
                     ce, ret = self.multi_attack(ce, w_list, 0, div)
                     total += ret
                     if self._rank==0:
                         print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
                     #
-                #
+                    
+                    if i>atk:
+                        if float(total)/float(i)<0.1:
+                            break;
+                        #
+                    #
+                    i += 1
+                    if i>=1000:
+                        break;
+                    #
+                # while
             #
             if self._rank==0:
                 r.save()

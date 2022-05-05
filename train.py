@@ -121,18 +121,25 @@ class Train:
         while len(attack_list)<attack_num:
             attack_i = random.randrange(w_num)
             w = w_list[attack_i]
-            if mode>0: # heat
-                if w.wi<core.WEIGHT_INDEX_MAX:
-                    #w.wi_alt = w.wi + 1
-                    w.wi_alt = random.randint(w.wi, core.WEIGHT_INDEX_MAX)
+            while 1:
+                w.wi_alt = random.randint(core.WEIGHT_INDEX_MIN, core.WEIGHT_INDEX_MAX)
+                if w.wi_alt!=w.wi:
                     attack_list.append(attack_i)
+                    break
                 #
-            else:
-                if w.wi>core.WEIGHT_INDEX_MIN:
-                    #w.wi_alt = w.wi - 1
-                    w.wi_alt = random.randint(core.WEIGHT_INDEX_MIN, w.wi)
-                    attack_list.append(attack_i)
-                #
+            #
+            #if mode>0: # heat
+            #    if w.wi<core.WEIGHT_INDEX_MAX:
+            #        #w.wi_alt = w.wi + 1
+            #        w.wi_alt = random.randint(w.wi, core.WEIGHT_INDEX_MAX)
+            #        attack_list.append(attack_i)
+            #    #
+            #else:
+            #    if w.wi>core.WEIGHT_INDEX_MIN:
+            #        #w.wi_alt = w.wi - 1
+            #        w.wi_alt = random.randint(core.WEIGHT_INDEX_MIN, w.wi)
+            #        attack_list.append(attack_i)
+            #    #
             #
         #
         return attack_list
@@ -182,8 +189,22 @@ class Train:
         
         ce_alt = self.evaluate()
         ret = 0
-        
-        if ce_alt<ce:
+        #
+        # need to implement acceptance control here??
+        #
+        #de = (ce - ce_alt)
+        #flg = math.exp(de/float(div)) < random.random()
+        #/float(div)
+        #ac = 2**(-de/float(div))
+        #ac = math.e**(de/float(div))
+        # log(div, 2) #math.e**(-de/div)
+        #c = math.e**(-de)
+        #ac = math.e**(de)
+        #ac = np.exp(de)
+        #print(ac)
+        #k = 1.38 * (10**-23)
+        #print(np.exp(-ac/k*math.log(div, 2)))
+        if ce_alt<=ce:
             ce = ce_alt
             ret = 1
             for i in attack_list:
@@ -191,6 +212,16 @@ class Train:
                 w.wi = w.wi_alt
             #
         else:
+            #if flg:
+            #    print("####", math.exp(de/float(div)))
+            #    ce = ce_alt
+            #    ret = 1
+            #    for i in attack_list:
+            #        w = w_list[i]
+            #        w.wi = w.wi_alt
+            #    #
+            #
+            #print(de, ac)
             self.undo_attack(w_list, attack_list)
         #
         return ce, ret
@@ -450,6 +481,56 @@ class Train:
             ce = self.evaluate()
             print("CE starts with %f" % ce)
             ce, lv_min, lv_min = self.w_loop(i, 1, d, ce, w_list, lv_min, lv_max, "all")
+            r.save()
+        #
+        return 0
+        
+        
+    def loop_sa(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
+        r = self._r
+        
+        ce = self.evaluate()
+        ret = 0
+        w_num = len(w_list)
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        #atk = 50
+        total = 0
+        
+        for j in range(n):
+            #for lv in range(lv_min, lv_max+1):
+            #    div = 2**lv
+            #    total = 0
+            #    for i in range(atk - int(atk*atk_r*lv)):
+            #        ce, ret = self.multi_attack(ce, w_list, 1, div)
+            #        total += ret
+            #        print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
+            #    #
+            #
+            total = 0
+            for lv in range(lv_max, -1, -1):
+                div = 2**lv
+                total = 0
+                #for i in range(atk - int(atk*atk_r*lv)):
+                for i in range(atk):
+                #i = 0
+                #while 1:
+                    ce, ret = self.multi_attack(ce, w_list, 0, div)
+                    total += ret
+                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
+                    #
+                #    if i>atk:
+                #        if float(total)/float(i)<0.1:
+                #            break;
+                #        #
+                #    #
+                #    i += 1
+                #    if i>=1000:
+                #        break;
+                #    #
+                #
+            #
             r.save()
         #
         return 0

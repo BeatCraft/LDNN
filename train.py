@@ -89,29 +89,6 @@ class Train:
             #
         #
         return w_list
-
-    def weight_ops(self, attack_i, mode, w_list):
-        r = self._r
-        w = w_list[attack_i]
-        #li = w[0]
-        #ni = w[1]
-        #ii = w[2]
-        #layer = r.get_layer_at(li)
-        #wi = layer.get_weight_index(ni, ii)
-        #wi_alt = wi
-        #maximum = core.WEIGHT_INDEX_MAX
-        #minimum = core.WEIGHT_INDEX_MIN
-        #
-        if mode>0: # heat
-            if w.wi<core.WEIGHT_INDEX_MAX:
-                w.wi_alt = w.wi + 1
-            #
-        else:
-            if w.wi>core.WEIGHT_INDEX_MIN:
-                w.wi_alt = w.wi - 1
-            #
-        #
-        return wi, wi_alt
        
     def make_attack_list(self, attack_num, mode, w_list):
         r = self._r
@@ -243,250 +220,118 @@ class Train:
         #
         #return ce, ret
 
-    def w_loop_2(self, c, n, d, ce, w_list, lv_min, lv_max, label):
-        r = self._r
-        level = lv_min
-        mode = 1
-        #
-        for j in range(n):
-            div = float(d)*float(2**(level))
-            cnt = 0
-            atk = 100#level*10
-            for i in range(atk):
-                ce, ret = self.multi_attack(ce, w_list, 1, div)
-                cnt = cnt + ret
-                print("[%d|%s] %d : H : %02d/%d : %f, %d (%d, %d) %d (%d, %d)" % (c, label, j, i, atk, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
-            #
-            for i in range(atk):
-                ce, ret = self.multi_attack(ce, w_list, 0, div)
-                cnt = cnt + ret
-                print("[%d|%s] %d : C : %02d/%d : %f, %d (%d, %d) %d (%d, %d)" % (c, label, j, i, atk, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
-            #
-            level = level + mode
-            if mode==1:
-                if level>=lv_max:
-                    mode = -1
-                #
-            elif mode==-1:
-                if level<=lv_min:
-                    mode = 1
-                #
-            #
-            r.save()
-        #
-        return ce, lv_min, lv_max
-
-    def w_loop(self, c, n, d, ce, w_list, lv_min, lv_max, label):
-        r = self._r
-        level = lv_min
-        mode = 1
-        #
-        for j in range(n):
-            div = float(d)*float(2**(level))
-            #
-            cnt = 0
-            atk = 50
-            for i in range(atk):
-                ce, ret = self.multi_attack(ce, w_list, 1, div)
-                cnt = cnt + ret
-                print("[%d|%s] %d : H : %d : %f, %d (%d, %d) %d (%d, %d)" % (c, label, j, i, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
-            #
-            for i in range(atk):
-                ce, ret = self.multi_attack(ce, w_list, 0, div)
-                cnt = cnt + ret
-                print("[%d|%s] %d : C : %d : %f, %d (%d, %d) %d (%d, %d)" % (c, label, j, i, ce, level, lv_min, lv_max, cnt, 2**(level), int(len(w_list)/div)))
-            #
-            if mode==1:
-                if level==lv_max:
-                    if level==lv_min:
-                        mode = 0
-                    else:
-                        mode = -1
-                elif level<lv_max-1:
-                    if cnt==0:
-                        if level==lv_min:
-                            lv_min = lv_min + 1
-                        #
-                    #
-                #
-                level = level + mode
-            elif mode==-1:
-                if level==lv_min:
-                    if level==lv_max:
-                        mode = 0
-                    else:
-                        mode = 1
-                        if cnt==0:
-                            lv_min = lv_min + 1
-                        #
-                    #
-                #
-                level = level + mode
-            #
-            #r.export_weight("./wi.csv")
-            #r.save()
-            #path = "./test-%04d.png" % (j)
-            #save_img(r, path)
-        #
-        return ce, lv_min, lv_max
-
-    def w_loop_new(self, ce, w_list, lv_min, lv_max, label):
-        #r = self._r
-        #level = lv_min
-        #mode = 1
-        
-        #ce, ret = self.multi_attack(ce, w_list, 1, div)
-        #ce, ret = self.multi_attack(ce, w_list, 0, div)
-        
-        for lv in range(lv_max):
-            print("lv", lv)
-        #
-        return ce, lv_min, lv_max
-        
-    def loop(self, n=1):#, k=500):#, mode=0):
-        print("Train::loop()")
-        r = self._r
-        w_list = None
-        w_num = 0
-        ce = 0.0
-        ret = 0
-        d = 100
-        wtype = "all"
-        lv_min = 0
-        lv_max = 0
-
-        ce = self.evaluate()
-        if self.mode_w==0: # all
-            w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-        elif self.mode_w==1: # FC
-            w_list = self.make_w_list([core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-        elif self.mode_w==2: # CNNs
-            w_list = self.make_w_list([core.LAYER_TYPE_CONV_4])
-        elif self.mode_w==3: # CNN layer
-            layer = r.get_layer_at(self.mse_idx)
-            for ni in range(layer._num_node):
-                for ii in range(layer._num_input):
-                    w_list.append((idx, ni, ii))
-                #
-            #
-            #d = 1
-        #
-        
-        print("CE starts with %f" % ce)
-        w_num = len(w_list)
-        print("wi", len(w_list))
-        
-        lv_max = int(math.log(w_num/d, 2))
-        if self.mode_w==2: # CNN
-            lv_max = 2
-        #
-        print("min", lv_min, "max", lv_max)
-        
-        atk = 50
-        total = 0
-        for j in range(n):
-            total = 0
-            for lv in range(lv_min, lv_max+1):
-                div = float(d*(2**lv))
-                for i in range(atk):
-                    ce, ret = self.multi_attack(ce, w_list, 1, div)
-                    total += ret
-                    print("[", j, "] lv", lv, "i", i, "ce", ce, total)
-                #
-            #
-            total = 0
-            for lv in range(lv_max, -1, -1):
-                div = float(d*(2**lv))
-                for i in range(atk):
-                    ce, ret = self.multi_attack(ce, w_list, 0, div)
-                    total += ret
-                    print("[", j, "] lv", lv, "i", i, "ce", ce, total)
-                #
-            #
-            r.save()
-        #
-        return 0
-        
-        #lv_min = 0
-        #lv_max = int(math.log(w_num/d, 2)) + 1
-        for i in range(n):
-            ce, lv_min, lv_min = self.w_loop(i, k, d, ce, w_list, lv_min, lv_max, "all")
-            r.save()
-        #
-        return 0
-
-    def loop_k(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
-        r = self._r
-        
-        ce = self.evaluate()
-        ret = 0
-        w_num = len(w_list)
-        d = 100
-        lv_min = 0
-        lv_max = int(math.log(w_num/d, 2)) + 1
-        #atk = 50
-        total = 0
-        
-        for j in range(n):
-            for lv in range(lv_min, lv_max+1):
-                div = 2**lv
-                total = 0
-                for i in range(atk - int(atk*atk_r*lv)):
-                    ce, ret = self.multi_attack(ce, w_list, 1, div)
-                    total += ret
-                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
-                #
-            #
-            total = 0
-            for lv in range(lv_max, -1, -1):
-                div = 2**lv
-                total = 0
-                for i in range(atk - int(atk*atk_r*lv)):
-                    ce, ret = self.multi_attack(ce, w_list, 0, div)
-                    total += ret
-                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
-                #
-            #
-            r.save()
-        #
-        return 0
-        
-    def stochastic_loop(self, pack, dsize, bsize, n=1):
-        r = self._r
-        w_list = None
-        ce = 0.0
-        ret = 0
-        #
-        #ce = self.evaluate()
-        #print("CE starts with %f" % ce)
-        #
-        w_list = self.make_w_list([core.LAYER_TYPE_CONV_4, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT])
-        w_num = len(w_list)
-        print(len(w_list))
-        #
-        d = 100
-        lv_min = 0
-        lv_max = int(math.log(w_num/d, 2)) + 1
-        
-        train_data_batch = pack._train_image_batch
-        train_label_batch = pack._train_label_batch
-        num_class = pack._num_class
-        tbs = len(train_data_batch)
-        num = int(tbs/dsize)
-        for i in range(num):
-            batch_offset = bsize*i
-            print("%d, %d, %d" % (dsize, bsize, i))
-            self.set_batch(dsize, num_class, train_data_batch, train_label_batch, bsize, batch_offset)
-            #r.set_batch(dsize, num_class, train_data_batch, train_label_batch, bsize, batch_offset)
-            ce = self.evaluate()
-            print("CE starts with %f" % ce)
-            ce, lv_min, lv_min = self.w_loop(i, 1, d, ce, w_list, lv_min, lv_max, "all")
-            r.save()
-        #
-        return 0
-        
-        
     def loop_sa(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
+        r = self._r
+        
+        ce = self.evaluate()
+        ret = 0
+        w_num = len(w_list)
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        total = 0
+        
+        for j in range(n):
+            for lv in range(lv_min, lv_max+1):
+                div = 2**lv
+                total = 0
+                for i in range(atk - int(atk*atk_r*lv)):
+                    ce, ret = self.multi_attack(ce, w_list, 1, div)
+                    total += ret
+                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
+                #
+            #
+            
+            for lv in range(lv_max, -1, -1):
+                div = 2**lv
+                total = 0
+                #for i in range(atk - int(atk*atk_r*lv)):
+                for i in range(atk):
+                    ce, ret = self.multi_attack(ce, w_list, 0, div)
+                    total += ret
+                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
+                #
+            #
+            r.save()
+        #
+        return 0
+        
+    def loop_sa2(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
+        r = self._r
+        
+        ce = self.evaluate()
+        ret = 0
+        w_num = len(w_list)
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        total = 0
+        
+        for j in range(n):
+            for lv in range(lv_max, -1, -1):
+                div = 2**lv
+                total = 0
+                #for i in range(atk - int(atk*atk_r*lv)):
+                for i in range(atk):
+                    ce, ret = self.multi_attack(ce, w_list, 0, div)
+                    total += ret
+                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
+                #
+            #
+            r.save()
+        #
+        return 0
+        
+    def loop_sa3(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
+        r = self._r
+        
+        ce = self.evaluate()
+        ret = 0
+        w_num = len(w_list)
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        total = 0
+        
+        for j in range(n):
+            for lv in range(lv_max, -1, -1):
+                div = 2**lv
+                total = 0
+                part = 0
+                i = 0
+                k = 0
+                flag = 1
+                while flag:
+                    ce, ret = self.multi_attack(ce, w_list, 0, div)
+                    total += ret
+                    part += ret
+                    print(m, wtype, "[", j, "] lv", lv, div, "(", i, ")", "ce", ce, total)
+                    #
+                    if k>atk:
+                        tr = float(total)/float(i)
+                        pr = float(part)/float(k)
+                        if tr<0.05 and pr<0.05:
+                            flag = 0
+                            #
+                            # need to refreash
+                            #
+                        else:
+                            if i>=atk*20:
+                                flag = 0
+                            #
+                        #
+                    #
+                    i += 1
+                    k += 1
+                # while
+                #i = 0
+                #j = 0
+            #
+            r.save()
+        #
+        return 0
+        
+    def loop_sa4(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
         r = self._r
         
         ce = self.evaluate()

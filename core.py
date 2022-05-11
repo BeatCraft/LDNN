@@ -350,7 +350,7 @@ class OutputLayer(Layer):
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
                 self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
             elif self._gpu.type==1:
-                print("output:gdx")
+                print("output:dgx")
                 self._gpu_product = self._gpu.allocateArray(self._product_matrix)
                 self._gpu_output = self._gpu.allocateArray(self._output_array)
                 self._gpu_softmax = self._gpu.allocateArray(self._softmax_array)
@@ -562,7 +562,7 @@ class MaxLayer(Layer):
                 self._gpu.max_batch(array_in, self._gpu_output,
                                     self._ch, self._x, self._y, self._batch_size)
             elif self._gpu.type==1:
-                #print("[%d] propagate max on gdx" % (self._index))
+                #print("[%d] propagate max on dgx" % (self._index))
                 #
                 # GDX
                 #

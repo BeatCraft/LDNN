@@ -36,7 +36,7 @@ class worker(object):
         ce = 0.0
         if self.mode_e==0 or self.mode_e==1: # classification
             ce = r.evaluate()
-        if self.mode_e==2 or self.mode_e==3: # CNN single
+        elif self.mode_e==2 or self.mode_e==3: # CNN single
             r.propagate()
             layer = r.get_layer_at(mse_idex)
             ent = layer.mse(0)
@@ -182,6 +182,57 @@ class worker(object):
                     if i>=1000:
                         break;
                     #
+                # while
+            #
+            if self._rank==0:
+                r.save()
+            #
+        #
+        
+        return 0
+        
+    def loop_sa(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
+        r = self.r
+        
+        ce = self.evaluate()
+        print(self._rank, ce)
+        ret = 0
+        w_num = len(w_list)
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        
+        for j in range(n):
+            for lv in range(lv_max, -1, -1):
+                div = 2**lv
+                total = 0
+                part = 0
+                i = 0
+                k = 0
+                flag = 1
+                while flag:
+                    ce, ret = self.multi_attack(ce, w_list, 0, div)
+                    total += ret
+                    part += ret
+                    if self._rank==0:
+                        print(m, wtype, "[", j, "] lv", lv, div, "(", i, ")", "ce", ce, total)
+                    #
+                    if k>atk:
+                        tr = float(total)/float(i)
+                        pr = float(part)/float(k)
+                        if tr<0.05 and pr<0.05:
+                            flag = 0
+                            #
+                            # refreash here if needed
+                            #
+                        else:
+                            if i>=atk*20:
+                                flag = 0
+                            #
+                        #
+                    #
+                    i += 1
+                    k += 1
                 # while
             #
             if self._rank==0:

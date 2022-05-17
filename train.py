@@ -384,7 +384,7 @@ class Train:
         #
         return ce, ret, pbty
     
-    def loop_sa4(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.01):
+    def loop_sa4(self, w_list, wtype, m, n=1, atk=1000, atk_r = 0.01):
         r = self._r
         
         ce = self.evaluate()
@@ -400,14 +400,14 @@ class Train:
             for lv in range(lv_max, -1, -1):
                 div = 2**lv
                 part = 0
-                for i in range(atk*20):
+                for i in range(atk):
                     ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
                     total += ret
                     part += ret
                     print(m, wtype, "[", j, "] lv", lv,"/", lv_max, "|", div, "(", i, ")", "ce", ce, part, total, pbty)
                     #
                 #
-                rate = float(part)/float(atk*20)
+                rate = float(part)/float(atk)
                 if rate<atk_r:
                     lv_max -= 1
                     if lv_max<3:

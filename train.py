@@ -330,7 +330,61 @@ class Train:
             r.save()
         #
         return 0
+    
+    
+    def multi_attack_sa4(self, ce, w_list, mode=1, div=0, pbty=0):
+        r = self._r
+        attack_list = self.make_attack_list(div, mode, w_list)
+       
+        llist = []
+        w_num = len(attack_list)
+        for i in attack_list:
+            w = w_list[i]
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
+
+        for li in llist:
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
         
+        ce_alt = self.evaluate()
+        ret = 0
+
+        if ce_alt<=ce:
+            ce = ce_alt
+            ret = 1
+            for i in attack_list:
+                w = w_list[i]
+                w.wi = w.wi_alt
+            #
+        else:
+            # acceptance control
+            delta = abs(ce_alt - ce)
+            #if pbty>=0.01:
+            if pbty>=1.0:
+                diff = math.log10(delta) - math.log10(ce)
+                limit = -1.0 - 1.0/(1.0+math.log(div, 2))
+                print(diff, limit)
+                if (diff < limit):
+                    print("RESET", diff, limit)
+                    ce = ce_alt
+                    ret = 1
+                    pbty = 0
+                #
+            #
+        #
+        if ret==0:
+            self.undo_attack(w_list, attack_list)
+        #
+        return ce, ret, pbty
+    
     def loop_sa4(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
         r = self._r
         
@@ -340,43 +394,56 @@ class Train:
         d = 100
         lv_min = 0
         lv_max = int(math.log(w_num/d, 2)) + 1
-        #atk = 50
         total = 0
         
+        pbty = 0.0
+        #n = int(lv_max/2)
+        n = 20
+        
         for j in range(n):
-            #for lv in range(lv_min, lv_max+1):
-            #    div = 2**lv
-            #    total = 0
-            #    for i in range(atk - int(atk*atk_r*lv)):
-            #        ce, ret = self.multi_attack(ce, w_list, 1, div)
-            #        total += ret
-            #        print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
-            #    #
-            #
-            total = 0
             for lv in range(lv_max, -1, -1):
                 div = 2**lv
                 total = 0
-                #for i in range(atk - int(atk*atk_r*lv)):
-                for i in range(atk):
-                #i = 0
-                #while 1:
-                    ce, ret = self.multi_attack(ce, w_list, 0, div)
+                part = 0
+                i = 0
+                k = 0
+                flag = 1
+                while flag:
+                    ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
                     total += ret
-                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
+                    part += ret
+                    print(m, wtype, "[", j, "] lv", lv,"/", lv_max, "|", div, "(", i, ")", "ce", ce, total, pbty)
                     #
-                #    if i>atk:
-                #        if float(total)/float(i)<0.1:
-                #            break;
-                #        #
-                #    #
-                #    i += 1
-                #    if i>=1000:
-                #        break;
-                #    #
+                    if k>atk:
+                        tr = float(total)/float(i)
+                        pr = float(part)/float(k)
+                        if tr<0.05 and pr<0.05:
+                            flag = 0
+                            pbty += 0.01
+                            #lv_max = lv
+                            #
+                            # need to refreash
+                            #
+                        else:
+                            if i>=atk*20:
+                                flag = 0
+                            #
+                        #
+                    #
+                    i += 1
+                    k += 1
+                # while
+                #i = 0
+                #j = 0
+                if pbty>0.05:
+                    pbty = 0
+                    lv_max -= 1
                 #
             #
             r.save()
+            #lv_max -= 1
         #
         return 0
+        
+
     

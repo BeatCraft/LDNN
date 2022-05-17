@@ -368,7 +368,7 @@ class Train:
             # acceptance control
             delta = abs(ce_alt - ce)
             #if pbty>=0.01:
-            if pbty>=1.0:
+            if pbty>2:
                 diff = math.log10(delta) - math.log10(ce)
                 limit = -1.0 - 1.0/(1.0+math.log(div, 2))
                 print(diff, limit)
@@ -396,48 +396,52 @@ class Train:
         lv_max = int(math.log(w_num/d, 2)) + 1
         total = 0
         
-        pbty = 0.0
+        pbty = 0
         #n = int(lv_max/2)
-        n = 20
+        #n = 20
         
+
+        total = 0
         for j in range(n):
             for lv in range(lv_max, -1, -1):
                 div = 2**lv
-                total = 0
+                #total = 0
                 part = 0
-                i = 0
+                #i = 0
                 k = 0
                 flag = 1
-                while flag:
+                #while flag:
+                for i  in range(atk*20):
                     ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
                     total += ret
                     part += ret
-                    print(m, wtype, "[", j, "] lv", lv,"/", lv_max, "|", div, "(", i, ")", "ce", ce, total, pbty)
+                    print(m, wtype, "[", j, "] lv", lv,"/", lv_max, "|", div, "(", i, ")", "ce", ce, part, total, pbty)
                     #
-                    if k>atk:
-                        tr = float(total)/float(i)
-                        pr = float(part)/float(k)
-                        if tr<0.05 and pr<0.05:
-                            flag = 0
-                            pbty += 0.01
-                            #lv_max = lv
-                            #
-                            # need to refreash
-                            #
-                        else:
-                            if i>=atk*20:
-                                flag = 0
-                            #
-                        #
+                    #if k>atk:
+                    #    tr = float(total)/float(i)
+                    #    pr = float(part)/float(k)
+                    #    if tr<0.01 and pr<0.01:
+                    #        flag = 0
+                    #        pbty += 0.01
+                    #        # need to refreash
+                    #    else:
+                    #        if i>=atk*20:
+                    #            flag = 0
+                    #        #
+                    #    #
                     #
-                    i += 1
-                    k += 1
+                    #i += 1
+                    #k += 1
                 # while
                 #i = 0
                 #j = 0
-                if pbty>0.05:
-                    pbty = 0
+                #if pbty>0.02:
+                if float(part)/float(atk*20)<0.01:
                     lv_max -= 1
+                    if lv_max<4:
+                        lv_max = 4
+                        pbty += 1
+                    #
                 #
             #
             r.save()

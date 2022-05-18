@@ -239,9 +239,130 @@ class worker(object):
                 r.save()
             #
         #
-        
         return 0
         
+    #def multi_attack_sa4(self, ce, w_list, mode, div):
+    def multi_attack_sa4(self, ce, w_list, mode=1, div=0, pbty=0):
+        r = self.r
+        #
+        if self._rank==0:
+            attack_list = self.train.make_attack_list(div, mode, w_list)
+            alt_list = []
+            for i in attack_list:
+                w = w_list[i]
+                alt_list.append(w.wi_alt)
+            #
+        else:
+            attack_list = []
+            alt_list = []
+        #
+        attack_list = self._com.bcast(attack_list, root=0)
+        alt_list = self._com.bcast(alt_list, root=0)
+
+        idx = 0
+        for i in attack_list:
+            w = w_list[i]
+            w.wi_alt = alt_list[idx]
+            idx += 1
+        #
+
+        llist = []
+        for i in attack_list:
+            w = w_list[i]
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
+        
+        for li in llist:
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+
+        ce_alt = self.evaluate()
+        ret = 0
+        
+        if ce_alt<ce:
+            ce = ce_alt
+            ret = 1
+            for i in attack_list:
+                w = w_list[i]
+                w.wi = w.wi_alt
+            #
+        else:
+            delta = abs(ce_alt - ce)
+            if pbty>3: # 2, 3?
+                diff = math.log10(delta) - math.log10(ce)
+                limit = -1.0 # - 1.0/(1.0+math.log(div, 2))
+                print(diff, limit)
+                if (diff < limit):
+                    #
+                    print(self._rank, "RESET", diff, limit)
+                    #
+                    ce = ce_alt
+                    ret = 1
+                    pbty = 0
+                #
+            #
+        #
+
+        if ret==0:
+            self.train.undo_attack(w_list, attack_list)
+        #
+        return ce, ret, pbty
+        
+    #def loop_sa4(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
+    def loop_sa4(self, w_list, wtype, n=1, atk=1000, atk_r = 0.01):
+        r = self.r
+        
+        ce = self.evaluate()
+        print(self._rank, ce)
+        ret = 0
+        w_num = len(w_list)
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        
+        pbty = 0
+                
+        for j in range(n):
+            total = 0
+            for lv in range(lv_max, -1, -1):
+                div = 2**lv
+                part = 0
+                #i = 0
+                #k = 0
+                #flag = 1
+                #while flag:
+                for i in range(atk):
+                    #ce, ret = self.multi_attack(ce, w_list, 0, div)
+                    ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
+                    total += ret
+                    part += ret
+                    if self._rank==0:
+                        #print(m, wtype, "[", j, "] lv", lv, div, "(", i, ")", "ce", ce, total)
+                        print(wtype, "[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", i, ")", "ce", ce, part, total, pbty)
+                    #
+                #
+                rate = float(part)/float(atk)
+                if rate<atk_r:
+                    lv_max -= 1
+                    if lv_max<3:
+                        lv_max = 3
+                        pbty += 1
+                    #
+                #
+            #
+            if self._rank==0:
+                r.save()
+            #
+        #
+        
+        return 0
 def main():
     argvs = sys.argv
     argc = len(argvs)

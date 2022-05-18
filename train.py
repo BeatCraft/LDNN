@@ -369,7 +369,7 @@ class Train:
             delta = abs(ce_alt - ce)
             if pbty>3: # 2, 3?
                 diff = math.log10(delta) - math.log10(ce)
-                limit = -1.0 - 1.0/(1.0+math.log(div, 2))
+                limit = -1.0# - 1.0/(1.0+math.log(div, 2))
                 print(diff, limit)
                 if (diff < limit):
                     print("RESET", diff, limit)
@@ -384,7 +384,7 @@ class Train:
         #
         return ce, ret, pbty
     
-    def loop_sa4(self, w_list, wtype, m, n=1, atk=1000, atk_r = 0.01):
+    def loop_sa4(self, w_list, wtype, n=1, atk=1000, atk_r = 0.01):
         r = self._r
         
         ce = self.evaluate()
@@ -393,6 +393,7 @@ class Train:
         d = 100
         lv_min = 0
         lv_max = int(math.log(w_num/d, 2)) + 1
+        
         pbty = 0
 
         for j in range(n):
@@ -404,7 +405,7 @@ class Train:
                     ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
                     total += ret
                     part += ret
-                    print(m, wtype, "[", j, "] lv", lv,"/", lv_max, "|", div, "(", i, ")", "ce", ce, part, total, pbty)
+                    print(wtype, "[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", i, ")", "ce", ce, part, total, pbty)
                     #
                 #
                 rate = float(part)/float(atk)

@@ -411,13 +411,17 @@ class Train:
                 rate = float(part)/float(atk)
                 if rate<atk_r:
                     lv_max -= 1
-                    if lv_max<3:
-                        lv_max = 3
-                        pbty += 1
+                    pbty += 1
+                    if lv_max<2:
+                        lv_max = 2
+                        #pbty += 1
                     #
                 #
             #
             r.save()
+            #if j>0 and j%10==0:
+            #    lv_max = int(math.log(w_num/d, 2)) + 1
+            #
         #
         return 0
         

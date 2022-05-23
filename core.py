@@ -575,7 +575,7 @@ class MaxLayer(Layer):
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
         print("Convolution Layer ver.4 ::__init__()")
-        self._cache = 0 # 0 : no, 1 : yes
+        #self._cache = 0 # 0 : no, 1 : yes
         self._ch = ch
         self._w = w
         self._h = h

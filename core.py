@@ -842,7 +842,7 @@ class Roster:
         else:
             return
         #
-        
+    
     def set_batch_data(self, data_size, train_data_batch, size, offset, scale=0):
         print("Roster::set_batch_data(%d, %d, %d, %d)" % (data_size, size, offset, scale))
         
@@ -874,6 +874,15 @@ class Roster:
         #
         self.reset()
         self._gpu.copy(self._gpu_labels, labels)
+    
+    
+    def direct_set_data(self, data_array):
+        self._gpu.copy(self._gpu_input, data_array)
+        self._gpu.copy(self.input._gpu_output, self._gpu_input)
+        
+    def direct_set_label(self, label_array):
+        self._gpu.copy(self._gpu_labels, label_array)
+    
     def set_scale_input(self, scale):
         self._scale_input = scale
     

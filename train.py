@@ -31,7 +31,7 @@ class Train:
         self.mse_idex = -1
         
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch,  batch_size, batch_offset):
-        self._bacth_size = batch_size
+        self._batch_size = batch_size
         self._data_size = data_size
         #
         r = self._r
@@ -54,9 +54,9 @@ class Train:
             return ent
         elif self.mode_e==4:
             r.propagate()
-            r._gpu.mse(r.output._gpu_output, r.input._gpu_output, r._gpu_entropy, self._data_size, self._bacth_size)
+            r._gpu.mse(r.output._gpu_output, r.input._gpu_output, r._gpu_entropy, self._data_size, self._batch_size)
             r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
-            ce = np.sum(r._batch_cross_entropy)/np.float32(batch_size)
+            ce = np.sum(r._batch_cross_entropy)/np.float32(self._batch_size)
             return ce
         #
         

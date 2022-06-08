@@ -235,10 +235,7 @@ __kernel void scale_layer(__global float* data, int size)
 }
 
 
-__kernel void mse(__global const float* infs,
-                            __global const float* labels,
-                            __global float* output,
-                            int num)
+__kernel void mse(__global const float* infs, __global const float* labels, __global float* output, int num)
 {
     int bi = get_global_id(0); // batch index
     
@@ -256,7 +253,8 @@ __kernel void mse(__global const float* infs,
         sum += d * d;
     }
     
-    output[bi] = sum/2.0;
+    //output[bi] = sum/2.0;
+    output[bi] = sum/(float)num;
 }
 
 __kernel void cross_entropy_rg(__global const float* infs,

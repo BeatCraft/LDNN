@@ -315,7 +315,6 @@ class worker(object):
         #
         return ce, ret, pbty
         
-    #def loop_sa4(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
     def loop_sa4(self, w_list, wtype, n=1, atk=1000, atk_r = 0.01):
         r = self.r
         
@@ -365,8 +364,59 @@ class worker(object):
             #    lv_max = int(math.log(w_num/d, 2)) + 1
             #
         #
-        
         return 0
+        
+    def loop_sa5(self, w_list, wtype, loop=1, min=200):
+        r = self.r
+        
+        ce = self.evaluate()
+        print(self._rank, ce)
+        ret = 0
+        w_num = len(w_list)
+        d = 100
+        lv_min = 0
+        lv_max = int(math.log(w_num/d, 2)) + 1
+        
+        pbty = 0
+                
+        for j in range(n):
+            total = 0
+            for lv in range(lv_max, -1, -1):
+                div = 2**lv
+                part = 0
+                atk_flag = True
+                num = 0
+                hist = []
+                while atk_flag:
+                    ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
+                    num += 1
+                    total += ret
+                    part += ret
+                    hist.append(ret)
+                    if len(hist)>min:
+                        hist = hist[1:]
+                    #
+                    s = 0
+                    for a in hist:
+                        s += a
+                    #
+                    rate = float(s)/float(num)
+                    if self._rank==0:
+                        print(wtype, "[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", num, ")", "ce", ce, part, total, s, rate)
+                    #
+                    if num>min:
+                        if rate<0.005:
+                            atk_flag = False
+                        #
+                    #
+                #
+            #
+            if self._rank==0:
+                r.save()
+            #
+        #
+        return 0
+        
 def main():
     argvs = sys.argv
     argc = len(argvs)

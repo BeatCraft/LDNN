@@ -761,6 +761,9 @@ class Roster:
 
     def set_evaluate_mode(self, mode):
         self._eval_mode = mode
+        # 0 : CE for classification
+        # 1 : MSE for autoencoder
+        # 2 : MSE for regression
     
     def set_gpu(self, gpu):
         self._gpu = gpu
@@ -1023,10 +1026,14 @@ class Roster:
         #print("Roster::evaluate()")
         self.propagate(debug)
         #
-        if self._eval_mode==0:
+        if self._eval_mode==0: # CE for classification
             ce = self.get_cross_entropy(debug)
-        elif self._eval_mode ==1:
+        elif self._eval_mode ==1: # MSE for autoencoder
             self._gpu.mse(self.output._gpu_output, self.input._gpu_output, self._gpu_entropy, self._data_size, self._batch_size)
+            self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
+            ce = np.sum(self._batch_cross_entropy)/np.float32(self._batch_size)
+        elif self._eval_mode ==2: # MSE for regression
+            self._gpu.mse(self.output._gpu_output, self._gpu_labels, self._gpu_entropy, self._data_size, self._batch_size)
             self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
             ce = np.sum(self._batch_cross_entropy)/np.float32(self._batch_size)
         #
@@ -1110,7 +1117,7 @@ class Roster:
         #
         
     def import_weight(self, path):
-        print(("Roster : import_weight(%s)" % path))
+        print(("Roster::import_weight(%s)" % path))
         self.import_weight_index(path)
         
     def import_weight_index(self, path):

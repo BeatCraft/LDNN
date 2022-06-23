@@ -366,7 +366,7 @@ class worker(object):
         #
         return 0
         
-    def loop_sa5(self, w_list, wtype, loop=1, min=200):
+    def loop_sa5(self, idx, w_list, wtype, loop=1, min=200):
         r = self.r
         
         ce = self.evaluate()
@@ -379,7 +379,7 @@ class worker(object):
         
         pbty = 0
                 
-        for j in range(n):
+        for j in range(loop):
             total = 0
             for lv in range(lv_max, -1, -1):
                 div = 2**lv
@@ -402,10 +402,10 @@ class worker(object):
                     #
                     rate = float(s)/float(num)
                     if self._rank==0:
-                        print(wtype, "[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", num, ")", "ce", ce, part, total, s, rate)
+                        print(wtype, idx, "[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", num, ")", "ce", ce, part, total, s, rate)
                     #
                     if num>min:
-                        if rate<0.005:
+                        if num>10000 or rate<0.01:
                             atk_flag = False
                         #
                     #

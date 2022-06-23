@@ -480,5 +480,5 @@ class Train:
             #
             #r.save()
         #
-        return 0
+        return ce
     

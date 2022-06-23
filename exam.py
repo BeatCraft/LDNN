@@ -90,6 +90,7 @@ def classification(r, data_size, num_class, batch_size, batch_image, batch_label
     print(r.get_cross_entropy())
 
     print("done")
+    return float(ca) / float(batch_size)
 #
 #
 #

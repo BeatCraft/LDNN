@@ -415,7 +415,7 @@ class worker(object):
                 r.save()
             #
         #
-        return 0
+        return ce
         
 def main():
     argvs = sys.argv

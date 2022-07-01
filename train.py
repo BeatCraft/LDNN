@@ -112,19 +112,6 @@ class Train:
                     break
                 #
             #
-            #if mode>0: # heat
-            #    if w.wi<core.WEIGHT_INDEX_MAX:
-            #        #w.wi_alt = w.wi + 1
-            #        w.wi_alt = random.randint(w.wi, core.WEIGHT_INDEX_MAX)
-            #        attack_list.append(attack_i)
-            #    #
-            #else:
-            #    if w.wi>core.WEIGHT_INDEX_MIN:
-            #        #w.wi_alt = w.wi - 1
-            #        w.wi_alt = random.randint(core.WEIGHT_INDEX_MIN, w.wi)
-            #        attack_list.append(attack_i)
-            #    #
-            #
         #
         return attack_list
 
@@ -342,7 +329,16 @@ class Train:
     def multi_attack_sa4(self, ce, w_list, mode=1, div=0, pbty=0):
         r = self._r
         attack_list = self.make_attack_list(div, mode, w_list)
-       
+        #if r._gpu.type==0: # opencl
+        #    attack_list = self.make_attack_list(div, mode, w_list)
+        #elif r._gpu.type==1: # DGX
+        #    r._gpu.make_attack_list(div, w_list, result_gpu)
+        #    result_cpu = cp.asnumpy(result_gpu)
+        #    attack_list = result_cpu.tolist()
+        #else:
+        #    print("error")
+        #    pass
+        #
         llist = []
         w_num = len(attack_list)
         for i in attack_list:

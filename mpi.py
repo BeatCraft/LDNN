@@ -365,7 +365,13 @@ class worker(object):
             #
         #
         return 0
-        
+    
+    
+    def log(self, path, msg):
+        with open(path, 'a') as f:
+            print(msg, file=f)
+        #
+    
     def loop_sa5(self, idx, w_list, wtype, loop=1, min=200):
         r = self.r
         
@@ -413,6 +419,8 @@ class worker(object):
             #
             if self._rank==0:
                 r.save()
+                msg = "%d, %f" % (idx+1, ce)
+                self.log("./log.csv", msg)
             #
         #
         return ce

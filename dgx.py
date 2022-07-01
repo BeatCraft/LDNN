@@ -323,6 +323,9 @@ class Dgx(gpu.Gpu):
 
     def layer_mse(self, buf_x, buf_y, ch, w, h, batch_size):
         calc_layer_mse((batch_size,), (1,), (buf_x, buf_y, ch, w, h))
+        
+    def make_attack_list(self, div, mode, w_list, result_gpu):
+        pass
     
     
 def main():

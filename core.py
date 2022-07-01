@@ -749,6 +749,10 @@ class Roster:
     def save(self):
         print("Roster::save(%s)" % (self._path))
         self.export_weight(self._path)
+        
+    def save_as(self, path):
+        print("Roster::save(%s)" % (path))
+        self.export_weight(path)
     
     def load(self):
         print("Roster::load(%s)" % (self._path))

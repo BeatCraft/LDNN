@@ -462,7 +462,7 @@ class Train:
                         s += a
                     #
                     rate = float(s)/float(len(hist))
-                    print(wtype, "[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", num, ")", "ce", ce, part, total, "|", s, "/", len(hist), "=", rate)
+                    print("[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", num, ")", "ce", ce, part, total, "|", s, "/", len(hist), "=", rate)
                     #
                     if num>min:
                         if num>10000 or rate<0.01:

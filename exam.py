@@ -54,7 +54,8 @@ def classification(r, data_size, num_class, batch_size, batch_image, batch_label
     if left>0:
         print(("error : n(=%d) is not appropriate" % (n)))
     #
-    start_time = time.time()
+    #start_time = time.time()
+    elapsed_time = 0.0
     #
     r.prepare(n, data_size, num_class)
     data_array = np.zeros((n, data_size), dtype=np.float32)
@@ -65,7 +66,9 @@ def classification(r, data_size, num_class, batch_size, batch_image, batch_label
             class_array[j] = batch_label[i*n+j]
         #
         r.set_batch(data_size, num_class, data_array, class_array, n, 0)
+        start_time = time.time()
         r.propagate(0)
+        elapsed_time += (time.time() - start_time)
         #
         #infs = r.get_inference()
         answers = r.get_answer()
@@ -84,7 +87,7 @@ def classification(r, data_size, num_class, batch_size, batch_image, batch_label
     ca = sum(oks)
     print_result(ca, batch_size, num_class, dist, rets, oks)
     #
-    elapsed_time = time.time() - start_time
+    #elapsed_time = time.time() - start_time
     t = format(elapsed_time, "0")
     print(("time = %s" % (t)))
     print(r.get_cross_entropy())

@@ -178,7 +178,13 @@ __kernel void scale(
 {
     int i = get_global_id(0); // data index
     int j = get_global_id(1); // bathch index
-    
+    /*
+    if (x[stride*j+i]==0){
+        y[stride*j+i] = 0.0001;
+    }else{
+        y[stride*j+i] = x[stride*j+i]/max;
+    }
+    */
     y[stride*j+i] = x[stride*j+i]/max;
     
     if (debug==1){
@@ -391,7 +397,8 @@ __kernel void k_sum(__global const float* in,
     
     // relu
     if (activation==0 && sum<0.0){
-        out[num_node*bi + ni] = 0.0;
+        //out[num_node*bi + ni] = 0.0;
+        out[num_node*bi + ni] = 0.000001;
     }else{
         out[num_node*bi + ni] = sum;
     }

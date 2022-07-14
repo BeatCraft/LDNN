@@ -203,7 +203,9 @@ void calc_mac_relu(const float* x, const float* w, float* y, int size) {
     if (temp>=0){
         y[y_start] = temp;
     } else {
-        y[y_start] = 0;
+        //y[y_start] = 0;
+        //y[y_start] = 0.000001;
+        y[y_start] = temp/20;
     }
 }
 ''', 'calc_mac_relu')

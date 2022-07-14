@@ -428,7 +428,7 @@ class Train:
         #
         return 0
         
-    def loop_sa5(self, w_list, wtype, loop=1, min=100):#, atk=1000, atk_r = 0.01):
+    def loop_sa5(self, idx, w_list, wtype, loop=1, min=100):#, atk=1000, atk_r = 0.01):
         r = self._r
         
         ce = self.evaluate()
@@ -439,42 +439,36 @@ class Train:
         lv_max = int(math.log(w_num/d, 2)) + 1
         
         pbty = 0
-
-        for j in range(loop):
-            total = 0
-            for lv in range(lv_max, -1, -1):
-                div = 2**lv
-                part = 0
-                atk_flag = True
-                num = 0
-                hist = []
-                while atk_flag:
-                    ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
-                    num += 1
-                    total += ret
-                    part += ret
-                    hist.append(ret)
-                    if len(hist)>min:
-                        hist = hist[1:]
-                    #
-                    s = 0
-                    for a in hist:
-                        s += a
-                    #
-                    rate = float(s)/float(len(hist))
-                    print("[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", num, ")", "ce", ce, part, total, "|", s, "/", len(hist), "=", rate)
-                    #
-                    if num>min:
-                        if num>10000 or rate<0.01:
-                            atk_flag = False
-                        #elif float(part)/float(num)<0.01:
-                        #    atk_flag = False
-                        #
+        total = 0
+        for lv in range(lv_max, -1, -1):
+            div = 2**lv
+            part = 0
+            atk_flag = True
+            num = 0
+            hist = []
+            while atk_flag:
+                ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
+                num += 1
+                total += ret
+                part += ret
+                hist.append(ret)
+                if len(hist)>min:
+                    hist = hist[1:]
+                #
+                s = 0
+                for a in hist:
+                    s += a
+                #
+                rate = float(s)/float(len(hist))
+                print("[", idx, "]", wtype, lv,"/", lv_max, "|", div, "(", num, ")", "ce", ce, part, total, "|", s, "/", len(hist), "=", rate)
+                #
+                if num>min:
+                    if num>10000 or rate<0.01:
+                        atk_flag = False
                     #
                 #
-                r.save()
             #
-            #r.save()
+            r.save()
         #
         return ce
     

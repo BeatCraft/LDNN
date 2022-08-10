@@ -419,8 +419,8 @@ class worker(object):
             #
             if self._rank==0:
                 r.save()
-                msg = "%d, %f" % (idx+1, ce)
-                self.log("./log.csv", msg)
+                #msg = "%d, %f" % (idx+1, ce)
+                #self.log("./log.csv", msg)
             #
         #
         return ce

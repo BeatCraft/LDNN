@@ -783,12 +783,12 @@ class Roster:
         self._labels = np.zeros((batch_size, num_class), dtype=np.float32)
         #self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float64)
         if self._gpu:
-            if self._gpu.type==0:
+            if self._gpu.type==0: # OpenCL
                 self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
                 self._gpu_input = self._gpu.dev_malloc(self._batch_data)
                 self._gpu_labels = self._gpu.dev_malloc(self._labels)
                 self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
-            elif self._gpu.type==1:
+            elif self._gpu.type==1: # GDX
                 self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float64)
                 self._gpu_input = self._gpu.allocateArray(self._batch_data)
                 self._gpu_labels = self._gpu.allocateArray(self._labels)

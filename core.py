@@ -743,6 +743,7 @@ class Roster:
         self._eval_mode = 0
         self._path = ""
         self._scale_input = 0
+        self.mem_save = 1
         
     def set_path(self, path):
         self._path = path
@@ -790,7 +791,9 @@ class Roster:
                 self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
             elif self._gpu.type==1: # GDX
                 self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float64)
-                self._gpu_input = self._gpu.allocateArray(self._batch_data)
+                if self.mem_save==0:
+                    self._gpu_input = self._gpu.allocateArray(self._batch_data)
+                #
                 self._gpu_labels = self._gpu.allocateArray(self._labels)
                 self._gpu_entropy = self._gpu.allocateArray(self._batch_cross_entropy)
             #
@@ -840,10 +843,16 @@ class Roster:
                 pass
             elif self._scale_input==1:
                 #print("OK")
-                self._gpu_input = self._gpu.allocateArray(data)
-                self._gpu_labels = self._gpu.allocateArray(label)
-                self._gpu_input = self._gpu_input / 255.0
-                self.input._gpu_output = self._gpu_input
+                if self.mem_save==0:
+                    self._gpu_input = self._gpu.allocateArray(data)
+                    self._gpu_labels = self._gpu.allocateArray(label)
+                    self._gpu_input = self._gpu_input / 255.0
+                    self.input._gpu_output = self._gpu_input
+                else:
+                    self._gpu_labels = self._gpu.allocateArray(label)
+                    #temp = self._gpu.allocateArray(data)
+                    temp = data / 255.0
+                    self.input._gpu_output = self._gpu.allocateArray(temp)
             else:
                 return
             #

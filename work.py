@@ -374,6 +374,7 @@ class worker(object):
     
     def loop_sa5(self, idx, w_list, wtype, loop=1, min=200):
         r = self.r
+        base = 2.0 # 1.25, 2.0
         
         ce = self.evaluate()
         print(self._rank, ce)
@@ -381,14 +382,15 @@ class worker(object):
         w_num = len(w_list)
         d = 100
         lv_min = 0
-        lv_max = int(math.log(w_num/d, 2)) + 1
-        
+        lv_max = int(math.log(w_num/d, base)) + 1
         pbty = 0
-                
+        rec = [0] * 10
+        
         for j in range(loop):
             total = 0
+            rec = [0] * lv_max
             for lv in range(lv_max, -1, -1):
-                div = 2**lv
+                div = base**lv
                 part = 0
                 atk_flag = True
                 num = 0
@@ -415,12 +417,16 @@ class worker(object):
                             atk_flag = False
                         #
                     #
-                #
+                # while
+                rec[lv] = part
             #
             if self._rank==0:
                 r.save()
                 #msg = "%d, %f" % (idx+1, ce)
                 #self.log("./log.csv", msg)
+            #
+            if lv_max>8 and rec[0]==0:
+                lv_max = lv_max -1
             #
         #
         return ce

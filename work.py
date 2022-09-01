@@ -17,6 +17,11 @@ import train
 
 sys.setrecursionlimit(10000)
 
+def output(path, msg):
+    with open(path, 'a') as f:
+        print(msg, file=f)
+    #
+
 class worker(object):
     def __init__(self, com, rank, size, r):
         self._com = com
@@ -372,25 +377,34 @@ class worker(object):
             print(msg, file=f)
         #
     
-    def loop_sa5(self, idx, w_list, wtype, loop=1, min=200):
+    def loop_sa5(self, idx, w_list, wtype, loop=1, min=200, base=2.0, debug=0):
         r = self.r
-        base = 2.0 # 1.25, 2.0
-        
+        #base = 2.0 # 1.25, 2.0
+        base_min = 1
+        if base ==2.0:
+            base_min = 3
+        elif base==1.5:
+            base_min = 5
+        elif base==1.1:
+            base_min = 8
+        #
+
         ce = self.evaluate()
         print(self._rank, ce)
         ret = 0
         w_num = len(w_list)
         d = 100
-        lv_min = 0
+        #lv_min = 0
         lv_max = int(math.log(w_num/d, base)) + 1
+        lv_min = int(lv_max/10) + 1
         pbty = 0
-        rec = [0] * 10
+        #rec = [0] * lv_max 
         
         for j in range(loop):
             total = 0
-            rec = [0] * lv_max
+            rec = [0] * (lv_max+1)
             for lv in range(lv_max, -1, -1):
-                div = base**lv
+                div = int(base**lv)
                 part = 0
                 atk_flag = True
                 num = 0
@@ -418,14 +432,21 @@ class worker(object):
                         #
                     #
                 # while
+                #print(lv, part)
                 rec[lv] = part
-            #
+            # for lv
             if self._rank==0:
                 r.save()
                 #msg = "%d, %f" % (idx+1, ce)
                 #self.log("./log.csv", msg)
+                if debug==1:
+                    log = "%d, %s" % (j+1, '{:.10g}'.format(ce))
+                    output("./log.csv", log)
+                    spath = "./wi/wi-%04d.csv" % (j+1)
+                    r.save_as(spath)
+                #
             #
-            if lv_max>8 and rec[0]==0:
+            if lv_max>lv_min and rec[lv_max]==0:
                 lv_max = lv_max -1
             #
         #

@@ -45,8 +45,6 @@ void calc_cnn_max(
     const int h)
 {
     //int bi = blockDim.x;
-    //int x = blockIdx.x;
-    //int y = blockIdx.y;
     int bi = blockIdx.x;
     int x = threadIdx.x;
     int y = threadIdx.y;
@@ -225,6 +223,24 @@ void cals_layer_scale(float* x, int size) {
     if (temp>0.0){
         for (int i=0;i<size;i++){
             x[x_start+i] = x[x_start+i] / temp;
+        }
+    }
+}
+''', 'cals_layer_scale')
+
+cals_layer_scale2 = cp.RawKernel(r'''
+extern "C" __global__
+void cals_layer_scale(float* x, int size) {
+    float temp = 0.0;
+    for (int i=0;i<size;i++){
+        if (x[i]>temp){
+            temp = x[i];
+        }
+    }
+
+    if (temp>0.0){
+        for (int i=0;i<size;i++){
+            x[i] = x[i] / temp;
         }
     }
 }

@@ -409,7 +409,13 @@ class worker(object):
                 atk_flag = True
                 num = 0
                 hist = []
+                #
+                # update w_list here?
+                #
                 while atk_flag:
+                    #
+                    # update w_list here?
+                    #
                     ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
                     num += 1
                     total += ret
@@ -451,7 +457,229 @@ class worker(object):
             #
         #
         return ce
+
+
+    def multi_attack_sa_cnn(self, ce, fc_w_list, cnn_w_list, fc_atk_num, cnn_atk_num):
+        r = self.r
+        mode = 0
+        #
+        if self._rank==0:
+            #attack_list = self.train.make_attack_list(div, mode, w_list)
+            fc_attack_list = self.train.make_attack_list(fc_atk_num, mode, fc_w_list)
+            cnn_attack_list = self.train.make_attack_list(cnn_atk_num, mode, cnn_w_list)
+            #attack_list = fc_attack_list + cnn_attack_list
+            
+            alt_list = []
+            for i in attack_list:
+                w = w_list[i]
+                alt_list.append(w.wi_alt)
+            #
+        else:
+            attack_list = []
+            alt_list = []
+        #
+        attack_list = self._com.bcast(attack_list, root=0)
+        alt_list = self._com.bcast(alt_list, root=0)
+
+        idx = 0
+        for i in attack_list:
+            w = w_list[i]
+            w.wi_alt = alt_list[idx]
+            idx += 1
+        #
+
+        llist = []
+        for i in attack_list:
+            w = w_list[i]
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
         
+        for li in llist:
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+
+        ce_alt = self.evaluate()
+        ret = 0
+        
+        if ce_alt<ce:
+            ce = ce_alt
+            ret = 1
+            for i in attack_list:
+                w = w_list[i]
+                w.wi = w.wi_alt
+            #
+        else:
+            delta = abs(ce_alt - ce)
+            if pbty>3: # 2, 3?
+                diff = math.log10(delta) - math.log10(ce)
+                limit = -1.0 # - 1.0/(1.0+math.log(div, 2))
+                print(diff, limit)
+                if (diff < limit):
+                    #
+                    print(self._rank, "RESET", diff, limit)
+                    #
+                    ce = ce_alt
+                    ret = 1
+                    pbty = 0
+                #
+            #
+        #
+
+        if ret==0:
+            self.train.undo_attack(w_list, attack_list)
+        #
+        return ce, ret, pbty
+        
+    def loop_sa_cnn(self, idx, fc_w_list, cnn_w_list, debug=0):
+        r = self.r
+        ce = self.evaluate()
+        print(self._rank, ce)
+        
+        fc_num = len(fc_w_list)
+        cnn_num = len(cnn_w_list)
+        
+        ret = 0
+        t_max = 100
+        for t in range(t_max, -1, -1):
+            total = 0
+            rec = [0] * (t_max+1)
+            hist = []
+            fc_atk_num = int(fc_num*0.01*(float(t)/100.0))
+            cnn_atk_num = int(cnn_num*0.01*(float(t)/100.0))
+            if fc_atk_num<1:
+                fc_atk_num = 1
+            #
+            if cnn_atk_num<1:
+                cnn_atk_num = 1
+            #
+            
+            while atk_flag:
+                if self._rank==0:
+                    fc_attack_list = self.train.make_attack_list(fc_atk_num, 0, fc_w_list)
+                    cnn_attack_list = self.train.make_attack_list(cnn_atk_num, 0, cnn_w_list)
+                    fc_alt_list = []
+                    for i in fc_attack_list:
+                        w = fc_attack_list[i]
+                        fc_alt_list.append(w.wi_alt)
+                    #
+                    cnn_alt_list = []
+                    for i in cnn_attack_list:
+                        w = cnn_attack_list[i]
+                        cnn_alt_list.append(w.wi_alt)
+                    #
+                else:
+                    fc_attack_list = []
+                    cnn_attack_list = []
+                    fc_alt_list = []
+                    cnn_alt_list = []
+                #
+                fc_attack_list = self._com.bcast(fc_attack_list, root=0)
+                cnn_attack_list = self._com.bcast(cnn_attack_list, root=0)
+                fc_alt_list = self._com.bcast(fc_alt_list, root=0)
+                cnn_alt_list = self._com.bcast(cnn_alt_list, root=0)
+                
+                idx = 0
+                for i in fc_attack_list:
+                    w = fc_w_list[i]
+                    w.wi_alt = fc_alt_list[idx]
+                    idx += 1
+                #
+                
+                idx = 0
+                for i in cnn_attack_list:
+                    w = cnn_w_list[i]
+                    w.wi_alt = cnn_alt_list[idx]
+                    idx += 1
+                #
+                
+                llist = []
+                for i in fc_attack_list:
+                    w = fc_w_list[i]
+                    layer = r.get_layer_at(w.li)
+                    layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+                    if w.li in llist:
+                        pass
+                    else:
+                        llist.append(w.li)
+                    #
+                #
+                
+                for i in cnn_attack_list:
+                    w = cnn_w_list[i]
+                    layer = r.get_layer_at(w.li)
+                    layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+                    if w.li in llist:
+                        pass
+                    else:
+                        llist.append(w.li)
+                    #
+                #
+    
+                for li in llist:
+                    layer = r.get_layer_at(li)
+                    layer.update_weight()
+                #
+
+                ce_alt = self.evaluate()
+                ret = 0
+                if ce_alt<=ce:
+                    ret = 1
+                    ce = ce_alt
+                    for i in fc_attack_list:
+                        w = w_list[i]
+                        w.wi = w.wi_alt
+                    #
+                    for i in cnn_attack_list:
+                        w = w_list[i]
+                        w.wi = w.wi_alt
+                    #
+                else:
+                    self.train.undo_attack(fc_w_list, fc_attack_list)
+                    self.train.undo_attack(cnn_w_list, cnn_attack_list)
+                #
+                
+                num += 1
+                total += ret
+                part += ret
+                hist.append(ret)
+                if len(hist)>min:
+                    hist = hist[1:]
+                #
+                s = 0
+                for a in hist:
+                    s += a
+                #
+                rate = float(s)/float(num)
+                if self._rank==0:
+                    print("[", idx,"]", t, "/", t_max, "|", "(", num, ")", "ce", ce, part, total, s, rate)
+                #
+                if num>min:
+                    if num>10000 or rate<0.01:
+                        atk_flag = False
+                    #
+                #
+            # while
+            rec[t] = part
+        # for t
+        if self._rank==0:
+            r.save()
+            if debug==1:
+                log = "%d, %s" % (j+1, '{:.10g}'.format(ce))
+                output("./log.csv", log)
+                spath = "./wi/wi-%04d.csv" % (j+1)
+                r.save_as(spath)
+            #
+        #
+        return ce
+
+
 def main():
     argvs = sys.argv
     argc = len(argvs)

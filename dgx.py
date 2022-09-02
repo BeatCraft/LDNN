@@ -228,23 +228,30 @@ void cals_layer_scale(float* x, int size) {
 }
 ''', 'cals_layer_scale')
 
-cals_layer_scale2 = cp.RawKernel(r'''
+cals_layer_normalize = cp.RawKernel(r'''
 extern "C" __global__
-void cals_layer_scale(float* x, int size) {
-    float temp = 0.0;
-    for (int i=0;i<size;i++){
-        if (x[i]>temp){
-            temp = x[i];
-        }
-    }
+void cals_layer_normalize(float* x, int size) {
+    int x_start = size * blockIdx.x;
 
-    if (temp>0.0){
-        for (int i=0;i<size;i++){
-            x[i] = x[i] / temp;
-        }
+    float u = 0.0;
+    float s = 0.0;
+    
+    for (int i=0;i<size;i++){
+        u += x[x_start+i];
+    }
+    u = u / float(size);
+
+    for (int i=0;i<size;i++){
+        s += (x[x_start+i] - u)*(x[x_start+i] - u);
+    }
+    s = s / float(size);
+    s = sqrtf(s + 0.000001);
+    
+    for (int i=0;i<size;i++){
+        x[x_start+i] = (x[x_start+i] - u) / s;
     }
 }
-''', 'cals_layer_scale')
+''', 'cals_layer_normalize')
 
 calc_softmax = cp.RawKernel(r'''
 extern "C" __global__
@@ -317,7 +324,10 @@ class Dgx(gpu.Gpu):
 
     def layerScale(self, buf, size_batch, size_node):
         cals_layer_scale((size_batch,), (1,), (buf, size_node))
-
+        
+    def layerNormalize(self, buf, size_batch, size_node):
+        cals_layer_normalize((size_batch,), (1,), (buf, size_node))
+        
     def mac(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input):
         calc_mac((size_batch,), (size_node,), (buf_x, buf_w, buf_y, size_input))
 

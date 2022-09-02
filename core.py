@@ -311,8 +311,10 @@ class HiddenLayer(Layer):
             elif self._gpu.type==1:
                 self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input)
                 #self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
-                mx = cp.max(self._gpu_output)
-                self._gpu_output = self._gpu_output/mx
+                self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
+                self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
+                #mx = cp.max(self._gpu_output)
+                #self._gpu_output = self._gpu_output/mx
                 if debug:
                     print("hidden", self._index)
                     darray = cp.asnumpy(self._gpu_output)
@@ -700,11 +702,14 @@ class Conv_4_Layer(Layer):
                 #
                 #return
 
-                mx = cp.max(self._gpu_output)
-                self._gpu_output = self._gpu_output/mx
+                #mx = cp.max(self._gpu_output)
+                #self._gpu_output = self._gpu_output/mx
 
                 ##self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
                 #self._gpu.layerScale(self._gpu_output, self._batch_size, size)
+                
+                self._gpu.layerNormalize(self._gpu_output, self._batch_size, size)
+                self._gpu.layerScale(self._gpu_output, self._batch_size, size)
                 if debug:
                     print("conv, scale", self._index)
                     darray = cp.asnumpy(self._gpu_output)

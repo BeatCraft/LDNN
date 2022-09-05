@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import math
+import random
 #
 from mpi4py import MPI
 #import cupy as cp
@@ -537,41 +538,46 @@ class worker(object):
         #
         return ce, ret, pbty
         
-    def loop_sa_cnn(self, idx, fc_w_list, cnn_w_list, debug=0):
+    def loop_sa_cnn(self, loop, fc_w_list, cnn_w_list, debug=0):
         r = self.r
         ce = self.evaluate()
         print(self._rank, ce)
+        min=200
         
         fc_num = len(fc_w_list)
         cnn_num = len(cnn_w_list)
         
         ret = 0
-        t_max = 100
+        t_max = 10
         for t in range(t_max, -1, -1):
             total = 0
             rec = [0] * (t_max+1)
             hist = []
-            fc_atk_num = int(fc_num*0.01*(float(t)/100.0))
-            cnn_atk_num = int(cnn_num*0.01*(float(t)/100.0))
-            if fc_atk_num<1:
-                fc_atk_num = 1
+            #fc_atk_num = random.randint(0, 100)#int(fc_num*0.01*(float(t)/100.0))
+            #cnn_atk_num = random.randint(0, 10)#int(cnn_num*0.01*(float(t)/100.0))
+            #if fc_atk_num<1:
+            #    fc_atk_num = 1
             #
-            if cnn_atk_num<1:
-                cnn_atk_num = 1
+            #if cnn_atk_num<1:
+            #    cnn_atk_num = 1
             #
-            
+            atk_flag = True
+            part = 0
+            num = 0
             while atk_flag:
                 if self._rank==0:
+                    fc_atk_num = t#random.randint(1, 10)
+                    cnn_atk_num = 1#random.randint(1, 10)
                     fc_attack_list = self.train.make_attack_list(fc_atk_num, 0, fc_w_list)
                     cnn_attack_list = self.train.make_attack_list(cnn_atk_num, 0, cnn_w_list)
                     fc_alt_list = []
                     for i in fc_attack_list:
-                        w = fc_attack_list[i]
+                        w = fc_w_list[i]
                         fc_alt_list.append(w.wi_alt)
                     #
                     cnn_alt_list = []
                     for i in cnn_attack_list:
-                        w = cnn_attack_list[i]
+                        w = cnn_w_list[i]
                         cnn_alt_list.append(w.wi_alt)
                     #
                 else:
@@ -633,11 +639,11 @@ class worker(object):
                     ret = 1
                     ce = ce_alt
                     for i in fc_attack_list:
-                        w = w_list[i]
+                        w = fc_w_list[i]
                         w.wi = w.wi_alt
                     #
                     for i in cnn_attack_list:
-                        w = w_list[i]
+                        w = cnn_w_list[i]
                         w.wi = w.wi_alt
                     #
                 else:
@@ -658,7 +664,8 @@ class worker(object):
                 #
                 rate = float(s)/float(num)
                 if self._rank==0:
-                    print("[", idx,"]", t, "/", t_max, "|", "(", num, ")", "ce", ce, part, total, s, rate)
+                    #print("[", idx,"]", t, "/", t_max, "|", "(", num, ")", "[fc:", fc_atk_num,"]", "[cnn:", cnn_atk_num,"]", "ce", ce, part, total, s)
+                    print("[%d] %d/%d (%d) [fc:%03d][cnn:%03d] ce %09f (%d, %d, %d)" %(loop, t, t_max, num, fc_atk_num, cnn_atk_num, ce, part, total, s))
                 #
                 if num>min:
                     if num>10000 or rate<0.01:
@@ -671,9 +678,9 @@ class worker(object):
         if self._rank==0:
             r.save()
             if debug==1:
-                log = "%d, %s" % (j+1, '{:.10g}'.format(ce))
+                log = "%d, %s" % (loop+1, '{:.10g}'.format(ce))
                 output("./log.csv", log)
-                spath = "./wi/wi-%04d.csv" % (j+1)
+                spath = "./wi/wi-%04d.csv" % (loop+1)
                 r.save_as(spath)
             #
         #

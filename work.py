@@ -685,6 +685,119 @@ class worker(object):
             #
         #
         return ce
+        
+    def loop_sa_20(self, loop, w_list, debug=0):
+        r = self._r
+        ce = self.evaluate()
+        print(ce)
+        
+        min=200
+        w_num = len(w_list)
+        ret = 0
+        t_max = 100
+        for t in range(t_max, 0, -1):
+            total = 0
+            rec = [0] * (t_max+1)
+            hist = []
+
+            atk_flag = True
+            part = 0
+            num = 0
+            while atk_flag:
+                if self._rank==0:
+                    atk_num = random.randint(1, t)
+                    attack_list = self.make_attack_list(atk_num, 0, w_list)
+                    alt_list = []
+                    for i in attack_list:
+                        w =w_list[i]
+                        alt_list.append(w.wi_alt)
+                    #
+   
+                    idx = 0
+                    for i in attack_list:
+                        w = w_list[i]
+                        w.wi_alt = alt_list[idx]
+                        idx += 1
+                    #
+                else:
+                    attack_list = []
+                    alt_list = []
+                #
+                attack_list = self._com.bcast(attack_list, root=0)
+                alt_list = self._com.bcast(alt_list, root=0)
+                #
+                #
+                llist = []
+                for i in attack_list:
+                    w = w_list[i]
+                    layer = r.get_layer_at(w.li)
+                    layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+                    if w.li in llist:
+                        pass
+                    else:
+                        llist.append(w.li)
+                    #
+                #
+                
+                for li in llist:
+                    layer = r.get_layer_at(li)
+                    layer.update_weight()
+                #
+
+                ce_alt = self.evaluate()
+                ret = 0
+                if ce_alt<=ce:
+                    ret = 1
+                    ce = ce_alt
+                    for i in attack_list:
+                        w = w_list[i]
+                        w.wi = w.wi_alt
+                    #
+                else:
+                    delta = ce_alt - ce
+                    hit = self.random_hit(delta, t)
+                    if hit==1:
+                        ret = 1
+                        ce = ce_alt
+                    else:
+                        ret = 0
+                        self.undo_attack(w_list, attack_list)
+                    #
+                #
+                
+                num += 1
+                total += ret
+                part += ret
+                hist.append(ret)
+                if len(hist)>min:
+                    hist = hist[1:]
+                #
+                s = 0
+                for a in hist:
+                    s += a
+                #
+                rate = float(s)/float(num)
+                if self._rank==0:
+                    print("[%d] %d/%d (%d) [fc:%03d] ce %09f (%d, %d, %d) %f" %(loop, t, t_max, num, atk_num, ce, part, total, s, rate))
+                #
+                if num>min:
+                    if num>10000 or rate<0.01:
+                        atk_flag = False
+                    #
+                #
+            # while
+            rec[t] = part
+        # for t
+        if self._rank==0:
+            r.save()
+            if debug==1:
+                log = "%d, %s" % (loop+1, '{:.10g}'.format(ce))
+                output("./log.csv", log)
+                spath = "./wi/wi-%04d.csv" % (loop+1)
+                r.save_as(spath)
+            #
+        #
+        return ce
 
 
 def main():

@@ -490,7 +490,7 @@ class Train:
         w_num = len(w_list)
         ret = 0
         t_max = 100
-        for t in range(t_max, -1, -1):
+        for t in range(t_max, 0, -1):
             total = 0
             rec = [0] * (t_max+1)
             hist = []
@@ -542,12 +542,10 @@ class Train:
                     #
                 else:
                     delta = ce_alt - ce
-                    
                     hit = self.random_hit(delta, t)
                     if hit==1:
                         ret = 1
                         ce = ce_alt
-                        #print(" d=", delta)
                     else:
                         ret = 0
                         self.undo_attack(w_list, attack_list)

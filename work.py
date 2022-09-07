@@ -138,117 +138,13 @@ class worker(object):
         #
 
         return ce, ret
-        
-    #def loop_k(self, w_list, wtype, m, n=1):
-    def loop_k(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
-        r = self.r
-        
-        ce = self.evaluate()
-        print(self._rank, ce)
-        ret = 0
-        w_num = len(w_list)
-        d = 100
-        lv_min = 0
-        lv_max = int(math.log(w_num/d, 2)) + 1
-        #atk = 50
-        
-        
-        for j in range(n):
-            total = 0
-            #for lv in range(lv_min, lv_max+1):
-            #    div = 2**lv
-            #    total = 0
-            #    for i in range(atk - int(atk*atk_r*lv)):
-            #        ce, ret = self.multi_attack(ce, w_list, 1, div)
-            #        total += ret
-            #        if self._rank==0:
-            #            print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
-            #        #
-            #    #
-            #
-           
-            for lv in range(lv_max, -1, -1):
-                div = 2**lv
-                total = 0
-                #for i in range(atk - int(atk*atk_r*lv)):
-                i = 0
-                while 1:
-                    ce, ret = self.multi_attack(ce, w_list, 0, div)
-                    total += ret
-                    if self._rank==0:
-                        print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
-                    #
-                    
-                    if i>atk:
-                        if float(total)/float(i)<0.1:
-                            break;
-                        #
-                    #
-                    i += 1
-                    if i>=1000:
-                        break;
-                    #
-                # while
-            #
-            if self._rank==0:
-                r.save()
-            #
+
+    def log(self, path, msg):
+        with open(path, 'a') as f:
+            print(msg, file=f)
         #
-        
-        return 0
-        
-    def loop_sa(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
-        r = self.r
-        
-        ce = self.evaluate()
-        print(self._rank, ce)
-        ret = 0
-        w_num = len(w_list)
-        d = 100
-        lv_min = 0
-        lv_max = int(math.log(w_num/d, 2)) + 1
-        
-        for j in range(n):
-            for lv in range(lv_max, -1, -1):
-                div = 2**lv
-                total = 0
-                part = 0
-                i = 0
-                k = 0
-                flag = 1
-                while flag:
-                    ce, ret = self.multi_attack(ce, w_list, 0, div)
-                    total += ret
-                    part += ret
-                    if self._rank==0:
-                        print(m, wtype, "[", j, "] lv", lv, div, "(", i, ")", "ce", ce, total)
-                    #
-                    if k>atk:
-                        tr = float(total)/float(i)
-                        pr = float(part)/float(k)
-                        if tr<0.05 and pr<0.05:
-                            flag = 0
-                            #
-                            # refreash here if needed
-                            #
-                        else:
-                            if i>=atk*20:
-                                flag = 0
-                            #
-                        #
-                    #
-                    i += 1
-                    k += 1
-                # while
-            #
-            if self._rank==0:
-                r.save()
-            #
-        #
-        return 0
-        
-    #def multi_attack_sa4(self, ce, w_list, mode, div):
-    def multi_attack_sa4(self, ce, w_list, mode=1, div=0, pbty=0):
+    
+    def multi_attack_sa5(self, ce, w_list, mode=1, div=0):
         r = self.r
         #
         if self._rank==0:
@@ -300,106 +196,37 @@ class worker(object):
                 w.wi = w.wi_alt
             #
         else:
-            delta = abs(ce_alt - ce)
-            if pbty>3: # 2, 3?
-                diff = math.log10(delta) - math.log10(ce)
-                limit = -1.0 # - 1.0/(1.0+math.log(div, 2))
-                print(diff, limit)
-                if (diff < limit):
-                    #
-                    print(self._rank, "RESET", diff, limit)
-                    #
-                    ce = ce_alt
-                    ret = 1
-                    pbty = 0
-                #
+            delta = ce_alt - ce
+            if self._rank==0:
+                hit = self.train.random_hit(delta, div)
+            else:
+                hit = 0
+            #
+            hit = self._com.bcast(hit, root=0)
+            if hit==1:
+                ret = 1
+                ce = ce_alt
+            else:
+                ret = 0
+                #self.undo_attack(w_list, attack_list)
             #
         #
 
         if ret==0:
             self.train.undo_attack(w_list, attack_list)
         #
-        return ce, ret, pbty
+        return ce, ret
         
-    def loop_sa4(self, w_list, wtype, n=1, atk=1000, atk_r = 0.01):
-        r = self.r
-        
-        ce = self.evaluate()
-        print(self._rank, ce)
-        ret = 0
-        w_num = len(w_list)
-        d = 100
-        lv_min = 0
-        lv_max = int(math.log(w_num/d, 2)) + 1
-        
-        pbty = 0
-                
-        for j in range(n):
-            total = 0
-            for lv in range(lv_max, -1, -1):
-                div = 2**lv
-                part = 0
-                #i = 0
-                #k = 0
-                #flag = 1
-                #while flag:
-                for i in range(atk):
-                    #ce, ret = self.multi_attack(ce, w_list, 0, div)
-                    ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
-                    total += ret
-                    part += ret
-                    if self._rank==0:
-                        #print(m, wtype, "[", j, "] lv", lv, div, "(", i, ")", "ce", ce, total)
-                        print(wtype, "[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", i, ")", "ce", ce, part, total, pbty)
-                    #
-                #
-                rate = float(part)/float(atk)
-                if rate<atk_r:
-                    lv_max -= 1
-                    pbty += 1
-                    if lv_max<2:
-                        lv_max = 2
-                        #pbty += 1
-                    #
-                #
-            #
-            if self._rank==0:
-                r.save()
-            #
-            #if j>0 and j%100==0:
-            #    lv_max = int(math.log(w_num/d, 2)) + 1
-            #
-        #
-        return 0
-    
-    
-    def log(self, path, msg):
-        with open(path, 'a') as f:
-            print(msg, file=f)
-        #
-    
     def loop_sa5(self, idx, w_list, wtype, loop=1, min=200, base=2.0, debug=0):
         r = self.r
-        #base = 2.0 # 1.25, 2.0
-        base_min = 1
-        if base ==2.0:
-            base_min = 3
-        elif base==1.5:
-            base_min = 5
-        elif base==1.1:
-            base_min = 8
-        #
-
+        
         ce = self.evaluate()
         print(self._rank, ce)
         ret = 0
         w_num = len(w_list)
         d = 100
-        #lv_min = 0
         lv_max = int(math.log(w_num/d, base)) + 1
         lv_min = int(lv_max/10) + 1
-        pbty = 0
-        #rec = [0] * lv_max 
         
         for j in range(loop):
             total = 0
@@ -410,14 +237,9 @@ class worker(object):
                 atk_flag = True
                 num = 0
                 hist = []
-                #
-                # update w_list here?
-                #
+                
                 while atk_flag:
-                    #
-                    # update w_list here?
-                    #
-                    ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
+                    ce, ret = self.multi_attack_sa5(ce, w_list, 0, div) # lv
                     num += 1
                     total += ret
                     part += ret
@@ -431,7 +253,9 @@ class worker(object):
                     #
                     rate = float(s)/float(num)
                     if self._rank==0:
-                        print(wtype, idx, "[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", num, ")", "ce", ce, part, total, s, rate)
+                        print(wtype, idx, "[", j, "]", lv,"/", lv_max, "|", div, "(", num, ")", "ce", ce, part, total, s, rate)
+                    else:
+                        pass
                     #
                     if num>min:
                         if num>10000 or rate<0.01:
@@ -439,19 +263,20 @@ class worker(object):
                         #
                     #
                 # while
-                #print(lv, part)
                 rec[lv] = part
+                print("rank : ", self._rank)
             # for lv
+            print(self._rank, lv_max, lv_min)
             if self._rank==0:
                 r.save()
-                #msg = "%d, %f" % (idx+1, ce)
-                #self.log("./log.csv", msg)
                 if debug==1:
                     log = "%d, %s" % (j+1, '{:.10g}'.format(ce))
                     output("./log.csv", log)
                     spath = "./wi/wi-%04d.csv" % (j+1)
                     r.save_as(spath)
                 #
+            else:
+                print("rank : ", self._rank)
             #
             if lv_max>lv_min and rec[lv_max]==0:
                 lv_max = lv_max -1
@@ -687,15 +512,15 @@ class worker(object):
         return ce
         
     def loop_sa_20(self, loop, w_list, debug=0):
-        r = self._r
+        r = self.r
         ce = self.evaluate()
         print(ce)
         
         min=200
         w_num = len(w_list)
         ret = 0
-        t_max = 100
-        for t in range(t_max, 0, -1):
+        t_max = 1000
+        for t in range(t_max, 0, -10):
             total = 0
             rec = [0] * (t_max+1)
             hist = []
@@ -706,7 +531,7 @@ class worker(object):
             while atk_flag:
                 if self._rank==0:
                     atk_num = random.randint(1, t)
-                    attack_list = self.make_attack_list(atk_num, 0, w_list)
+                    attack_list = self.train.make_attack_list(atk_num, 0, w_list)
                     alt_list = []
                     for i in attack_list:
                         w =w_list[i]
@@ -755,13 +580,18 @@ class worker(object):
                     #
                 else:
                     delta = ce_alt - ce
-                    hit = self.random_hit(delta, t)
+                    if self._rank==0:
+                        hit = self.train.random_hit(delta, t)
+                    else:
+                        hit = 0
+                    #
+                    hit = self._com.bcast(hit, root=0)
                     if hit==1:
                         ret = 1
                         ce = ce_alt
                     else:
                         ret = 0
-                        self.undo_attack(w_list, attack_list)
+                        self.train.undo_attack(w_list, attack_list)
                     #
                 #
                 

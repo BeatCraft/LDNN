@@ -311,7 +311,7 @@ class HiddenLayer(Layer):
             elif self._gpu.type==1:
                 self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input)
                 #self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
-                self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
+                #self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
                 self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
                 #mx = cp.max(self._gpu_output)
                 #self._gpu_output = self._gpu_output/mx

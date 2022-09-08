@@ -268,8 +268,8 @@ class HiddenLayer(Layer):
 
         if self._gpu:
             if self._gpu.type==0:
-                self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
-                self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
+                #self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
+                #self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
             elif self._gpu.type==1:
                 #self._gpu_product = self._gpu.allocateArray(self._product_matrix)
@@ -297,12 +297,13 @@ class HiddenLayer(Layer):
 
         if self._gpu:
             if self._gpu.type==0:
-                self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
-                                                self._batch_size, stride_1, stride_2,
-                                                self._num_input, self._num_node)
-                self._gpu.sum(self._gpu_product, self._gpu_output, self._num_input, self._num_node, activation, self._batch_size)
-                if self._scale:
-                    self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
+                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 1)
+                #self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
+                #                                self._batch_size, stride_1, stride_2,
+                #                                self._num_input, self._num_node)
+                #self._gpu.sum(self._gpu_product, self._gpu_output, self._num_input, self._num_node, activation, self._batch_size)
+                #if self._scale:
+                self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
                 #
                 if debug:
                     print("hidden", self._index)
@@ -310,9 +311,9 @@ class HiddenLayer(Layer):
                     print((self._output_array[0]))
                 #
             elif self._gpu.type==1:
-                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input)
+                self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 1)
                 self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
-                #self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
+                self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
                 #mx = cp.max(self._gpu_output)
                 #self._gpu_output = self._gpu_output/mx
                 if debug:
@@ -350,8 +351,8 @@ class OutputLayer(Layer):
         
         if self._gpu:
             if self._gpu.type==0:
-                self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
-                self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
+                #self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
+                #self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
                 self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
             elif self._gpu.type==1:
@@ -382,11 +383,12 @@ class OutputLayer(Layer):
 
         if self._gpu:
             if self._gpu.type==0: # OpenCL
-                self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
-                                                self._batch_size, stride_1, stride_2,
-                                                self._num_input, self._num_node)
-                self._gpu.sum(self._gpu_product, self._gpu_output,
-                              self._num_input, self._num_node, activation, self._batch_size)
+                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 0)
+                #self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
+                #                                self._batch_size, stride_1, stride_2,
+                #                                self._num_input, self._num_node)
+                #self._gpu.sum(self._gpu_product, self._gpu_output,
+                #              self._num_input, self._num_node, activation, self._batch_size)
                 # softmax
                 if debug:
                     print("output")
@@ -400,7 +402,8 @@ class OutputLayer(Layer):
                     print((self._output_array[6]))
                 #
             elif self._gpu.type==1: # DGX
-                self._gpu.mac(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input)
+                #self._gpu.mac(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input)
+                self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 0)
                 self._gpu.softmax(self._gpu_output, self._gpu_softmax, self._batch_size, self._num_node)
                 if debug:
                     print("softmax", self._index)

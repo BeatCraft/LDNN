@@ -456,6 +456,43 @@ __kernel void k_test(const float in)
     printf(\"%d : exp(%If) = %If\\n\", i, in, out);
 };
 
+__kernel void calc_mac_relu(
+    __global float* x,
+    __global float* w,
+    __global float* y,
+    int xsize,
+    int wsize,
+    int act)
+{
+    int bi = get_global_id(0);
+    int xi = get_global_id(1);
+    //int bi = blockIdx.x;
+    //int xi = threadIdx.x;
+    int x_start = (wsize * bi);
+    int w_start = wsize * xi;
+    int y_start = (xsize * bi) + xi;
+    float temp = 0.0;
+
+    for (int i=0;i<wsize;i++){
+        temp += (x[x_start+i] * w[w_start+i]);
+    }
+
+    // activation
+    if (act==0){
+        y[y_start] = temp;
+        return;
+    }
+    
+    // relu
+    if (temp>=0){
+        y[y_start] = temp;
+    } else {
+        //y[y_start] = 0;
+        //y[y_start] = 0.000001;
+        y[y_start] = temp/20;
+    }
+}
+
 """
 #
 #
@@ -509,6 +546,13 @@ class OpenCL(gpu.Gpu):
         event = self.prg.multiple_x_by_w(self._queue,(row,col), None,
                                          d_x, d_w, d_y, np.int32(bi),
                                          np.int32(stride_1), np.int32(stride_2))
+        event.wait()
+        
+    def macRelu(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input, act):
+        event = self.prg.calc_mac_relu(self._queue,(size_batch, size_node), None,
+                                        buf_x, buf_w, buf_y,
+                                        np.int32(size_node), np.int32(size_input),
+                                        np.int32(act))
         event.wait()
 
     def multiple_x_by_w_batch(self, d_x, d_w, d_y, bsize, stride_1, stride_2, row, col):
@@ -589,8 +633,6 @@ class OpenCL(gpu.Gpu):
         event = self.prg.k_cross_entropy(self._queue, (num_batch,), None,
                                         infs, output, labels, np.int32(size))
         event.wait()
-    
-    
     
     def layer_mse_batch(self, input, output, ch, w, h, num_batch):
         event = self.prg.layer_mse_batch(self._queue, (num_batch,), None,

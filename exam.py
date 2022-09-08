@@ -49,7 +49,10 @@ def classification(r, data_size, num_class, batch_size, batch_image, batch_label
     #
     it, left = divmod(batch_size, n)
     #
+    # for single test
+    #
     #it = 1
+    #n = 10
     #
     if left>0:
         print(("error : n(=%d) is not appropriate" % (n)))

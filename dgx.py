@@ -186,13 +186,72 @@ void calc_mac(const float* x, const float* w, float* y, int size) {
 }
 ''', 'calc_mac')
 
+
+# size : size_input = number of weights
+calc_mac_relu3 = cp.RawKernel(r'''
+extern "C" __global__
+void calc_mac_relu3(const float* x, const float* w, float* y, int xsize, int wsize, int act) {
+    int bi = blockIdx.x;
+    int xi = threadIdx.x;
+    int x_start = (wsize * bi);
+    int w_start = wsize * xi;
+    int y_start = (xsize * bi) + xi;
+    float temp = 0.0;
+
+    for (int i=0;i<wsize;i++){
+        temp += (x[x_start+i] * w[w_start+i]);
+    }
+
+    // activation
+    if (act==0){
+        y[y_start] = temp;
+        return;
+    }
+    
+    // relu
+    if (temp>=0){
+        y[y_start] = temp;
+    } else {
+        //y[y_start] = 0;
+        //y[y_start] = 0.000001;
+        y[y_start] = temp/20;
+    }
+}
+''', 'calc_mac_relu3')
+
+calc_mac_relu2 = cp.RawKernel(r'''
+extern "C" __global__
+void calc_mac_relu2(const float* x, const float* w, float* y, int xsize, int wsize) {
+    int bi = blockIdx.x;
+    int xi = threadIdx.x;
+    int x_start = (wsize * bi);
+    int w_start = wsize * xi;
+    int y_start = (xsize * bi) + xi;
+    float temp = 0.0;
+
+    for (int i=0;i<wsize;i++){
+        temp += (x[x_start+i] * w[w_start+i]);
+    }
+
+    if (temp>=0){
+        y[y_start] = temp;
+    } else {
+        //y[y_start] = 0;
+        //y[y_start] = 0.000001;
+        y[y_start] = temp/20;
+    }
+}
+''', 'calc_mac_relu2')
+
 calc_mac_relu = cp.RawKernel(r'''
 extern "C" __global__
 void calc_mac_relu(const float* x, const float* w, float* y, int size) {
     int x_start = size * blockIdx.x;
     int w_start = size * threadIdx.x;
-    int y_start = blockDim.x * blockIdx.x  + threadIdx.x;
+    int y_start = blockDim.x * blockIdx.x + threadIdx.x;
     float temp = 0.0;
+
+    printf("[%d, %d, %d]\n", blockDim.x, blockIdx.x, threadIdx.x);
 
     for (int i=0;i<size;i++){
         temp += (x[x_start+i] * w[w_start+i]);
@@ -332,11 +391,16 @@ class Dgx(gpu.Gpu):
         calc_mac((size_batch,), (size_node,), (buf_x, buf_w, buf_y, size_input))
 
     def macRelu(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input):
-         calc_mac_relu((size_batch,), (size_node,), (buf_x, buf_w, buf_y, size_input))
-
+        calc_mac_relu((size_batch,), (size_node,), (buf_x, buf_w, buf_y, size_input))
+        
+    def macRelu2(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input):
+        calc_mac_relu2((size_batch,), (size_node,), (buf_x, buf_w, buf_y, size_node, size_input))
+    
+    def macRelu3(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input, act): # 0 : no activation
+        calc_mac_relu3((size_batch,), (size_node,), (buf_x, buf_w, buf_y, size_node, size_input, act))
+        
     def softmax(self, buf_x, buf_y, size_batch, size_node):
         calc_softmax((size_batch,), (1,), (buf_x, buf_y, size_node))
-    
     #
     # cnn
     #

@@ -263,15 +263,16 @@ class HiddenLayer(Layer):
     def prepare(self, batch_size):
         print("HiddenLayer::prepare(%d)" % (batch_size))
         self._batch_size = batch_size
-        self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
+        #self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
 
         if self._gpu:
             if self._gpu.type==0:
+                self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
                 self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
             elif self._gpu.type==1:
-                self._gpu_product = self._gpu.allocateArray(self._product_matrix)
+                #self._gpu_product = self._gpu.allocateArray(self._product_matrix)
                 self._gpu_output = self._gpu.allocateArray(self._output_array)
             #
         else:
@@ -310,9 +311,8 @@ class HiddenLayer(Layer):
                 #
             elif self._gpu.type==1:
                 self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input)
+                self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
                 #self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
-                #self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
-                self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
                 #mx = cp.max(self._gpu_output)
                 #self._gpu_output = self._gpu_output/mx
                 if debug:
@@ -345,18 +345,18 @@ class OutputLayer(Layer):
         print("OutputLayer::prepare(%d)" % (batch_size))
             
         self._batch_size = batch_size
-        self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
         self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float64)
-
+        
         if self._gpu:
             if self._gpu.type==0:
+                self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
                 self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
                 self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
             elif self._gpu.type==1:
                 print("output:dgx")
-                self._gpu_product = self._gpu.allocateArray(self._product_matrix)
+                #self._gpu_product = self._gpu.allocateArray(self._product_matrix)
                 self._gpu_output = self._gpu.allocateArray(self._output_array)
                 self._gpu_softmax = self._gpu.allocateArray(self._softmax_array)
             #
@@ -517,45 +517,45 @@ class MaxLayer(Layer):
         print("MaxLayer::prepare(%d)" % (batch_size))
         self._batch_size = batch_size
         self._output_array = np.zeros((self._batch_size, self._ch, self._num_node), dtype=np.float32)
-        self._mse_array = np.zeros((self._batch_size,), dtype=np.float32)
+        #self._mse_array = np.zeros((self._batch_size,), dtype=np.float32)
         
         #
         if self._gpu:
             if self._gpu.type==0:
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
-                self._gpu_mse = self._gpu.dev_malloc(self._mse_array)
+                #self._gpu_mse = self._gpu.dev_malloc(self._mse_array)
             elif self._gpu.type==1:
                 self._gpu_output = self._gpu.allocateArray(self._output_array)
-                self._gpu_mse = self._gpu.allocateArray(self._mse_array)
+                #self._gpu_mse = self._gpu.allocateArray(self._mse_array)
             #
         else:
             print("error")
         #
         
-    def mse(self, debug=0):
-        if self._gpu:
-            pass
-        else:
-            return 0.0
-        #
-
-        if self._gpu.type==0:
-            self._gpu.layer_mse_batch(self._gpu_output, self._gpu_mse, self._ch, self._x, self._y, self._batch_size)
-            self._gpu.copy(self._mse_array, self._gpu_mse)
-            avg = np.sum(self._mse_array)/float(self._batch_size)
-            if debug==1:
+    #def mse(self, debug=0):
+    #    if self._gpu:
+    #        pass
+    #    else:
+    #        return 0.0
+    #    #
+    #
+    #    if self._gpu.type==0:
+    #        self._gpu.layer_mse_batch(self._gpu_output, self._gpu_mse, self._ch, self._x, self._y, self._batch_size)
+    #        self._gpu.copy(self._mse_array, self._gpu_mse)
+    #        avg = np.sum(self._mse_array)/float(self._batch_size)
+    #        if debug==1:
                 #self._gpu.copy(self._mse_array, self._gpu_mse)
-                print(avg)
-            #
-            return avg
-        elif self._gpu.type==1:
-            #print("aaa")
-            self._gpu.layer_mse(self._gpu_output, self._gpu_mse, self._ch, self._x, self._y, self._batch_size)
-            mses = cp.asnumpy(self._gpu_mse)
-            #print(mses)
-            return np.sum(mses)/float(self._batch_size)
-        #
-        return 0.0
+    #            print(avg)
+    #        #
+    #        return avg
+    #    elif self._gpu.type==1:
+    #        #print("aaa")
+    #        self._gpu.layer_mse(self._gpu_output, self._gpu_mse, self._ch, self._x, self._y, self._batch_size)
+    #        mses = cp.asnumpy(self._gpu_mse)
+    #        #print(mses)
+    #        return np.sum(mses)/float(self._batch_size)
+    #    #
+    #    return 0.0
         
     def propagate(self, array_in, debug=0):
         if self.lock:
@@ -700,16 +700,12 @@ class Conv_4_Layer(Layer):
                 #
                 # GDX
                 #
-                #return
-
+  
                 #mx = cp.max(self._gpu_output)
                 #self._gpu_output = self._gpu_output/mx
 
-                ##self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
-                #self._gpu.layerScale(self._gpu_output, self._batch_size, size)
-                
                 self._gpu.layerNormalize(self._gpu_output, self._batch_size, size)
-                self._gpu.layerScale(self._gpu_output, self._batch_size, size)
+                #self._gpu.layerScale(self._gpu_output, self._batch_size, size)
                 if debug:
                     print("conv, scale", self._index)
                     darray = cp.asnumpy(self._gpu_output)

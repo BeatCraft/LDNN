@@ -10,13 +10,13 @@ Following python modules are required:
 - mpi4py
 
 
-How to install
+[ How to install ]
 clone the repository or download the zip file, and unzip it.
 
 
-Quick start
+[ Quick start ]
 python3 ./core.py
-No error if eberything is OK:)
+No error if everything is OK:)
 
 
 

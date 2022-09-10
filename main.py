@@ -22,23 +22,23 @@ def main():
         return 0
     #
 
-    r = Roster()
+    r = core.Roster()
     r.set_gpu(my_gpu)
     #
     c = r.count_layers()
-    input = InputLayer(c, 128, 128, None, my_gpu)
+    input = core.InputLayer(c, 128, 128, None, my_gpu)
     r.layers.append(input)
     
     c = r.count_layers()
-    hidden_1 = HiddenLayer(c, 128, 64, input, my_gpu)
+    hidden_1 = core.HiddenLayer(c, 128, 64, input, my_gpu)
     r.layers.append(hidden_1)
     
     c = r.count_layers()
-    hidden_2 = HiddenLayer(c, 64, 64, hidden_1, my_gpu)
+    hidden_2 = core.HiddenLayer(c, 64, 64, hidden_1, my_gpu)
     r.layers.append(hidden_2)
 
     c = r.count_layers()
-    output = OutputLayer(c, 64, 10, hidden_2, my_gpu)
+    output = core.OutputLayer(c, 64, 10, hidden_2, my_gpu)
     r.layers.append(output)
 
     r.init_weight()

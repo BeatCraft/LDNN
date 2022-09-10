@@ -19,7 +19,7 @@ clone the repository or download the zip file, and unzip it.
 
 [ Quick start ]
 
-python3 ./core.py
+python3 ./main.py
 
 
 No error if everything is OK:)

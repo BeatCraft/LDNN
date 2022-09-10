@@ -11,14 +11,11 @@ Following python modules are required:
 
 
 How to install
-
 clone the repository or download the zip file, and unzip it.
 
 
 Quick start
-
 python3 ./core.py
-
 No error if eberything is OK:)
 
 

@@ -8,8 +8,11 @@ ID = 0
 
 # 0 : MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports)
 #     macOS Monterey Version 12.3.1
+#     opencl
 # 1 : Threadripper
 #     ubuntu
-# 2 : VDX/Tesla
+#     opencl
+# 2 : Nvidia DGX
 #     ubuntu
+#     cupy
 

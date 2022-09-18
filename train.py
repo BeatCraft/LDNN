@@ -161,21 +161,7 @@ class Train:
         
         ce_alt = self.evaluate()
         ret = 0
-        #
-        # need to implement acceptance control here??
-        #
-        #de = (ce - ce_alt)
-        #flg = math.exp(de/float(div)) < random.random()
-        #/float(div)
-        #ac = 2**(-de/float(div))
-        #ac = math.e**(de/float(div))
-        # log(div, 2) #math.e**(-de/div)
-        #c = math.e**(-de)
-        #ac = math.e**(de)
-        #ac = np.exp(de)
-        #print(ac)
-        #k = 1.38 * (10**-23)
-        #print(np.exp(-ac/k*math.log(div, 2)))
+
         if ce_alt<=ce:
             ce = ce_alt
             ret = 1
@@ -184,162 +170,14 @@ class Train:
                 w.wi = w.wi_alt
             #
         else:
-            #if flg:
-            #    print("####", math.exp(de/float(div)))
-            #    ce = ce_alt
-            #    ret = 1
-            #    for i in attack_list:
-            #        w = w_list[i]
-            #        w.wi = w.wi_alt
-            #    #
-            #
-            #print(de, ac)
             self.undo_attack(w_list, attack_list)
         #
         return ce, ret
-        
-        #if self.mode==0 or self.mode==1 or self.mode==4:
-        #    if ce_alt<ce:
-        #        ce = ce_alt
-        #        ret = 1
-        #    else:
-        #        self.undo_attack(attack_list)
-        #elif self.mode==2 or self.mode==3:
-        #    if ce_alt>ce:
-        #        ce = ce_alt
-        #        ret = 1
-        #    else:
-        #        self.undo_attack(attack_list)
-        #    #
-        ##
-        #
-        #return ce, ret
-
-    def loop_sa(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
-        r = self._r
-        
-        ce = self.evaluate()
-        ret = 0
-        w_num = len(w_list)
-        d = 100
-        lv_min = 0
-        lv_max = int(math.log(w_num/d, 2)) + 1
-        total = 0
-        
-        for j in range(n):
-            for lv in range(lv_min, lv_max+1):
-                div = 2**lv
-                total = 0
-                for i in range(atk - int(atk*atk_r*lv)):
-                    ce, ret = self.multi_attack(ce, w_list, 1, div)
-                    total += ret
-                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
-                #
-            #
-            
-            for lv in range(lv_max, -1, -1):
-                div = 2**lv
-                total = 0
-                #for i in range(atk - int(atk*atk_r*lv)):
-                for i in range(atk):
-                    ce, ret = self.multi_attack(ce, w_list, 0, div)
-                    total += ret
-                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
-                #
-            #
-            r.save()
-        #
-        return 0
-        
-    def loop_sa2(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
-        r = self._r
-        
-        ce = self.evaluate()
-        ret = 0
-        w_num = len(w_list)
-        d = 100
-        lv_min = 0
-        lv_max = int(math.log(w_num/d, 2)) + 1
-        total = 0
-        
-        for j in range(n):
-            for lv in range(lv_max, -1, -1):
-                div = 2**lv
-                total = 0
-                #for i in range(atk - int(atk*atk_r*lv)):
-                for i in range(atk):
-                    ce, ret = self.multi_attack(ce, w_list, 0, div)
-                    total += ret
-                    print(m, wtype, "[", j, "] lv", lv, div, "i", i, "ce", ce, total)
-                #
-            #
-            r.save()
-        #
-        return 0
-        
-    def loop_sa3(self, w_list, wtype, m, n=1, atk=50, atk_r = 0.05):
-        r = self._r
-        
-        ce = self.evaluate()
-        ret = 0
-        w_num = len(w_list)
-        d = 100
-        lv_min = 0
-        lv_max = int(math.log(w_num/d, 2)) + 1
-        total = 0
-        
-        for j in range(n):
-            for lv in range(lv_max, -1, -1):
-                div = 2**lv
-                total = 0
-                part = 0
-                i = 0
-                k = 0
-                flag = 1
-                while flag:
-                    ce, ret = self.multi_attack(ce, w_list, 0, div)
-                    total += ret
-                    part += ret
-                    print(m, wtype, "[", j, "] lv", lv, div, "(", i, ")", "ce", ce, total)
-                    #
-                    if k>atk:
-                        tr = float(total)/float(i)
-                        pr = float(part)/float(k)
-                        if tr<0.05 and pr<0.05:
-                            flag = 0
-                            #
-                            # need to refreash
-                            #
-                        else:
-                            if i>=atk*20:
-                                flag = 0
-                            #
-                        #
-                    #
-                    i += 1
-                    k += 1
-                # while
-                #i = 0
-                #j = 0
-            #
-            r.save()
-        #
-        return 0
-    
     
     def multi_attack_sa4(self, ce, w_list, mode=1, div=0, pbty=0):
         r = self._r
         attack_list = self.make_attack_list(div, mode, w_list)
-        #if r._gpu.type==0: # opencl
-        #    attack_list = self.make_attack_list(div, mode, w_list)
-        #elif r._gpu.type==1: # DGX
-        #    r._gpu.make_attack_list(div, w_list, result_gpu)
-        #    result_cpu = cp.asnumpy(result_gpu)
-        #    attack_list = result_cpu.tolist()
-        #else:
-        #    print("error")
-        #    pass
-        #
+        
         llist = []
         w_num = len(attack_list)
         for i in attack_list:
@@ -387,48 +225,7 @@ class Train:
             self.undo_attack(w_list, attack_list)
         #
         return ce, ret, pbty
-    
-    def loop_sa4(self, w_list, wtype, n=1, atk=1000, atk_r = 0.01):
-        r = self._r
-        
-        ce = self.evaluate()
-        ret = 0
-        w_num = len(w_list)
-        d = 100
-        lv_min = 0
-        lv_max = int(math.log(w_num/d, 2)) + 1
-        
-        pbty = 0
 
-        for j in range(n):
-            total = 0
-            for lv in range(lv_max, -1, -1):
-                div = 2**lv
-                part = 0
-                for i in range(atk):
-                    ce, ret, pbty = self.multi_attack_sa4(ce, w_list, 0, div, pbty)
-                    total += ret
-                    part += ret
-                    print(wtype, "[", j, "]", wtype, lv,"/", lv_max, "|", div, "(", i, ")", "ce", ce, part, total, pbty)
-                    #
-                #
-                rate = float(part)/float(atk)
-                if rate<atk_r:
-                    lv_max -= 1
-                    pbty += 1
-                    if lv_max<2:
-                        lv_max = 2
-                        #pbty += 1
-                    #
-                #
-            #
-            r.save()
-            #if j>0 and j%10==0:
-            #    lv_max = int(math.log(w_num/d, 2)) + 1
-            #
-        #
-        return 0
-        
     def loop_sa5(self, idx, w_list, wtype, loop=1, min=100):#, atk=1000, atk_r = 0.01):
         r = self._r
         
@@ -477,6 +274,7 @@ class Train:
         A = np.exp(-delta/(temperature+0.000001)) / 1000.0
         hit = random.choices([0, 1], k=1, weights=[1-A, A])
         if hit[0]==1:
+            print(A)
             return 1
         #
         return 0
@@ -582,3 +380,115 @@ class Train:
             r.save_as(spath)
         #
         return ce
+        
+        
+        
+        
+        
+    #
+    # with acceptance control
+    #
+    def multi_attack_t(self, ce, w_list, attack_num, temperature):
+        r = self._r
+        
+        attack_list = self.make_attack_list(attack_num, 0, w_list)
+        llist = []
+        w_num = len(attack_list)
+        for i in attack_list:
+            w = w_list[i]
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
+
+        for li in llist:
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+        
+        ce_alt = self.evaluate()
+        ret = 0
+
+        if ce_alt<=ce:
+            ce = ce_alt
+            ret = 1
+            for i in attack_list:
+                w = w_list[i]
+                w.wi = w.wi_alt
+            #
+        else:
+            # acceptance control
+            delta = ce_alt - ce
+            hit = self.random_hit(delta, temperature)
+            if hit==1:
+                ret = 1
+                ce = ce_alt
+            else:
+                ret = 0
+            #
+        #
+        if ret==0:
+            self.undo_attack(w_list, attack_list)
+        #
+        return ce, ret
+    #
+    # a loop with a temperature
+    #
+    def loop_sa_t(self, ce, temperature, attack_num, w_list, wtype, debug=0):
+        r = self._r
+        
+        w_num = len(w_list)
+        ret = 0
+        part = 0 # hit count
+        num = 0 # loop count
+        min = 200
+        hist = []
+        atk_flag = True
+        
+        while atk_flag:
+            ce, ret = self.multi_attack_t(ce, w_list, attack_num, temperature)
+            num += 1
+            part += ret
+            hist.append(ret)
+            if len(hist)>min:
+                hist = hist[1:]
+            #
+            s = 0 # hit conunt in the last 200
+            for a in hist:
+                s += a
+            #
+            rate = float(s)/float(num)
+            print("[%d] %d [%s:%d] ce %09f (%d, %d) %06f"
+                    % (temperature, num, wtype, attack_num, ce, part, s, rate))
+            if num>min:
+                if num>10000 or rate<0.01:
+                    atk_flag = False
+                #
+            #
+        # while
+        
+        return ce
+
+
+    def logathic_loop(self, w_list, wtype):
+        r = self._r
+        
+        w_num = len(w_list)
+        lv_min = 0
+        lv_max = int(math.log(w_num/100, 2)) + 1 # 1 % max
+        ce = self.evaluate()
+        
+        for temperature in range(lv_max, -1, -1):
+            attack_num = 2**temperature
+            ce = self.loop_sa_t(ce, temperature, attack_num, w_list, wtype)
+        #
+        r.save()
+#
+#
+#
+    
+    

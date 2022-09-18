@@ -13,6 +13,39 @@ import gpu
 #os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
 KERNEL_CODE = """
+__kernel void normalize_batch(__global float* data, int size)
+{
+    //int j = get_global_id(0);
+    
+    float sum = 0.0;
+    float mean = 0.0;
+    float delta = 0.0000001;
+    float div2 = 0.0;
+    float div = 0.0;
+    
+    for (int i=0; i<size; i++){
+        sum += data[i];
+    }
+    mean = sum / (float)size;
+    
+    sum = 0.0;
+    for (int i=0; i<size; i++){
+        float k = data[i] - mean;
+        sum += k * k;
+    }
+
+    div2 = sum / (float)size;
+    //div2 += delta;
+    div = sqrt(div2);
+    
+    for (int i=0; i<size; i++){
+        float k = data[i] - mean;
+        //data[i] = k;
+        //data[i] = k / div;
+    }
+    printf(\"CL%f\\n\", div);
+}
+
 __kernel void conv_4_pad_batch(
     __global float* input,
     __global float* output,
@@ -49,7 +82,8 @@ __kernel void conv_4_roll_batch(
     const int w,
     const int h,
     const int ch,
-    const int filter)
+    const int filter,
+    const int activation)
 {
     int bi = get_global_id(0);
     int xi = get_global_id(1);
@@ -80,37 +114,19 @@ __kernel void conv_4_roll_batch(
             sum += input[start + y_stride + (w+2)*2 + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 7];
             sum += input[start + y_stride + (w+2)*2 + xi + 2] * weight[fi*ch*3*3 + i*3*3 + 8];
         }
-        // relu
-        if (sum<0.0){
-            output[bi*w*h*filter + w*h*fi + yi*w+xi] = 0.0;
-        }else{
+        
+        // activation
+        if (activation==0){
             output[bi*w*h*filter + w*h*fi + yi*w+xi] = sum;
+        }else{ // relu
+            if (sum<0.0){
+                output[bi*w*h*filter + w*h*fi + yi*w+xi] = 0.0;
+            }else{
+                output[bi*w*h*filter + w*h*fi + yi*w+xi] = sum;
+            }
         }
     }
 };
-
-__kernel void layer_mse_batch(
-    __global const float* input,
-    __global float* output,
-    const int ch,
-    const int w,
-    const int h)
-{
-    int bi = get_global_id(0);
-    
-    int ch_stride = w*h;
-    int input_offset = ch_stride*ch*bi;
-
-    for (int c=1;c<ch;c++){
-        int ch_start = input_offset + (ch_stride*c);
-        float sum_d = 0.0;
-        for (int i=0;i<ch_stride;i++){
-            float d = input[input_offset+i] - input[ch_start+i];
-            sum_d += (d*d);
-        }
-        output[bi] = sum_d/(float)ch_stride;
-    }
-}
 
 __kernel void max_batch(
     __global float* input,
@@ -240,7 +256,6 @@ __kernel void scale_layer(__global float* data, int size)
     }
 }
 
-
 __kernel void mse(__global const float* infs, __global const float* labels, __global float* output, int num)
 {
     int bi = get_global_id(0); // batch index
@@ -262,39 +277,6 @@ __kernel void mse(__global const float* infs, __global const float* labels, __gl
     //output[bi] = sum/2.0;
     output[bi] = sum/(float)num;
 }
-
-__kernel void cross_entropy_rg(__global const float* infs,
-                            __global const float* labels,
-                            __global float* output,
-                            int num)
-{
-    int bi = get_global_id(0); // batch index
-    //int ni = get_global_id(1); // node index
-    
-    float delta;
-    float k;
-    float t;
-    float sum;
-    
-    delta = 0.0000001;
-    sum = 0.0;
-    
-//    printf(\"[%d](%d)\\n\", bi, num);
-
-    for (int i=0;i<num;i++){
-        //printf(\"[%d](%d)\\n\", bi, i);
-        t = labels[bi*num + i];
-        k = infs[bi*num + i] + delta;
-        //printf(\"[%d](%i) %f\\n\", bi, i, t);
-        sum += t * log(k);
-        //printf(\"[%d](%i) %f\\n\", bi, i, t * log(k));
-    }
-    
-    output[bi] = (-1.0)*sum;
-    //printf(\"%d | %f\\n\", bi, output[bi]);
-}
-
-
 
 __kernel void cross_entropy(__global const float* infs,
                             __global const float* labels,
@@ -323,22 +305,6 @@ __kernel void cross_entropy(__global const float* infs,
     //printf(\"%d | %f\\n\", bi, output[bi]);
 }
 
-__kernel void k_cross_entropy(__global const float* infs,
-                              __global float* output,
-                              __global const int* labels,
-                              int num)
-{
-    int bi = get_global_id(0);
-    float delta;
-    float k;
-    int i;
-    
-    delta = 0.0000001;
-    i = labels[bi];
-    k = infs[bi*num+i]+delta;
-    output[bi] = -log(k);
-}
-
 __kernel void p_softmax(__global float* in, int num)
 {
     int bi = get_global_id(0);
@@ -356,27 +322,6 @@ __kernel void p_softmax(__global float* in, int num)
 
     for (int i=0;i<num;i++){
         in[bi*num+i] = in[bi*num+i]/sum;
-    }
-}
-
-__kernel void k_softmax(__global float* in, int num)
-{
-    int bi = get_global_id(0);
-    float max = 0.0;
-    float sum = 0.0;
-    
-    for (int i=0;i<num;i++){
-        if (in[bi*num+i]>max){
-            max = in[bi*num+i];
-        }
-    }
-    
-    for (int i=0;i<num;i++){
-        sum += exp(in[bi*num+i]-max);
-    }
-
-    for (int i=0;i<num;i++){
-        in[bi*num+i] = exp(in[bi*num+i]-max)/sum;
     }
 }
 
@@ -404,7 +349,7 @@ __kernel void k_sum(__global const float* in,
     }
 }
 
-__kernel void relu(__global float* out, int num, int stride)
+__kernel void relu(__global float* out, int num, int stride, int mode)
 {
     int bi = get_global_id(0);
     int ni = get_global_id(1);
@@ -412,9 +357,25 @@ __kernel void relu(__global float* out, int num, int stride)
     
     for (int i=0;i<num;i++){
         k = out[stride*bi + ni + i];
-        if (k<0.0){
-            out[stride * bi + ni + i] = 0.0;
-        }else{
+        if (mode==1){ // normal relu
+            if (k<0.0){
+                out[stride * bi + ni + i] = 0.0;
+            }else{
+                out[stride * bi + ni + i] = k;
+            }
+        }else if (mode==2){
+            if (k<0.0){
+                out[stride * bi + ni + i] = 0.000001;
+            }else{
+                out[stride * bi + ni + i] = k;
+            }
+        }else if (mode==3){
+            if (k<0.0){
+                out[stride * bi + ni + i] = k/20;
+            }else{
+                out[stride * bi + ni + i] = k;
+            }
+        }else{ // none
             out[stride * bi + ni + i] = k;
         }
     }
@@ -478,18 +439,18 @@ __kernel void calc_mac_relu(
     }
 
     // activation
-    if (act==0){
-        y[y_start] = temp;
-        return;
-    }
-    
-    // relu
     if (temp>=0){
         y[y_start] = temp;
-    } else {
-        //y[y_start] = 0;
-        //y[y_start] = 0.000001;
-        y[y_start] = temp/20;
+    }else{
+        if (act==0){ // no
+            y[y_start] = temp;
+        }else if (act==1){ // relu
+            y[y_start] = 0;
+        }else if (act==2){
+            y[y_start] = 0.000001;
+        }else{
+            y[y_start] = temp/20;
+        }
     }
 }
 
@@ -530,6 +491,14 @@ class OpenCL(gpu.Gpu):
                         size=host_array.nbytes)
         self._bufs.append(buf)
         return buf
+        
+    def copy(self, dist, src):
+        event = cl.enqueue_copy(self._queue, dist, src)
+        event.wait()
+
+    #
+    #
+    #
 
     def scale_exp(self, d_x, d_y, stride, row, batch_size, debug):
         event = self.prg.scale_exp(self._queue, (row, batch_size), None,
@@ -548,7 +517,7 @@ class OpenCL(gpu.Gpu):
                                          np.int32(stride_1), np.int32(stride_2))
         event.wait()
         
-    def macRelu(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input, act):
+    def macRelu(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input, act): # <<
         event = self.prg.calc_mac_relu(self._queue,(size_batch, size_node), None,
                                         buf_x, buf_w, buf_y,
                                         np.int32(size_node), np.int32(size_input),
@@ -562,36 +531,15 @@ class OpenCL(gpu.Gpu):
                                                np.int32(stride_2))
         event.wait()
         
-    #def int_multiple_x_by_w_batch(self, d_x, d_w, d_y, bsize, stride_1, stride_2, row, col):
-    #    event = self.prg.int_multiple_x_by_w_batch(self._queue,(row,col,bsize), None,
-    #                                           d_x, d_w, d_y,
-    #                                           np.int32(stride_1),
-    #                                           np.int32(stride_2))
-    #    event.wait()
-    
-    #def int_sum(self, data_in, data_out, num_input, num_node, activation, num_batch):
-     #   event = self.prg.int_sum(self._queue, (num_node, num_batch), None,
-     #                          data_in, data_out,
-     #                          np.int32(num_input), np.int32(num_node), np.int32(activation))
-     #   event.wait()
-    
-    #def int_scale_layer(self, data, size, batch_size):
-    #    event = self.prg.int_scale_layer(self._queue, (batch_size,), None, data, np.int32(size))
-    #    event.wait()
-    
-    def copy(self, dist, src):
-        event = cl.enqueue_copy(self._queue, dist, src)
-        event.wait()
-        
     def sum(self, data_in, data_out, num_input, num_node, activation, num_batch):
         event = self.prg.k_sum(self._queue, (num_node, num_batch), None,
                                data_in, data_out,
                                np.int32(num_input), np.int32(num_node), np.int32(activation))
         event.wait()
     
-    def relu(self, data_out, batch_size, num_node, size):
+    def relu(self, data_out, batch_size, num_node, size, mode):
         event = self.prg.relu(self._queue, (batch_size, num_node), None,
-                              data_out, np.int32(size), np.int32(num_node))
+                              data_out, np.int32(size), np.int32(num_node), np.int32(mode))
         event.wait()
     
     def scale_layer(self, data, size, batch_size):
@@ -602,26 +550,12 @@ class OpenCL(gpu.Gpu):
         event = self.prg.normalize_layer(self._queue, (batch_size,), None, data, np.int32(size))
         event.wait()
     
-    def softmax(self, data, size, num_batch):
+    def softmax(self, data, size, num_batch): # <<
         event = self.prg.p_softmax(self._queue, (num_batch,), None, data, np.int32(size))
         event.wait()
-
-    #def int_softmax(self, data, data_out, size, num_batch):
-    #    event = self.prg.int_softmax(self._queue, (num_batch,), None, data, data_out, np.int32(size))
-    #    event.wait()
-
-    #def int_cross_entropy(self, infs, labels, output, num_node, num_batch):
-    #    event = self.prg.int_cross_entropy(self._queue, (num_batch,), None,
-    #                                   infs, labels, output, np.int32(num_node))
-    #    event.wait()
     
     def mse(self, infs, labels, output, num_node, num_batch):
         event = self.prg.mse(self._queue, (num_batch,), None, infs, labels, output, np.int32(num_node))
-        event.wait()
-        
-    def cross_entropy_rg(self, infs, labels, output, num_node, num_batch):
-        event = self.prg.cross_entropy_rg(self._queue, (num_batch,), None,
-                                       infs, labels, output, np.int32(num_node))
         event.wait()
         
     def cross_entropy(self, infs, labels, output, num_node, num_batch):
@@ -629,31 +563,25 @@ class OpenCL(gpu.Gpu):
                                        infs, labels, output, np.int32(num_node))
         event.wait()
     
-    def k_cross_entropy(self, infs, output, labels, size, num_batch):
-        event = self.prg.k_cross_entropy(self._queue, (num_batch,), None,
-                                        infs, output, labels, np.int32(size))
-        event.wait()
-    
-    def layer_mse_batch(self, input, output, ch, w, h, num_batch):
-        event = self.prg.layer_mse_batch(self._queue, (num_batch,), None,
-                                   input, output, np.int32(ch), np.int32(w), np.int32(h))
-        event.wait()
-    
-    def max_batch(self, input, output, ch, w, h, num_batch):
+    def max_batch(self, input, output, ch, w, h, num_batch): # <<
         event = self.prg.max_batch(self._queue, (num_batch, w, h), None,
                                    input, output, np.int32(ch), np.int32(w), np.int32(h))
         event.wait()
     #
-    # new CNN implementations
+    # CNN
     #
     def conv_4_pad_batch(self, input, output, w, h, ch, batch_size):
         event = self.prg.conv_4_pad_batch(self._queue, (batch_size, w, h), None,
                                           input, output, np.int32(w), np.int32(h), np.int32(ch))
         event.wait()
             
-    def conv_4_roll_batch(self, input, weight, output, w, h, ch, filter, batch_size):
+    def conv_4_roll_batch(self, input, weight, output, w, h, ch, filter, batch_size, activation=0):
         event = self.prg.conv_4_roll_batch(self._queue, (batch_size, w, h), None,
-                                           input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter))
+                                           input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter), np.int32(activation))
+        event.wait()
+    
+    def normalize_batch(self, buf, size):
+        event = self.prg.normalize_batch(self._queue, (1,), None, buf, np.float32(size))
         event.wait()
     
     def k_test(self, value):

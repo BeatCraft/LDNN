@@ -628,7 +628,10 @@ class worker(object):
             #
         #
         return ce
-        
+    
+    #
+    # basic loop
+    #
     def loop_sa_t(self, ce, temperature, attack_num, w_list, wtype, debug=0):
         r = self.r
         w_num = len(w_list)

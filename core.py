@@ -44,7 +44,7 @@ WEIGHT_SET_5 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0.0625, 0.125, 0.25, 0.5, 1.
 WEIGHT_SET_6 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 12
 
 #
-WEIGHT_SET = WEIGHT_SET_5
+WEIGHT_SET = WEIGHT_SET_4
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -535,31 +535,6 @@ class MaxLayer(Layer):
             print("error")
         #
         
-    #def mse(self, debug=0):
-    #    if self._gpu:
-    #        pass
-    #    else:
-    #        return 0.0
-    #    #
-    #
-    #    if self._gpu.type==0:
-    #        self._gpu.layer_mse_batch(self._gpu_output, self._gpu_mse, self._ch, self._x, self._y, self._batch_size)
-    #        self._gpu.copy(self._mse_array, self._gpu_mse)
-    #        avg = np.sum(self._mse_array)/float(self._batch_size)
-    #        if debug==1:
-                #self._gpu.copy(self._mse_array, self._gpu_mse)
-    #            print(avg)
-    #        #
-    #        return avg
-    #    elif self._gpu.type==1:
-    #        #print("aaa")
-    #        self._gpu.layer_mse(self._gpu_output, self._gpu_mse, self._ch, self._x, self._y, self._batch_size)
-    #        mses = cp.asnumpy(self._gpu_mse)
-    #        #print(mses)
-    #        return np.sum(mses)/float(self._batch_size)
-    #    #
-    #    return 0.0
-        
     def propagate(self, array_in, debug=0):
         if self.lock:
             return
@@ -593,6 +568,8 @@ class Conv_4_Layer(Layer):
         num_node = self._filter
         #
         super(Conv_4_Layer, self).__init__(i, LAYER_TYPE_CONV_4, num_input, num_node, pre, gpu)
+                
+        #self._num_node
         #
         # mems for weights
         self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
@@ -690,23 +667,30 @@ class Conv_4_Layer(Layer):
                     print(darray[0][0])
                 #
             #
-            # scale
+            
+            # activation / scale
             size = self._filter * self._w * self._h
-            if self._gpu.type==0:
-                self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
+            if self._gpu.type==0: # OpenCL
+                self._gpu.copy(self._output_array, self._gpu_output)
+                xmean = self._output_array.mean()
+                xstd  = np.std(self._output_array)
+                zscore = (self._output_array-xmean)/xstd
+                self._gpu.copy(self._gpu_output, zscore)
+                #self._output_array = zscore
+                #self._gpu.copy(self._gpu_output, self._output_array)
+                #
+                self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, 1)
+                #osize = self._batch_size * self._filter * (self._w * self._h)
+                #self._gpu.normalize_batch(self._gpu_output, size)
+                #self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
                 if debug:
                     print("conv, scale", self._index)
                     self._gpu.copy(self._output_array, self._gpu_output)
                     print((self._output_array[0][0]))
                 #
-            elif self._gpu.type==1:
-                #
-                # GDX
-                #
-  
+            elif self._gpu.type==1: # GDX
                 #mx = cp.max(self._gpu_output)
                 #self._gpu_output = self._gpu_output/mx
-
                 self._gpu.layerNormalize(self._gpu_output, self._batch_size, size)
                 #self._gpu.layerScale(self._gpu_output, self._batch_size, size)
                 if debug:

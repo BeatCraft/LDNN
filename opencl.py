@@ -3,6 +3,7 @@
 #
 
 import os
+os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 import sys
 #import time
 #from time import time
@@ -13,37 +14,50 @@ import gpu
 #os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
 KERNEL_CODE = """
-__kernel void normalize_batch(__global float* data, int size)
+__kernel void normalize_batch(
+    __global float* data, 
+    const int b_num, 
+    const int ch_size, 
+    const int ch_num)
 {
-    //int j = get_global_id(0);
-    
+    int ci = get_global_id(0);
+    int stride = ch_size * ch_num;
+
     float sum = 0.0;
     float mean = 0.0;
+    float dsum = 0.0;
     float delta = 0.0000001;
     float div2 = 0.0;
     float div = 0.0;
-    
-    for (int i=0; i<size; i++){
-        sum += data[i];
-    }
-    mean = sum / (float)size;
-    
-    sum = 0.0;
-    for (int i=0; i<size; i++){
-        float k = data[i] - mean;
-        sum += k * k;
-    }
+    int cnt = 0;
 
-    div2 = sum / (float)size;
-    //div2 += delta;
+    for (int bi=0; bi<b_num; bi++){
+        int start = bi * stride + ci * ch_size;
+        for (int i=0; i<ch_size; i++){
+            sum += data[start + i];
+            cnt++;
+        }
+    }
+    mean = sum / (float)cnt;
+
+    for (int bi=0; bi<b_num; bi++){
+        int start = bi * stride + ci * ch_size;
+        for (int i=0; i<ch_size; i++){
+            float k = data[start + i] - mean;
+            dsum += (k*k);
+        }
+    }        
+    div2 = dsum / (float)cnt + delta;
     div = sqrt(div2);
     
-    for (int i=0; i<size; i++){
-        float k = data[i] - mean;
-        //data[i] = k;
-        //data[i] = k / div;
+    for (int bi=0; bi<b_num; bi++){
+        int start = bi * stride + ci * ch_size;
+        for (int i=0; i<ch_size; i++){
+            float k = data[start + i] - mean;
+            data[start + i] = k / div;
+            //data[start + i] = data[start + i] * div + mean;
+        }
     }
-    printf(\"CL%f\\n\", div);
 }
 
 __kernel void conv_4_pad_batch(
@@ -114,6 +128,8 @@ __kernel void conv_4_roll_batch(
             sum += input[start + y_stride + (w+2)*2 + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 7];
             sum += input[start + y_stride + (w+2)*2 + xi + 2] * weight[fi*ch*3*3 + i*3*3 + 8];
         }
+
+        //sum = sum / 9.0;
         
         // activation
         if (activation==0){
@@ -579,9 +595,11 @@ class OpenCL(gpu.Gpu):
         event = self.prg.conv_4_roll_batch(self._queue, (batch_size, w, h), None,
                                            input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter), np.int32(activation))
         event.wait()
-    
-    def normalize_batch(self, buf, size):
-        event = self.prg.normalize_batch(self._queue, (1,), None, buf, np.float32(size))
+
+#normalize_batch(__global float* data, int b_num, int ch_size, int ch_num)
+    def normalize_batch(self, buf, b_num, ch_size, ch_num):
+        event = self.prg.normalize_batch(self._queue, (ch_num,), None, 
+                                         buf, np.int32(b_num), np.int32(ch_size), np.int32(ch_num))
         event.wait()
     
     def k_test(self, value):

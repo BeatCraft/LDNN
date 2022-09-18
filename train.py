@@ -435,10 +435,149 @@ class Train:
             self.undo_attack(w_list, attack_list)
         #
         return ce, ret
+
+
+
+    def make_attack_list_d(self, attack_num, temperature, fc_list, cnn_list):
+        r = self._r
+        
+        fc_num = len(fc_list)
+        cnn_num = len(cnn_list)
+        #w_num = len(w_list)
+        #cnn_ratio = float(cnn_num)/float(cnn_num)
+        #fc_ratio = 1 - cnn_ratio
+        fc_cnt = 0
+        cnn_cnt = 0
+
+        attack_list = []
+        t_max = random.randint(0, attack_num)
+        for k in range(t_max):
+            attack_i = random.randrange(fc_num)
+            w = fc_list[attack_i]
+            fc_cnt += 1
+            while 1:
+                w.wi_alt = random.randint(core.WEIGHT_INDEX_MIN, core.WEIGHT_INDEX_MAX)
+                if w.wi_alt!=w.wi:
+                    attack_list.append([0, attack_i])
+                    break
+                #
+            #
+        #
+
+        t_max = random.randint(0, 5)#temperature)
+        for k in range(t_max):
+            attack_i = random.randrange(cnn_num)
+            w = cnn_list[attack_i]
+            cnn_cnt += 1
+            while 1:
+                w.wi_alt = random.randint(core.WEIGHT_INDEX_MIN, core.WEIGHT_INDEX_MAX)
+                if w.wi_alt!=w.wi:
+                    attack_list.append([1, attack_i])
+                    break
+                #
+            #
+        #        
+
+        #print(fc_cnt, cnn_cnt, len(attack_list))
+        return attack_list
+
+    def undo_attack_d(self, fc_list, cnn_list, attack_list):
+        r = self._r
+
+        llist = []
+        for aw in attack_list:
+            w_type = aw[0]
+            i = aw[1]
+            if w_type==0:
+                w = fc_list[i]
+            else:
+                w = cnn_list[i]
+            #
+            #w = w_list[i]
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi)
+            w.wi_alt = w.wi # ?
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
+
+        for li in llist:
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+
+    def multi_attack_d(self, ce, fc_list, cnn_list, attack_num, temperature):
+        r = self._r
+
+        attack_list = self.make_attack_list_d(attack_num, temperature, fc_list, cnn_list)
+        llist = []
+        w_num = len(attack_list)
+
+
+        for aw in attack_list:
+            w_type = aw[0]
+            i = aw[1]
+            if w_type==0: # fc
+                w = fc_list[i]
+            else:
+               w = cnn_list[i]
+            #
+            #w = w_list[i]
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
+
+        for li in llist:
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+
+        ce_alt = self.evaluate()
+        ret = 0
+
+        if ce_alt<=ce:
+            ce = ce_alt
+            ret = 1
+            for aw in attack_list:
+                w_type = aw[0]
+                i = aw[1]
+                #w = w_list[i]
+                if w_type==0:
+                    w = fc_list[i]
+                else:
+                    w = cnn_list[i]
+                #
+                w.wi = w.wi_alt
+            #
+        else:
+            # acceptance control
+            delta = ce_alt - ce
+            hit = self.random_hit(delta, temperature)
+            if hit==1:
+                ret = 1
+                ce = ce_alt
+            else:
+                ret = 0
+            #
+        #
+        if ret==0:
+            self.undo_attack_d(fc_list, cnn_list, attack_list)
+        #
+        return ce, ret    
+
+
     #
     # a loop with a temperature
     #
-    def loop_sa_t(self, ce, temperature, attack_num, w_list, wtype, debug=0):
+    def loop_sa_t(self, loop, ce, temperature, attack_num, w_list, wtype, debug=0):
         r = self._r
         
         w_num = len(w_list)
@@ -462,8 +601,8 @@ class Train:
                 s += a
             #
             rate = float(s)/float(num)
-            print("[%d] %d [%s:%d] ce %09f (%d, %d) %06f"
-                    % (temperature, num, wtype, attack_num, ce, part, s, rate))
+            print("[%d:%d] %d [%s:%d] ce %09f (%d, %d) %06f"
+                    % (loop, temperature, num, wtype, attack_num, ce, part, s, rate))
             if num>min:
                 if num>10000 or rate<0.01:
                     atk_flag = False
@@ -474,7 +613,7 @@ class Train:
         return ce
 
 
-    def logathic_loop(self, w_list, wtype):
+    def logathic_loop(self, loop, w_list, wtype):
         r = self._r
         
         w_num = len(w_list)
@@ -484,9 +623,45 @@ class Train:
         
         for temperature in range(lv_max, -1, -1):
             attack_num = 2**temperature
-            ce = self.loop_sa_t(ce, temperature, attack_num, w_list, wtype)
+            ce = self.loop_sa_t(loop, ce, temperature, attack_num, w_list, wtype)
         #
         r.save()
+
+    def loop_sa_d(self, loop, ce, temperature, attack_num, fc_list, cnn_list, wtype, debug=0):
+        r = self._r
+
+        #w_num = len(w_list)
+        ret = 0
+        part = 0 # hit count
+        num = 0 # loop count
+        min = 200
+        hist = []
+        atk_flag = True
+
+        while atk_flag:
+            ce, ret = self.multi_attack_d(ce, fc_list, cnn_list, attack_num, temperature)
+            num += 1
+            part += ret
+            hist.append(ret)
+            if len(hist)>min:
+                hist = hist[1:]
+            #
+            s = 0 # hit conunt in the last 200
+            for a in hist:
+                s += a
+            #
+            rate = float(s)/float(num)
+            print("[%d:%d] %d [%s:%d] ce %09f (%d, %d) %06f"
+                    % (loop, temperature, num, wtype, attack_num, ce, part, s, rate))
+            if num>min:
+                if num>10000 or rate<0.01:
+                    atk_flag = False
+                #
+            #
+        # while
+
+        return ce
+
 #
 #
 #

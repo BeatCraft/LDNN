@@ -44,7 +44,7 @@ WEIGHT_SET_5 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0.0625, 0.125, 0.25, 0.5, 1.
 WEIGHT_SET_6 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 12
 
 #
-WEIGHT_SET = WEIGHT_SET_4
+WEIGHT_SET = WEIGHT_SET_3
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -650,7 +650,7 @@ class Conv_4_Layer(Layer):
             # ii : index of matrix, 0 to 3*3*ch-1
             if self._gpu.type==0:
                 self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output,
-                                            self._w, self._h, self._ch, self._filter, self._batch_size)
+                                            self._w, self._h, self._ch, self._filter, self._batch_size, 0)
                 if debug:
                     print("conv", self._index)
                     self._gpu.copy(self._output_array, self._gpu_output)
@@ -671,18 +671,18 @@ class Conv_4_Layer(Layer):
             # activation / scale
             size = self._filter * self._w * self._h
             if self._gpu.type==0: # OpenCL
-                self._gpu.copy(self._output_array, self._gpu_output)
-                xmean = self._output_array.mean()
-                xstd  = np.std(self._output_array)
-                zscore = (self._output_array-xmean)/xstd
-                self._gpu.copy(self._gpu_output, zscore)
-                #self._output_array = zscore
-                #self._gpu.copy(self._gpu_output, self._output_array)
+                #self._gpu.copy(self._output_array, self._gpu_output)
+                #xmean = self._output_array.mean()
+                #xstd  = np.std(self._output_array)
+                #zscore = (self._output_array-xmean)/xstd
+                #self._gpu.copy(self._gpu_output, zscore)
+                #
+                self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._w * self._h, self._filter)
                 #
                 self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, 1)
                 #osize = self._batch_size * self._filter * (self._w * self._h)
                 #self._gpu.normalize_batch(self._gpu_output, size)
-                #self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
+                self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
                 if debug:
                     print("conv, scale", self._index)
                     self._gpu.copy(self._output_array, self._gpu_output)

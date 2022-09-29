@@ -103,7 +103,8 @@ class Train:
         w_num = len(w_list)
         
         attack_list = []
-        while len(attack_list)<attack_num:
+        #while len(attack_list)<attack_num:
+        for i in range(attack_num):
             attack_i = random.randrange(w_num)
             w = w_list[attack_i]
             while 1:
@@ -124,7 +125,7 @@ class Train:
             w = w_list[i]
             layer = r.get_layer_at(w.li)
             layer.set_weight_index(w.ni, w.ii, w.wi)
-            w.wi_alt = w.wi # ?
+            w.wi_alt = w.wi
             if w.li in llist:
                 pass
             else:
@@ -271,12 +272,18 @@ class Train:
         return ce
     
     def random_hit(self, delta, temperature):
-        A = np.exp(-delta/(temperature+0.000001)) / 1000.0
-        hit = random.choices([0, 1], k=1, weights=[1-A, A])
-        if hit[0]==1:
-            print(A)
-            return 1
+        #A = np.exp(-delta/(temperature+0.000001)) / 1000.0
+        #return 0
+        A = np.exp(-np.abs(delta)/float(temperature)) / 1000.0
+        if random.random() < A:
+            print(delta, temperature, A)
+            #return 1
         #
+        
+        #hit = random.choices([0, 1], k=1, weights=[1-A, A])
+        #if hit[0]==1:
+        #    print(A)
+        #    return 1
         return 0
     
     def loop_sa_20(self, loop, w_list, debug=0):
@@ -394,17 +401,20 @@ class Train:
         attack_list = self.make_attack_list(attack_num, 0, w_list)
         llist = []
         w_num = len(attack_list)
+        
         for i in attack_list:
             w = w_list[i]
             layer = r.get_layer_at(w.li)
             layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            #print(i, w.wi, w.wi_alt)
             if w.li in llist:
                 pass
             else:
                 llist.append(w.li)
             #
         #
-
+        #print(llist)
+        
         for li in llist:
             layer = r.get_layer_at(li)
             layer.update_weight()
@@ -414,29 +424,27 @@ class Train:
         ret = 0
 
         if ce_alt<=ce:
-            ce = ce_alt
             ret = 1
-            for i in attack_list:
-                w = w_list[i]
-                w.wi = w.wi_alt
-            #
-        else:
-            # acceptance control
+        else: # acceptance control
             delta = ce_alt - ce
             hit = self.random_hit(delta, temperature)
             if hit==1:
                 ret = 1
-                ce = ce_alt
             else:
                 ret = 0
             #
         #
         if ret==0:
             self.undo_attack(w_list, attack_list)
+        else:
+            #print(ret, ce, ce_alt)
+            ce = ce_alt
+            for i in attack_list:
+                w = w_list[i]
+                w.wi = w.wi_alt
+            #
         #
         return ce, ret
-
-
 
     def make_attack_list_d(self, attack_num, temperature, fc_list, cnn_list):
         r = self._r
@@ -598,7 +606,7 @@ class Train:
             #
             s = 0 # hit conunt in the last 200
             for a in hist:
-                s += a
+                s += 1
             #
             rate = float(s)/float(num)
             print("[%d:%d] %d [%s:%d] ce %09f (%d, %d) %06f"
@@ -662,6 +670,25 @@ class Train:
 
         return ce
 
+    def loop_sa_alt(self, loop, ce, temperature, fc_list, fc_attack_num, cnn_list, cnn_attack_num, wtype, debug=0):
+        r = self._r
+        
+        ret = 0
+        cnt = 0
+        for i in range(100):
+            ce, ret = self.multi_attack_t(ce, cnn_list, cnn_attack_num, temperature)
+            cnt += ret
+            print("[%d:%d] cnn [%d] %d : ce %f" % (loop, i, cnn_attack_num, cnt, ce))
+        #
+
+        cnt = 0
+        for i in range(100):
+            ce, ret = self.multi_attack_t(ce, fc_list, fc_attack_num, temperature)
+            cnt += ret
+            print("[%d:%d] fc [%d] %d : ce %f" % (loop, i, fc_attack_num, cnt, ce))
+        #
+
+        return ce
 #
 #
 #

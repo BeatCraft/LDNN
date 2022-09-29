@@ -258,7 +258,17 @@ class HiddenLayer(Layer):
         else:
             print("error")
         #
+        self._scale = 0
+        
+    def set_scale(self, mode):
         self._scale = 1
+        
+    def get_scale(self, mode):
+        return self._scale
+        # 0 : none
+        # 1 : layer normalize
+        # 2 : batch normalize
+        # 3 : max scale
     
     def prepare(self, batch_size):
         print("HiddenLayer::prepare(%d)" % (batch_size))
@@ -302,8 +312,14 @@ class HiddenLayer(Layer):
                 #                                self._batch_size, stride_1, stride_2,
                 #                                self._num_input, self._num_node)
                 #self._gpu.sum(self._gpu_product, self._gpu_output, self._num_input, self._num_node, activation, self._batch_size)
-                #if self._scale:
-                self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
+                if self._scale==0:
+                    pass
+                elif self._scale==1:
+                    self._gpu.normalize_layer(self._gpu_output, self._batch_size, self._num_node)
+                elif self._scale==2:
+                    self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._num_input, self._num_node)
+                elif self._scale==3:
+                    self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
                 #
                 if debug:
                     print("hidden", self._index)
@@ -806,14 +822,15 @@ class Roster:
         labels = np.zeros((size, num_class), dtype=np.float32)
         for j in range(size):
             data_array[j] = train_data_batch[offset+j]
+            #print(offset+j, type(train_label_batch[offset+j]))
             k = int(train_label_batch[offset+j])
             #print(k)
             labels[j][k] = 1.0
         #
-        self.set_data(data_array, data_size, labels, size, 1)
+        self.set_data(data_array, data_size, labels, size)
                 
-    def set_data(self, data, data_size, label, batch_size, scale=0):
-        print("Roster::set_data(%d, %d, scale=%d)" % (data_size, batch_size, scale))
+    def set_data(self, data, data_size, label, batch_size):
+        print("Roster::set_data(%d, %d)" % (data_size, batch_size))
         if self._gpu:
             pass
         else:
@@ -824,20 +841,46 @@ class Roster:
         if self._gpu.type==0: # OpenCL
             self._gpu.copy(self._gpu_input, data)
             self._gpu.copy(self._gpu_labels, label)
-            if self._scale_input==0:
+            if self._scale_input==0: # none
                 self._gpu.copy(self.input._gpu_output, data)
-            elif self._scale_input==1:
+            elif self._scale_input==1: # scale
                 self._gpu.scale(self._gpu_input, self.input._gpu_output, data_size, float(255.0), self.input._num_node, batch_size, 0)
-            elif self._scale_input==2:
-                self._gpu.scale_exp(self._gpu_input, self.input._gpu_output, data_size, self.input._num_node, batch_size, 0)
+            elif self._scale_input==2: # batch normalize
+                print("1", data.shape)
+                #print(data[0])
+                data = data.transpose()
+                print("2", data.shape)
+                k = data.shape[0]
+                #print(k)
+                for i in range(k):
+                    xmean = data[i].mean()
+                    xstd  = np.std(data[i])
+                    zscore = (data[i]-xmean)/xstd
+                    max = zscore.max()
+                    min = zscore.min()
+                    if max < abs(min):
+                        max = abs(min)
+                    #
+                    zscore = zscore / max
+                    data[i] = zscore / 2 + 0.5
+                #
+                data = data.transpose()
+                print("3", data.shape)
+                k = data.shape[0]
+                #for i in range(k):
+                #    print(i)
+                #    print(data[i])
+                #
+                self._gpu.copy(self.input._gpu_output, data)
+                #self._gpu.copy(self._gpu_output, zscore)
+            #    self._gpu.scale_exp(self._gpu_input, self.input._gpu_output, data_size, self.input._num_node, batch_size, 0)
             else:
                 return
             #
         elif self._gpu.type==1: # GDX
-            if self._scale_input==0:
-                pass
-            elif self._scale_input==1:
-                #print("OK")
+            if self._scale_input==0: # none
+                self.input._gpu_output = self._gpu_input
+            elif self._scale_input==1: # scale 0.0 - 1.0
                 if self.mem_save==0:
                     self._gpu_input = self._gpu.allocateArray(data)
                     self._gpu_labels = self._gpu.allocateArray(label)

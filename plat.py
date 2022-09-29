@@ -16,3 +16,32 @@ ID = 0
 #     ubuntu
 #     cupy
 
+if sys.platform.startswith('darwin'):
+    import opencl
+else:
+    if ID==1:
+        import opencl
+    elif ID==2:
+        import dgx
+    #
+#
+
+def getGpu():
+    if ID==0: # MBP
+        platform_id = 0
+        device_id = 1
+        my_gpu = opencl.OpenCL(platform_id, device_id)
+        my_gpu.set_kernel_code()
+    elif ID==1: # tr
+        platform_id = 1
+        device_id = 0
+        my_gpu = opencl.OpenCL(platform_id, device_id)
+        my_gpu.set_kernel_code()
+    elif ID==2: # nvidia
+        my_gpu = dgx.Dgx(1)
+    else:
+        print("error : undefined platform")
+        my_gpu = None
+    #
+    return my_gpu
+

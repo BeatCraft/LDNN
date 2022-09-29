@@ -69,6 +69,7 @@ class worker(object):
             ce_avg_list = None
         #
         ce_avg = self._com.scatter(ce_avg_list, root=0)
+        #print(self._rank, ce, ce_avg)
         return ce_avg
 
     def multi_attack(self, ce, w_list, mode, div):
@@ -589,6 +590,10 @@ class worker(object):
                     if hit==1:
                         ret = 1
                         ce = ce_alt
+                        for i in attack_list:
+                            w = w_list[i]
+                            w.wi = w.wi_alt
+                        #
                     else:
                         ret = 0
                         self.train.undo_attack(w_list, attack_list)
@@ -608,7 +613,7 @@ class worker(object):
                 #
                 rate = float(s)/float(num)
                 if self._rank==0:
-                    print("[%d] %d/%d (%d) [%s:%03d] ce %09f (%d, %d, %d) %f" %(loop, t, t_max, num, wtype, atk_num, ce, part, total, s, rate))
+                    print("[%d] %d/%d (%d) [%s:%03d] ce %f (%d, %d, %d) %f | %d, %f" %(loop, t, t_max, num, wtype, atk_num, ce, part, total, s, rate, ret, ce_alt))
                 #
                 if num>min:
                     if num>10000 or rate<0.01:
@@ -632,7 +637,7 @@ class worker(object):
     #
     # basic loop
     #
-    def loop_sa_t(self, ce, temperature, attack_num, w_list, wtype, debug=0):
+    def loop_sa_t0000(self, ce, temperature, attack_num, w_list, wtype, debug=0):
         r = self.r
         w_num = len(w_list)
         ret = 0
@@ -730,18 +735,121 @@ class worker(object):
                 #
             #
         # while
-        
-        #if self._rank==0:
-        #    r.save()
-        #    if debug==1:
-        #        log = "%d, %s" % (loop+1, '{:.10g}'.format(ce))
-        #        output("./log.csv", log)
-        #        spath = "./wi/wi-%04d.csv" % (loop+1)
-        #        r.save_as(spath)
-        #    #
-        #
         return ce
 
+    def multi_attack_t(self, ce, w_list, attack_num, temperature):
+        r = self.r
+        
+        if self._rank==0:
+            attack_list = self.train.make_attack_list(attack_num, 0, w_list)
+        else:
+            attack_list = []
+        #
+        attack_list = self._com.bcast(attack_list, root=0)
+        
+        llist = []
+        w_num = len(attack_list)
+        for i in attack_list:
+            w = w_list[i]
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
+
+        for li in llist:
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+        
+        ce_alt = self.evaluate()
+        ret = 0
+
+        if ce_alt<=ce:
+            ret = 1
+        else: # acceptance control
+            delta = ce_alt - ce
+            if self._rank==0:
+                hit = self.train.random_hit(delta, temperature)
+            else:
+                hit = 0
+            #
+            hit = self._com.bcast(hit, root=0)
+            if hit==1:
+                ret = 1
+            else:
+                ret = 0
+            #
+        #
+        
+        if ret==0:
+            self.train.undo_attack(w_list, attack_list)
+        else:
+            #print(ce_alt)
+            ce = ce_alt
+            for i in attack_list:
+                w = w_list[i]
+                w.wi = w.wi_alt
+            #
+        #
+        return ce, ret
+    #
+    # a loop with a temperature
+    #
+    def loop_sa_t(self, loop, ce, temperature, attack_num, w_list, wtype, debug=0):
+        r = self.r
+        
+        w_num = len(w_list)
+        ret = 0
+        part = 0 # hit count
+        num = 0 # loop count
+        min = 200
+        hist = []
+        atk_flag = True
+        
+        while atk_flag:
+            ce, ret = self.multi_attack_t(ce, w_list, attack_num, temperature)
+            num += 1
+            part += ret
+            hist.append(ret)
+            if len(hist)>min:
+                hist = hist[1:]
+            #
+            s = 0 # hit conunt in the last 200
+            for a in hist:
+                s += a
+            #
+            rate = float(s)/float(num)
+            print("[%d:%d] %d [%s:%d] ce %f (%d, %d) %f | %d"
+                    % (loop, temperature, num, wtype, attack_num, ce, part, s, rate, ret))
+            if num>min:
+                if num>10000 or rate<0.01:
+                    atk_flag = False
+                #
+            #
+        # while
+        
+        return ce
+
+
+    def logathic_loop(self, loop, w_list, wtype):
+        r = self.r
+        
+        w_num = len(w_list)
+        lv_min = 0
+        lv_max = int(math.log(w_num/100, 2)) + 1 # 1 % max
+        ce = self.evaluate()
+        
+        for temperature in range(lv_max, -1, -1):
+            attack_num = 2**temperature
+            ce = self.loop_sa_t(loop, ce, temperature, attack_num, w_list, wtype)
+        #
+        if self._rank==0:
+            r.save()
+        #
 
 def main():
     argvs = sys.argv

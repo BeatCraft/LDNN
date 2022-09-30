@@ -115,18 +115,20 @@ __kernel void conv_4_roll_batch(
         
         for (int i=0; i<ch; i++){
             int start = b_stride*bi + ch_stride*i;
+            int f_start = 3*3*fi*ch;
+            int c_start = 3*3*i;
             
-            sum += input[start + y_stride + xi    ] * weight[fi*ch*3*3 + i*3*3    ];
-            sum += input[start + y_stride + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 1];
-            sum += input[start + y_stride + xi + 2] * weight[fi*ch*3*3 + i*3*3 + 2];
+            sum += input[start + y_stride + xi    ] * weight[f_start + c_start + 0];
+            sum += input[start + y_stride + xi + 1] * weight[f_start + c_start + 1];
+            sum += input[start + y_stride + xi + 2] * weight[f_start + c_start + 2];
         
-            sum += input[start + y_stride + (w+2) + xi    ] * weight[fi*ch*3*3 + i*3*3 + 3];
-            sum += input[start + y_stride + (w+2) + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 4];
-            sum += input[start + y_stride + (w+2) + xi + 2] * weight[fi*ch*3*3 + i*3*3 + 5];
+            sum += input[start + y_stride + (w+2) + xi    ] * weight[f_start + c_start + 3];
+            sum += input[start + y_stride + (w+2) + xi + 1] * weight[f_start + c_start + 4];
+            sum += input[start + y_stride + (w+2) + xi + 2] * weight[f_start + c_start + 5];
         
-            sum += input[start + y_stride + (w+2)*2 + xi    ] * weight[fi*ch*3*3 + i*3*3 + 6];
-            sum += input[start + y_stride + (w+2)*2 + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 7];
-            sum += input[start + y_stride + (w+2)*2 + xi + 2] * weight[fi*ch*3*3 + i*3*3 + 8];
+            sum += input[start + y_stride + (w+2)*2 + xi    ] * weight[f_start + c_start + 6];
+            sum += input[start + y_stride + (w+2)*2 + xi + 1] * weight[f_start + c_start + 7];
+            sum += input[start + y_stride + (w+2)*2 + xi + 2] * weight[f_start + c_start + 8];
         }
 
         //sum = sum / 9.0;
@@ -243,7 +245,7 @@ __kernel void normalize_layer(__global float* data, int size)
         float k = data[bi*size+i] - mean;
         sum += k * k;
     }
-    div2 = sum / size + delta;
+    div2 = sum / (float)size + delta;
     div =  sqrt(div2);
     
     for (int i=0; i<size; i++){
@@ -337,6 +339,7 @@ __kernel void p_softmax(__global float* in, int num)
     //printf(\"%d : %f\\n\", bi, sum);
 
     for (int i=0;i<num;i++){
+        //printf(\"%f : %f\\n\", in[bi*num+i], sum);
         in[bi*num+i] = in[bi*num+i]/sum;
     }
 }
@@ -437,14 +440,13 @@ __kernel void calc_mac_relu(
     __global float* x,
     __global float* w,
     __global float* y,
-    int xsize,
-    int wsize,
+    int xsize, // node
+    int wsize, // input
     int act)
 {
-    int bi = get_global_id(0);
-    int xi = get_global_id(1);
-    //int bi = blockIdx.x;
-    //int xi = threadIdx.x;
+    int bi = get_global_id(0); // batch
+    int xi = get_global_id(1); // node
+    
     int x_start = (wsize * bi);
     int w_start = wsize * xi;
     int y_start = (xsize * bi) + xi;
@@ -596,7 +598,7 @@ class OpenCL(gpu.Gpu):
                                            input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter), np.int32(activation))
         event.wait()
 
-#normalize_batch(__global float* data, int b_num, int ch_size, int ch_num)
+    #normalize_batch(__global float* data, int b_num, int ch_size, int ch_num)
     def normalize_batch(self, buf, b_num, ch_size, ch_num):
         event = self.prg.normalize_batch(self._queue, (ch_num,), None, 
                                          buf, np.int32(b_num), np.int32(ch_size), np.int32(ch_num))

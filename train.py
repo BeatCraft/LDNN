@@ -606,7 +606,7 @@ class Train:
             #
             s = 0 # hit conunt in the last 200
             for a in hist:
-                s += 1
+                s += a
             #
             rate = float(s)/float(num)
             print("[%d:%d] %d [%s:%d] ce %09f (%d, %d) %06f"

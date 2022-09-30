@@ -168,6 +168,7 @@ class Layer(object):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
                 wi = random.randrange(WEIGHT_INDEX_SIZE)
+                #wi = 0
                 self.set_weight_index(ni, ii, wi)
             #
         #
@@ -258,10 +259,10 @@ class HiddenLayer(Layer):
         else:
             print("error")
         #
-        self._scale = 0
+        self._scale = 3
         
     def set_scale(self, mode):
-        self._scale = 1
+        self._scale = mode
         
     def get_scale(self, mode):
         return self._scale
@@ -303,11 +304,12 @@ class HiddenLayer(Layer):
     def propagate(self, array_in, debug=0):
         stride_1 = self._num_node * self._num_input
         stride_2 = self._num_input
-        activation = 0 # 0 : relu, 1 : skip
+        activation = 0 # 0 : skip, 1 : relu
 
         if self._gpu:
             if self._gpu.type==0:
-                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 1)
+                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
+                                  self._batch_size, self._num_node, self._num_input, 1)
                 #self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
                 #                                self._batch_size, stride_1, stride_2,
                 #                                self._num_input, self._num_node)
@@ -399,23 +401,25 @@ class OutputLayer(Layer):
 
         if self._gpu:
             if self._gpu.type==0: # OpenCL
-                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 0)
+                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
+                                  self._batch_size, self._num_node, self._num_input, 0)
                 #self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
                 #                                self._batch_size, stride_1, stride_2,
                 #                                self._num_input, self._num_node)
                 #self._gpu.sum(self._gpu_product, self._gpu_output,
                 #              self._num_input, self._num_node, activation, self._batch_size)
+                
                 # softmax
                 if debug:
                     print("output")
                     self._gpu.copy(self._output_array, self._gpu_output)
-                    print((self._output_array[6]))
+                    print((self._output_array[0]))
                 #
                 self._gpu.softmax(self._gpu_output, self._num_node, self._batch_size)
                 if debug:
                     print("softmax")
                     self._gpu.copy(self._output_array, self._gpu_output)
-                    print((self._output_array[6]))
+                    print((self._output_array[0]))
                 #
             elif self._gpu.type==1: # DGX
                 #self._gpu.mac(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input)
@@ -575,21 +579,22 @@ class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
         print("Convolution Layer ver.4 ::__init__()")
         #self._cache = 0 # 0 : no, 1 : yes
-        self._ch = ch
         self._w = w
         self._h = h
-        self._filter = filter # node
+        self._ch = ch # number of inputs
+        self._filter = filter # node / # number of outputs
         self._filter_size = 3 * 3 * ch # width and height of filter are fixed to 3
-        num_input = self._filter_size
+        self._num_of_w = 3 * 3 * ch * filter
+        num_input = self._num_of_w # self._filter_size
         num_node = self._filter
         #
         super(Conv_4_Layer, self).__init__(i, LAYER_TYPE_CONV_4, num_input, num_node, pre, gpu)
-                
-        #self._num_node
         #
         # mems for weights
-        self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
+        self._weight_index_matrix = np.zeros( (self._filter, self._num_of_w), dtype=np.int32)
+        self._weight_matrix = np.zeros( (self._filter, self._num_of_w), dtype=np.float32)
+        #self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+        #self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
         #
         if self._gpu:
             if self._gpu.type==0:
@@ -646,16 +651,10 @@ class Conv_4_Layer(Layer):
             if self._cache:
                 pass
             else:
-                if self._gpu.type==0:
+                if self._gpu.type==0: # OpenCL
                     self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-                elif self._gpu.type==1:
-                    #print("[%d] propagate convolusion on gdx" % (self._index))
-                    #print(array_in[0])
-                    #
-                    # GDX
-                    #
+                elif self._gpu.type==1: # GDX
                     self._gpu.padding(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-                    #print(self._gpu_padded[0])
                 #
                 if self._index==1:
                     self._cache = 1 # cache for padding
@@ -664,18 +663,16 @@ class Conv_4_Layer(Layer):
         
             # ni : filetr index, 0 to num of filter -1
             # ii : index of matrix, 0 to 3*3*ch-1
-            if self._gpu.type==0:
+            if self._gpu.type==0: # OpenCL
                 self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output,
-                                            self._w, self._h, self._ch, self._filter, self._batch_size, 0)
+                                            self._w, self._h, self._ch, self._filter,
+                                            self._batch_size, 0)
                 if debug:
                     print("conv", self._index)
                     self._gpu.copy(self._output_array, self._gpu_output)
                     print((self._output_array[0][0]))
                 #
-            elif self._gpu.type==1:
-                #
-                # GDX
-                #
+            elif self._gpu.type==1: # GDX
                 self._gpu.convolusion(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
                 if debug:
                     print("conv", self._index)
@@ -685,20 +682,16 @@ class Conv_4_Layer(Layer):
             #
             
             # activation / scale
-            size = self._filter * self._w * self._h
+            size = self._w * self._h * self._filter
             if self._gpu.type==0: # OpenCL
                 #self._gpu.copy(self._output_array, self._gpu_output)
                 #xmean = self._output_array.mean()
                 #xstd  = np.std(self._output_array)
                 #zscore = (self._output_array-xmean)/xstd
                 #self._gpu.copy(self._gpu_output, zscore)
-                #
                 self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._w * self._h, self._filter)
-                #
                 self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, 1)
-                #osize = self._batch_size * self._filter * (self._w * self._h)
-                #self._gpu.normalize_batch(self._gpu_output, size)
-                self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
+                #self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
                 if debug:
                     print("conv, scale", self._index)
                     self._gpu.copy(self._output_array, self._gpu_output)
@@ -707,6 +700,7 @@ class Conv_4_Layer(Layer):
             elif self._gpu.type==1: # GDX
                 #mx = cp.max(self._gpu_output)
                 #self._gpu_output = self._gpu_output/mx
+                # relu ??
                 self._gpu.layerNormalize(self._gpu_output, self._batch_size, size)
                 #self._gpu.layerScale(self._gpu_output, self._batch_size, size)
                 if debug:

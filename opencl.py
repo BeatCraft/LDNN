@@ -47,15 +47,14 @@ __kernel void normalize_batch(
             dsum += (k*k);
         }
     }        
-    div2 = dsum / (float)cnt + delta;
-    div = sqrt(div2);
+    div2 = dsum / (float)cnt;
+    div = sqrt(div2) + delta;
     
     for (int bi=0; bi<b_num; bi++){
         int start = bi * stride + ci * ch_size;
         for (int i=0; i<ch_size; i++){
             float k = data[start + i] - mean;
             data[start + i] = k / div;
-            //data[start + i] = data[start + i] * div + mean;
         }
     }
 }
@@ -231,22 +230,22 @@ __kernel void normalize_layer(__global float* data, int size)
     int bi = get_global_id(0);
     float sum = 0.0;
     float mean = 0.0;
-    float delta = 0.0000001;
+    float delta = 0.000001;
     float div2 = 0.0;
     float div = 0.0;
 
     for (int i=0; i<size; i++){
         sum += data[bi*size+i];
     }
-    mean = sum / size;
+    mean = sum / (float)size;
     
     sum = 0.0;
     for (int i=0; i<size; i++){
         float k = data[bi*size+i] - mean;
         sum += k * k;
     }
-    div2 = sum / (float)size + delta;
-    div =  sqrt(div2);
+    div2 = sum / (float)size;
+    div =  sqrt(div2 + delta);
     
     for (int i=0; i<size; i++){
         float k = data[bi*size+i] - mean;
@@ -257,19 +256,18 @@ __kernel void normalize_layer(__global float* data, int size)
 __kernel void scale_layer(__global float* data, int size)
 {
     int bi = get_global_id(0);
+    int start = bi*size;
     float max = 0.0;
     
     for (int i=0;i<size;i++){
-        if (data[bi*size+i]>max){
-            max = data[bi*size+i];
+        if (data[start+i]>max){
+            max = data[start+i];
         }
     }
     
-    for (int i=0;i<size;i++){
-        if (max > 0.0){
-            data[bi*size+i] = (data[bi*size+i]/max);
-        }else{
-            data[bi*size+i] = 0.0;
+    if (max>0.0){
+        for (int i=0;i<size;i++){
+            data[start+i] = (data[start+i]/max);
         }
     }
 }
@@ -326,21 +324,37 @@ __kernel void cross_entropy(__global const float* infs,
 __kernel void p_softmax(__global float* in, int num)
 {
     int bi = get_global_id(0);
-    float sum = 0.0;
+    float temp = 0.0;
+    float total = 0.0;
+    int start = bi*num;
 
     for (int i=0;i<num;i++){
-        in[bi*num+i] = exp(in[bi*num+i]);
+        temp = in[start+i];
+        temp = exp(temp);
+        if (isinf(temp)){
+            temp = 3.402823e+38;
+        }else if (isnan(temp)){
+            temp = 0;
+        }
+        in[start+i] = temp;
+        total += temp;
     }
 
-    for (int i=0;i<num;i++){
-        sum += in[bi*num+i];
-    }
+    //for (int i=0;i<num;i++){
+    //    in[bi*num+i] = exp(in[bi*num+i]);
+    //}
+    //
+    //for (int i=0;i<num;i++){
+    //    sum += in[bi*num+i];
+    //}
+    
+    
     //sum += 0.0000001;
     //printf(\"%d : %f\\n\", bi, sum);
 
     for (int i=0;i<num;i++){
         //printf(\"%f : %f\\n\", in[bi*num+i], sum);
-        in[bi*num+i] = in[bi*num+i]/sum;
+        in[start+i] = in[start+i]/total;
     }
 }
 
@@ -447,7 +461,7 @@ __kernel void calc_mac_relu(
     int bi = get_global_id(0); // batch
     int xi = get_global_id(1); // node
     
-    int x_start = (wsize * bi);
+    int x_start = wsize * bi;
     int w_start = wsize * xi;
     int y_start = (xsize * bi) + xi;
     float temp = 0.0;
@@ -466,8 +480,10 @@ __kernel void calc_mac_relu(
             y[y_start] = 0;
         }else if (act==2){
             y[y_start] = 0.000001;
-        }else{
+        }else if (act==3){
             y[y_start] = temp/20;
+        }else{
+            y[y_start] = temp;
         }
     }
 }
@@ -556,7 +572,7 @@ class OpenCL(gpu.Gpu):
         event.wait()
     
     def relu(self, data_out, batch_size, num_node, size, mode):
-        event = self.prg.relu(self._queue, (batch_size, num_node), None,
+        event = self.prg.size_input(self._queue, (batch_size, num_node), None,
                               data_out, np.int32(size), np.int32(num_node), np.int32(mode))
         event.wait()
     

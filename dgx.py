@@ -92,9 +92,6 @@ void calc_cnn_roll(
     const int ch,
     const int filter)
 {
-    //int bi = blockDim.x;
-    //int xi = blockIdx.x;
-    //int yi = blockIdx.y;
     int bi = blockIdx.x;
     int xi = threadIdx.x;
     int yi = threadIdx.y;
@@ -124,12 +121,13 @@ void calc_cnn_roll(
             sum += input[start + y_stride + (w+2)*2 + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 7];
             sum += input[start + y_stride + (w+2)*2 + xi + 2] * weight[fi*ch*3*3 + i*3*3 + 8];
         }
+        output[bi*w*h*filter + w*h*fi + yi*w+xi] = sum;
         // relu
-        if (sum<0.0){
-            output[bi*w*h*filter + w*h*fi + yi*w+xi] = 0.0;
-        }else{
-            output[bi*w*h*filter + w*h*fi + yi*w+xi] = sum;
-        }
+        //if (sum<0.0){
+        //    output[bi*w*h*filter + w*h*fi + yi*w+xi] = 0.0;
+        //}else{
+        //    output[bi*w*h*filter + w*h*fi + yi*w+xi] = sum;
+        //}
     }
 }
 ''', 'calc_cnn_roll')
@@ -176,7 +174,7 @@ extern "C" __global__
 void calc_mac(const float* x, const float* w, float* y, int size) {
     int x_start = size * blockIdx.x;
     int w_start = size * threadIdx.x;
-    int y_start = blockDim.x * blockIdx.x +  threadIdx.x;
+    int y_start = blockDim.x * blockIdx.x + threadIdx.x;
     float temp = 0.0;
 
     for (int i=0;i<size;i++){
@@ -266,6 +264,27 @@ void calc_mac_relu(const float* x, const float* w, float* y, int size) {
     }
 }
 ''', 'calc_mac_relu')
+
+calc_relu = cp.RawKernel(r'''
+extern "C" __global__
+void calc_relu(float* buf, int size_input, int mode){
+    int bi = blockIdx.x;
+    int ni = threadIdx.x;
+
+    for (int i=0;i<size_input;i++){
+        int idx = bi*size_input;
+        if (buf[idx+i]<0){
+            if (mode==1){
+                buf[idx+i] = 0.0;
+            }else if (mode==2){
+                buf[idx+i] = 0.000001;
+            }else if (mode==3){
+                buf[idx+i] = buf[idx+i]/20;
+            }
+        }
+    }
+}
+''', 'calc_relu')
 
 cals_layer_scale = cp.RawKernel(r'''
 extern "C" __global__
@@ -367,6 +386,50 @@ void calc_entropy(const double* x, const float *a, double* y, int size) {
 }
 ''', 'calc_entropy')
 
+calc_batch_normalize = cp.RawKernel(r'''
+extern "C" __global__
+void calc_batch_normalize(float* data, const int b_num, int ch_size, int ch_num) {
+    int ci = blockIdx.x;//get_global_id(0);
+    int stride = ch_size * ch_num;
+
+    float sum = 0.0;
+    float mean = 0.0;
+    float dsum = 0.0;
+    float delta = 0.0000001;
+    float div2 = 0.0;
+    float div = 0.0;
+    int cnt = 0;
+
+    for (int bi=0; bi<b_num; bi++){
+        int start = bi * stride + ci * ch_size;
+        for (int i=0; i<ch_size; i++){
+            sum += data[start + i];
+            cnt++;
+        }
+    }
+    mean = sum / (float)cnt;
+
+    for (int bi=0; bi<b_num; bi++){
+        int start = bi * stride + ci * ch_size;
+        for (int i=0; i<ch_size; i++){
+            float k = data[start + i] - mean;
+            dsum += (k*k);
+        }
+    }
+    div2 = dsum / (float)cnt;
+    div = sqrt(div2) + delta;
+    
+    for (int bi=0; bi<b_num; bi++){
+        int start = bi * stride + ci * ch_size;
+        for (int i=0; i<ch_size; i++){
+            float k = data[start + i] - mean;
+            data[start + i] = k / div;
+        }
+    }
+}
+''', 'calc_batch_normalize')
+
+
 class Dgx(gpu.Gpu):
     def __init__(self, device_id):
         super(gpu.Gpu, self).__init__()
@@ -386,6 +449,11 @@ class Dgx(gpu.Gpu):
         
     def layerNormalize(self, buf, size_batch, size_node):
         cals_layer_normalize((size_batch,), (1,), (buf, size_node))
+        
+        
+    def batchNormalize(self, buf, size_batch, size_rect, size_node):
+        calc_batch_normalize((size_node,), (1,),
+                             (buf, np.int32(size_batch), np.int32(size_rect), np.int32(size_node)))
         
     def mac(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input):
         calc_mac((size_batch,), (size_node,), (buf_x, buf_w, buf_y, size_input))
@@ -415,7 +483,10 @@ class Dgx(gpu.Gpu):
 
     def layer_mse(self, buf_x, buf_y, ch, w, h, batch_size):
         calc_layer_mse((batch_size,), (1,), (buf_x, buf_y, ch, w, h))
-        
+    
+    def relu(self, buf, size_input, mode, batch_size, size_node):
+        calc_relu((batch_size,), (size_node,), (buf, size_input, mode))
+
     def make_attack_list(self, div, mode, w_list, result_gpu):
         pass
     

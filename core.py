@@ -44,7 +44,7 @@ WEIGHT_SET_5 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0.0625, 0.125, 0.25, 0.5, 1.
 WEIGHT_SET_6 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 12
 
 #
-WEIGHT_SET = WEIGHT_SET_3
+WEIGHT_SET = WEIGHT_SET_5
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -259,7 +259,7 @@ class HiddenLayer(Layer):
         else:
             print("error")
         #
-        self._scale = 3
+        self._scale = 3 # scale only
         
     def set_scale(self, mode):
         self._scale = mode
@@ -309,7 +309,11 @@ class HiddenLayer(Layer):
         if self._gpu:
             if self._gpu.type==0:
                 self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
-                                  self._batch_size, self._num_node, self._num_input, 1)
+                                  self._batch_size, self._num_node, self._num_input, 3)
+                                  
+                #self._gpu.copy(self._output_array, self._gpu_output)
+                #print((self._output_array[0]))
+                    
                 #self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
                 #                                self._batch_size, stride_1, stride_2,
                 #                                self._num_input, self._num_node)
@@ -322,15 +326,21 @@ class HiddenLayer(Layer):
                     self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._num_input, self._num_node)
                 elif self._scale==3:
                     self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
+                elif self._scale==4:
+                    self._gpu.normalize_layer(self._gpu_output, self._batch_size, self._num_node)
+                    self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
                 #
                 if debug:
+                    tarray = np.zeros((self._batch_size, self._num_input), dtype=np.float32)
+                    self._gpu.copy(tarray, array_in)
+                    print((tarray[0]))
                     print("hidden", self._index)
                     self._gpu.copy(self._output_array, self._gpu_output)
                     print((self._output_array[0]))
                 #
             elif self._gpu.type==1:
                 self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 1)
-                self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
+                #self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
                 self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
                 #mx = cp.max(self._gpu_output)
                 #self._gpu_output = self._gpu_output/mx
@@ -668,15 +678,22 @@ class Conv_4_Layer(Layer):
                                             self._w, self._h, self._ch, self._filter,
                                             self._batch_size, 0)
                 if debug:
-                    print("conv", self._index)
+                    print(self._index, "conv")
                     self._gpu.copy(self._output_array, self._gpu_output)
                     print((self._output_array[0][0]))
                 #
             elif self._gpu.type==1: # GDX
+                if debug:
+                    print(self._index, "conv", "padded", )
+                    #print(self._padded_array.shape)
+                    darray = cp.asnumpy(self._gpu_padded)
+                    print((darray.shape, type(darray[0])))
+                #
                 self._gpu.convolusion(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
                 if debug:
-                    print("conv", self._index)
+                    print(self._index, "conv")
                     darray = cp.asnumpy(self._gpu_output)
+                    print((darray.shape, type(darray[0])))
                     print(darray[0][0])
                 #
             #
@@ -693,15 +710,22 @@ class Conv_4_Layer(Layer):
                 self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, 1)
                 #self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
                 if debug:
-                    print("conv, scale", self._index)
+                    print(self._index, "conv, scale")
                     self._gpu.copy(self._output_array, self._gpu_output)
                     print((self._output_array[0][0]))
+                    #
+                    self.save_output()
                 #
             elif self._gpu.type==1: # GDX
                 #mx = cp.max(self._gpu_output)
                 #self._gpu_output = self._gpu_output/mx
                 # relu ??
-                self._gpu.layerNormalize(self._gpu_output, self._batch_size, size)
+                h = self._w * self._h
+                self._gpu.batchNormalize(self._gpu_output, self._batch_size, h, self._filter)
+                self._gpu.relu(self._gpu_output, size, 3, self._batch_size, self._filter)
+                
+                #size = self._w * self._h * self._filter
+                #self._gpu.layerNormalize(self._gpu_output, self._batch_size, size)
                 #self._gpu.layerScale(self._gpu_output, self._batch_size, size)
                 if debug:
                     print("conv, scale", self._index)
@@ -730,7 +754,10 @@ class Conv_4_Layer(Layer):
                         pix[x,y] = v1
                     #
                 #
-                img.save("./debug/cnn/%d_%d.png" %(bi, fi))
+                #spath = "./debug/cnn/%d_%d.png" % (bi, fi)
+                spath = "./debug/%d-%d_%d.png" % (self._index, bi, fi)
+                print(spath)
+                img.save(spath)
             #
         #
 #
@@ -848,19 +875,23 @@ class Roster:
                 #print(k)
                 for i in range(k):
                     xmean = data[i].mean()
+                    #print(xmean)
                     xstd  = np.std(data[i])
+                    #print(xstd)
                     zscore = (data[i]-xmean)/xstd
                     max = zscore.max()
                     min = zscore.min()
                     if max < abs(min):
                         max = abs(min)
                     #
+                    #print(max)
                     zscore = zscore / max
                     data[i] = zscore / 2 + 0.5
                 #
                 data = data.transpose()
                 print("3", data.shape)
                 k = data.shape[0]
+                #print(data)
                 #for i in range(k):
                 #    print(i)
                 #    print(data[i])

@@ -389,27 +389,15 @@ __kernel void relu(__global float* out, int num, int stride, int mode)
     float k = 0.0;
     
     for (int i=0;i<num;i++){
-        k = out[stride*bi + ni + i];
-        if (mode==1){ // normal relu
-            if (k<0.0){
-                out[stride * bi + ni + i] = 0.0;
-            }else{
-                out[stride * bi + ni + i] = k;
+        int idx = stride*bi + ni + i;
+        if (out[idx]<0){
+            if (mode==1){
+                out[idx] = 0.0;
+            }else if (mode==2){
+                out[idx] = 0.000001;
+            }else if (mode==3){
+                out[idx] = out[idx]/20;
             }
-        }else if (mode==2){
-            if (k<0.0){
-                out[stride * bi + ni + i] = 0.000001;
-            }else{
-                out[stride * bi + ni + i] = k;
-            }
-        }else if (mode==3){
-            if (k<0.0){
-                out[stride * bi + ni + i] = k/20;
-            }else{
-                out[stride * bi + ni + i] = k;
-            }
-        }else{ // none
-            out[stride * bi + ni + i] = k;
         }
     }
 }
@@ -572,7 +560,7 @@ class OpenCL(gpu.Gpu):
         event.wait()
     
     def relu(self, data_out, batch_size, num_node, size, mode):
-        event = self.prg.size_input(self._queue, (batch_size, num_node), None,
+        event = self.prg.relu(self._queue, (batch_size, num_node), None,
                               data_out, np.int32(size), np.int32(num_node), np.int32(mode))
         event.wait()
     

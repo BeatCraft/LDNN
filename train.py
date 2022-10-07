@@ -272,18 +272,13 @@ class Train:
         return ce
     
     def random_hit(self, delta, temperature):
-        #A = np.exp(-delta/(temperature+0.000001)) / 1000.0
-        #return 0
         A = np.exp(-np.abs(delta)/float(temperature)) / 1000.0
         if random.random() < A:
             print(delta, temperature, A)
+            #
             #return 1
+            #
         #
-        
-        #hit = random.choices([0, 1], k=1, weights=[1-A, A])
-        #if hit[0]==1:
-        #    print(A)
-        #    return 1
         return 0
     
     def loop_sa_20(self, loop, w_list, debug=0):
@@ -424,7 +419,11 @@ class Train:
         ret = 0
 
         if ce_alt<=ce:
-            ret = 1
+            if ce_alt<0:
+                ret = -1
+            else:
+                ret = 1
+            #
         else: # acceptance control
             delta = ce_alt - ce
             hit = self.random_hit(delta, temperature)
@@ -434,7 +433,7 @@ class Train:
                 ret = 0
             #
         #
-        if ret==0:
+        if ret<=0:
             self.undo_attack(w_list, attack_list)
         else:
             #print(ret, ce, ce_alt)
@@ -554,6 +553,7 @@ class Train:
         if ce_alt<=ce:
             ce = ce_alt
             ret = 1
+            #
             for aw in attack_list:
                 w_type = aw[0]
                 i = aw[1]
@@ -598,6 +598,10 @@ class Train:
         
         while atk_flag:
             ce, ret = self.multi_attack_t(ce, w_list, attack_num, temperature)
+            if ret<0:
+                atk_flag = False
+                continue
+            #
             num += 1
             part += ret
             hist.append(ret)

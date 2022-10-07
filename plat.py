@@ -26,7 +26,7 @@ else:
     #
 #
 
-def getGpu():
+def getGpu(idx=0):
     if ID==0: # MBP
         platform_id = 0
         device_id = 1
@@ -38,7 +38,7 @@ def getGpu():
         my_gpu = opencl.OpenCL(platform_id, device_id)
         my_gpu.set_kernel_code()
     elif ID==2: # nvidia
-        my_gpu = dgx.Dgx(1)
+        my_gpu = dgx.Dgx(idx)
     else:
         print("error : undefined platform")
         my_gpu = None

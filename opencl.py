@@ -79,11 +79,11 @@ __kernel void conv_4_pad_batch(
     
     int out_b_stride = (w+2)*(h+2)*ch;
     int out_ch_stride = (w+2)*(h+2);
-    int out_y_stride = yi*(w+2);
+    int out_y_stride = (yi+1)*(w+2);
     
     for (int i=0; i<ch;i++){
         index = b_stride*bi + ch_stride*i + y_stride + xi;
-        out_index = out_b_stride*bi + + out_ch_stride*i + out_y_stride + xi;
+        out_index = out_b_stride*bi + out_ch_stride*i + out_y_stride + xi + 1;
         output[out_index] = input[index];
     }
 };

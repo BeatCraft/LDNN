@@ -156,14 +156,14 @@ void calc_cnn_pad(
     
     int out_b_stride = (w+2)*(h+2)*ch;
     int out_ch_stride = (w+2)*(h+2);
-    int out_y_stride = yi*(w+2);
+    int out_y_stride = (yi+1)*(w+2);
 
     //printf("PAD(%d)(%d, %d)\n", bi, xi, yi);
     //printf("[softmax] inf\n");
 
     for (int i=0; i<ch;i++){
         index = b_stride*bi + ch_stride*i + y_stride + xi;
-        out_index = out_b_stride*bi + + out_ch_stride*i + out_y_stride + xi;
+        out_index = out_b_stride*bi + + out_ch_stride*i + out_y_stride + xi + 1;
         output[out_index] = input[index];
     }
 }
@@ -435,6 +435,7 @@ class Dgx(gpu.Gpu):
         super(gpu.Gpu, self).__init__()
         self.name = "nvidia DGX V100"
         self.id = device_id
+        cp.cuda.Device(device_id).use()
         # -1:unknown, 0:OpenCL, 1:CuPy/DGX
         self.type = 1
 

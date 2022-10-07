@@ -42,9 +42,9 @@ WEIGHT_SET_3 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0, 0.0625, 0.125, 0.25, 0.5,
 WEIGHT_SET_4 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0] # 9
 WEIGHT_SET_5 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0.0625, 0.125, 0.25, 0.5, 1.0] # 10
 WEIGHT_SET_6 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 12
-
+WEIGHT_SET_7 = [-1.0, -0.5, -0.25, 0.25, 0.5, 1.0] # 6
 #
-WEIGHT_SET = WEIGHT_SET_5
+WEIGHT_SET = WEIGHT_SET_7
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -302,62 +302,68 @@ class HiddenLayer(Layer):
         #
 
     def propagate(self, array_in, debug=0):
+        if self._gpu:
+            pass
+        else:
+            return
+        #
+        
         stride_1 = self._num_node * self._num_input
         stride_2 = self._num_input
-        activation = 0 # 0 : skip, 1 : relu
-
-        if self._gpu:
-            if self._gpu.type==0:
-                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
-                                  self._batch_size, self._num_node, self._num_input, 3)
-                                  
-                #self._gpu.copy(self._output_array, self._gpu_output)
-                #print((self._output_array[0]))
+        # activation mode
+        #   0 : none
+        #   1 : normal
+        #   2 : 0.000001
+        #   3 : y/20
+        a_mode = 1
+        
+        if self._gpu.type==0:
+            self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
+                              self._batch_size, self._num_node, self._num_input, a_mode)
+            #self._gpu.copy(self._output_array, self._gpu_output)
+            #print((self._output_array[0]))
                     
-                #self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
-                #                                self._batch_size, stride_1, stride_2,
-                #                                self._num_input, self._num_node)
-                #self._gpu.sum(self._gpu_product, self._gpu_output, self._num_input, self._num_node, activation, self._batch_size)
-                if self._scale==0:
-                    pass
-                elif self._scale==1:
-                    self._gpu.normalize_layer(self._gpu_output, self._batch_size, self._num_node)
-                elif self._scale==2:
-                    self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._num_input, self._num_node)
-                elif self._scale==3:
-                    self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
-                elif self._scale==4:
-                    self._gpu.normalize_layer(self._gpu_output, self._batch_size, self._num_node)
-                    self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
-                #
-                if debug:
-                    print(self._index, "hidden, input")
-                    tarray = np.zeros((self._batch_size, self._num_input), dtype=np.float32)
-                    self._gpu.copy(tarray, array_in)
-                    print((tarray[0]))
-                    
-                    print(self._index, "hidden")
-                    self._gpu.copy(self._output_array, self._gpu_output)
-                    print((self._output_array[0]))
-                #
-            elif self._gpu.type==1:
-                self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 1)
-                #self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
-                self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
-                #mx = cp.max(self._gpu_output)
-                #self._gpu_output = self._gpu_output/mx
-                if debug:
-                    print(self._index, "hidden, input")
-                    darray = cp.asnumpy(array_in)
-                    print(darray[0])
-                    
-                    print(self._index, "hidden")
-                    darray = cp.asnumpy(self._gpu_output)
-                    print(darray[0])
-                #
+            #self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
+            #                                self._batch_size, stride_1, stride_2,
+            #                                self._num_input, self._num_node)
+            #self._gpu.sum(self._gpu_product, self._gpu_output, self._num_input, self._num_node, activation, self._batch_size)
+            if self._scale==0:
+                pass
+            elif self._scale==1:
+                self._gpu.normalize_layer(self._gpu_output, self._batch_size, self._num_node)
+            elif self._scale==2:
+                self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._num_input, self._num_node)
+            elif self._scale==3:
+                self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
+            elif self._scale==4:
+                self._gpu.normalize_layer(self._gpu_output, self._batch_size, self._num_node)
+                self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
             #
-        else:
-            pass
+            if debug:
+                print(self._index, "hidden, input")
+                tarray = np.zeros((self._batch_size, self._num_input), dtype=np.float32)
+                self._gpu.copy(tarray, array_in)
+                print((tarray[0]))
+                    
+                print(self._index, "hidden")
+                self._gpu.copy(self._output_array, self._gpu_output)
+                print((self._output_array[0]))
+            #
+        elif self._gpu.type==1:
+            self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
+            #self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
+            self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
+            #mx = cp.max(self._gpu_output)
+            #self._gpu_output = self._gpu_output/mx
+            if debug:
+                print(self._index, "hidden, input")
+                darray = cp.asnumpy(array_in)
+                print(darray[0])
+                    
+                print(self._index, "hidden")
+                darray = cp.asnumpy(self._gpu_output)
+                print(darray[0])
+            #
         #
 
 class OutputLayer(Layer):
@@ -385,13 +391,10 @@ class OutputLayer(Layer):
         
         if self._gpu:
             if self._gpu.type==0:
-                #self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
-                #self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
                 self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
             elif self._gpu.type==1:
                 print("output:dgx")
-                #self._gpu_product = self._gpu.allocateArray(self._product_matrix)
                 self._gpu_output = self._gpu.allocateArray(self._output_array)
                 self._gpu_softmax = self._gpu.allocateArray(self._softmax_array)
             #
@@ -419,12 +422,6 @@ class OutputLayer(Layer):
             if self._gpu.type==0: # OpenCL
                 self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
                                   self._batch_size, self._num_node, self._num_input, 0)
-                #self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
-                #                                self._batch_size, stride_1, stride_2,
-                #                                self._num_input, self._num_node)
-                #self._gpu.sum(self._gpu_product, self._gpu_output,
-                #              self._num_input, self._num_node, activation, self._batch_size)
-                
                 # softmax
                 if debug:
                     print("output")
@@ -571,16 +568,23 @@ class MaxLayer(Layer):
         if self.lock:
             return
         #
-        
         if self._gpu:
-            if self._gpu.type==0: # opencl
-                self._gpu.max_batch(array_in, self._gpu_output,
-                                    self._ch, self._x, self._y, self._batch_size)
-            elif self._gpu.type==1: # GDX
-                self._gpu.max(array_in, self._gpu_output, self._ch, self._x, self._y, self._batch_size)
-            #
+            pass
         else:
-            print("error")
+            return
+        #
+        
+        if self._gpu.type==0: # opencl
+            self._gpu.max_batch(array_in, self._gpu_output,
+                                self._ch, self._x, self._y, self._batch_size)
+            if debug:
+                print(self._index, "max")
+                self._gpu.copy(self._output_array, self._gpu_output)
+                print(self._output_array[0].shape)
+                print(self._output_array[0][0])
+            #
+        elif self._gpu.type==1: # GDX
+            self._gpu.max(array_in, self._gpu_output, self._ch, self._x, self._y, self._batch_size)
         #
 
 class Conv_4_Layer(Layer):
@@ -652,96 +656,128 @@ class Conv_4_Layer(Layer):
         if self.lock:
             return
         #
-        
         if self._gpu:
-            if self._cache:
-                pass
-            else:
-                if self._gpu.type==0: # OpenCL
-                    self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-                elif self._gpu.type==1: # GDX
-                    self._gpu.padding(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-                #
-                if self._index==1:
-                    self._cache = 1 # cache for padding
-                #
-            #
+            pass
+        else:
+            return
+        #
         
-            # ni : filetr index, 0 to num of filter -1
-            # ii : index of matrix, 0 to 3*3*ch-1
-            if self._gpu.type==0: # OpenCL
-                self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output,
-                                            self._w, self._h, self._ch, self._filter,
-                                            self._batch_size, 0)
-                if debug:
-                    print(self._index, "conv ret")
-                    self._gpu.copy(self._output_array, self._gpu_output)
-                    print((self._output_array[0][0]))
+        # activation mode
+        # 0 : none
+        # 1 : normal
+        # 2 : 0.000001
+        # 3 : y/20
+        a_mode = 1
+        if self._gpu.type==0: # OpenCL
+            self._gpu.conv_4_pad_batch(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
+            if debug:
+                print(self._index, "conv pad")
+                self._gpu.copy(self._padded_array, self._gpu_padded)
+                print(self._padded_array[0])
+                self.save_padded(0, 0, self._padded_array[0])
+                self.save_padded(0, 1, self._padded_array[0])
+                self.save_padded(0, 2, self._padded_array[0])
+            #
+            self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output,
+                                        self._w, self._h, self._ch, self._filter,
+                                        self._batch_size, 0)
+            if debug:
+                print(self._index, "conv ret")
+                self._gpu.copy(self._output_array, self._gpu_output)
+                print((self._output_array[0][0]))
+            #
+            #self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._w * self._h, self._filter)
+            size = self._w * self._h * self._filter
+            self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, a_mode)
+            #self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
+            if debug:
+                print(self._index, "conv, scale")
+                self._gpu.copy(self._output_array, self._gpu_output)
+                print((self._output_array[0][0]))
                 #
-            elif self._gpu.type==1: # GDX
-                #if debug:
-                #    print(self._index, "conv", "padded", )
-                #    darray = cp.asnumpy(self._gpu_padded)
-                #    print((darray.shape, type(darray[0])))
-                #
-                self._gpu.convolusion(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
-                if debug:
-                    print(self._index, "conv ret")
-                    darray = cp.asnumpy(self._gpu_output)
-                    print((darray.shape, type(darray[0])))
-                    print(darray[0][0])
-                #
+                #self.save_output()
+                self.save_filter_out(0, 0, self._output_array[0][0])
+            #
+        elif self._gpu.type==1: # GDX
+            self._gpu.padding(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
+            #if debug:
+            #    print(self._index, "conv", "padded", )
+            #    darray = cp.asnumpy(self._gpu_padded)
+            #    print((darray.shape, type(darray[0])))
+            #
+            self._gpu.convolusion(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
+            
+            if debug:
+                print(self._index, "conv ret")
+                darray = cp.asnumpy(self._gpu_output)
+                print((darray.shape, type(darray[0])))
+                print(darray[0][0])
             #
             
-            # activation / scale
+            #h = self._w * self._h
+            #self._gpu.batchNormalize(self._gpu_output, self._batch_size, h, self._filter)
             size = self._w * self._h * self._filter
-            if self._gpu.type==0: # OpenCL
-                #self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._w * self._h, self._filter)
-                self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, 3)
-                #self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
-                if debug:
-                    print(self._index, "conv, scale")
-                    self._gpu.copy(self._output_array, self._gpu_output)
-                    print((self._output_array[0][0]))
-                    #
-                    #self.save_output()
-                    #
-                #
-            elif self._gpu.type==1: # GDX
-                h = self._w * self._h
-                #self._gpu.batchNormalize(self._gpu_output, self._batch_size, h, self._filter)
-                self._gpu.relu(self._gpu_output, size, 3, self._batch_size, self._filter)
-                if debug:
-                    print(self._index, "conv, scale")
-                    darray = cp.asnumpy(self._gpu_output)
-                    print(darray[0][0])
+            self._gpu.relu(self._gpu_output, size, a_mode, self._batch_size, self._filter)
+            if debug:
+                print(self._index, "conv, scale")
+                darray = cp.asnumpy(self._gpu_output)
+                print(darray[0][0])
+            #
+        #
+    
+    def save_padded(self, bi, ci, data_array):
+        w = self._w + 2
+        h = self._h + 2
+        size = w * h
+        max = np.max(data_array)
+        min = np.min(data_array)
+        print(("max=%f, min=%f" % (max, min)))
+        
+        img = Image.new("L", (w, h), 0)
+        pix = img.load()
+        for y in range(h):
+            for x in range(w):
+                v = data_array[size*ci + w*y + x]
+                if max>0.0:
+                    v1 = int(v*255/max)
+                    pix[x,y] = v1
+                else:
+                    pix[x,y] = 0
                 #
             #
-        # if self._gpu:
+        spath = "./debug/%d-%d-%d-p.png" % (self._index, bi, ci)
+        print(spath)
+        img.save(spath)
+    
+    def save_filter_out(self, bi, fi, data_array):
+        size = self._w * self._h
+        max = np.max(data_array)
+        min = np.min(data_array)
+        print(("max=%f, min=%f" % (max, min)))
         
+        img = Image.new("L", (self._w, self._h), 0)
+        pix = img.load()
+        for y in range(self._h):
+            for x in range(self._w):
+                v = data_array[self._w*y + x]
+                if max>0.0:
+                    v1 = int(v*255/max)
+                    pix[x,y] = v1
+                else:
+                    pix[x,y] = 0
+                #
+            #
+        spath = "./debug/%d-%d_%d.png" % (self._index, bi, fi)
+        print(spath)
+        img.save(spath)
+    
     def save_output(self):
         self._gpu.copy(self._output_array, self._gpu_output)
         #
         for bi in range(self._batch_size):
             for fi in range(self._filter):
                 data_array = self._output_array[bi][fi]
-                size = self._w * self._h
-                max = np.max(data_array)
-                min = np.min(data_array)
-                print(("max=%f, min=%f" % (max, min)))
-                img = Image.new("L", (self._w, self._h), 0)
-                pix = img.load()
-                for y in range(self._h):
-                    for x in range(self._w):
-                        v = data_array[self._w*y + x]
-                        v1 = int(v*255/max)
-                        pix[x,y] = v1
-                    #
-                #
-                #spath = "./debug/cnn/%d_%d.png" % (bi, fi)
-                spath = "./debug/%d-%d_%d.png" % (self._index, bi, fi)
-                print(spath)
-                img.save(spath)
+                self.save_filter_out(bi, fi, data_array)
             #
         #
 #

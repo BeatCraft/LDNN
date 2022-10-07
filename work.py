@@ -770,6 +770,9 @@ class worker(object):
 
         if ce_alt<=ce:
             ret = 1
+            if ce_alt<0:
+                ret = -1
+            #
         else: # acceptance control
             delta = ce_alt - ce
             if self._rank==0:
@@ -785,7 +788,7 @@ class worker(object):
             #
         #
         
-        if ret==0:
+        if ret<=0:
             self.train.undo_attack(w_list, attack_list)
         else:
             #print(ce_alt)
@@ -812,6 +815,10 @@ class worker(object):
         
         while atk_flag:
             ce, ret = self.multi_attack_t(ce, w_list, attack_num, temperature)
+            if ret<0:
+                atk_flag = False
+                continue
+            #
             num += 1
             part += ret
             hist.append(ret)
@@ -841,11 +848,20 @@ class worker(object):
         w_num = len(w_list)
         lv_min = 0
         lv_max = int(math.log(w_num/100, 2)) + 1 # 1 % max
+        #lv_max = int(math.log(w_num, 2)) + 1 # 1 % max
         ce = self.evaluate()
+        
+        slice_size = int(w_num/100)
+        start = loop*slice_size
+        end = start + slice_size
+        w1_list = w_list[start:end]
         
         for temperature in range(lv_max, -1, -1):
             attack_num = 2**temperature
-            ce = self.loop_sa_t(loop, ce, temperature, attack_num, w_list, wtype)
+            ce = self.loop_sa_t(loop, ce, temperature, attack_num, w1_list, wtype)
+            if ce<0:
+                break
+            #
         #
         if self._rank==0:
             r.save()

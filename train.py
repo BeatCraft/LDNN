@@ -276,7 +276,7 @@ class Train:
         if random.random() < A:
             print(delta, temperature, A)
             #
-            #return 1
+            return 1
             #
         #
         return 0

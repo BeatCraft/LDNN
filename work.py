@@ -535,16 +535,16 @@ class worker(object):
                     attack_list = self.train.make_attack_list(atk_num, 0, w_list)
                     alt_list = []
                     for i in attack_list:
-                        w =w_list[i]
+                        w = w_list[i]
                         alt_list.append(w.wi_alt)
                     #
    
-                    idx = 0
-                    for i in attack_list:
-                        w = w_list[i]
-                        w.wi_alt = alt_list[idx]
-                        idx += 1
-                    #
+                    #idx = 0
+                    #for i in attack_list:
+                    #    w = w_list[i]
+                    #    w.wi_alt = alt_list[idx]
+                    #    idx += 1
+                    ##
                 else:
                     attack_list = []
                     alt_list = []
@@ -552,7 +552,13 @@ class worker(object):
                 attack_list = self._com.bcast(attack_list, root=0)
                 alt_list = self._com.bcast(alt_list, root=0)
                 #
+                idx = 0
+                for i in attack_list:
+                    w = w_list[i]
+                    w.wi_alt = alt_list[idx]
+                    idx += 1
                 #
+                
                 llist = []
                 for i in attack_list:
                     w = w_list[i]
@@ -742,10 +748,28 @@ class worker(object):
         
         if self._rank==0:
             attack_list = self.train.make_attack_list(attack_num, 0, w_list)
+            alt_list = []
+            for i in attack_list:
+                w = w_list[i]
+                alt_list.append(w.wi_alt)
+            #
         else:
             attack_list = []
+            alt_list = []
         #
         attack_list = self._com.bcast(attack_list, root=0)
+        alt_list = self._com.bcast(alt_list, root=0)
+        #
+        if self._rank==0:
+            pass
+        else:
+            idx = 0
+            for i in attack_list:
+                w = w_list[i]
+                w.wi_alt = alt_list[idx]
+                idx += 1
+            #
+        #
         
         llist = []
         w_num = len(attack_list)
@@ -791,7 +815,6 @@ class worker(object):
         if ret<=0:
             self.train.undo_attack(w_list, attack_list)
         else:
-            #print(ce_alt)
             ce = ce_alt
             for i in attack_list:
                 w = w_list[i]
@@ -848,17 +871,16 @@ class worker(object):
         w_num = len(w_list)
         lv_min = 0
         lv_max = int(math.log(w_num/100, 2)) + 1 # 1 % max
-        #lv_max = int(math.log(w_num, 2)) + 1 # 1 % max
         ce = self.evaluate()
         
-        slice_size = int(w_num/100)
-        start = loop*slice_size
-        end = start + slice_size
-        w1_list = w_list[start:end]
+        #slice_size = int(w_num/100)
+        #start = loop*slice_size
+        #end = start + slice_size
+        #w1_list = w_list[start:end]
         
         for temperature in range(lv_max, -1, -1):
             attack_num = 2**temperature
-            ce = self.loop_sa_t(loop, ce, temperature, attack_num, w1_list, wtype)
+            ce = self.loop_sa_t(loop, ce, temperature, attack_num, w_list, wtype)
             if ce<0:
                 break
             #

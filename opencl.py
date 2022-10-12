@@ -105,29 +105,31 @@ __kernel void conv_4_roll_batch(
     int ch_stride = (w+2)*(h+2);
     int b_stride = ch_stride*ch;
     int y_stride = yi*(w+2);
-
+    int i_start = b_stride*bi + y_stride;
     //printf(\"CL : bi=%d\\n\", bi);
     
     for (int fi=0; fi<filter; fi++){
-        float sum = 0.0;
         //printf(\"CL : fi=%d\\n\", fi);
-        
+        float sum = 0.0;
+        int f_start = 3*3*fi*ch;
+                    
         for (int i=0; i<ch; i++){
-            int start = b_stride*bi + ch_stride*i;
-            int f_start = 3*3*fi*ch;
-            int c_start = 3*3*i;
+            //int start = b_stride*bi + ch_stride*i;
+            int start = i_start + ch_stride*i;
+            //int c_start = 3*3*i;
+            int w_start = + f_start + i*3*3;
             
-            sum += input[start + y_stride + xi    ] * weight[f_start + c_start + 0];
-            sum += input[start + y_stride + xi + 1] * weight[f_start + c_start + 1];
-            sum += input[start + y_stride + xi + 2] * weight[f_start + c_start + 2];
+            sum += input[start + xi + 0] * weight[w_start + 0];
+            sum += input[start + xi + 1] * weight[w_start + 1];
+            sum += input[start + xi + 2] * weight[w_start + 2];
         
-            sum += input[start + y_stride + (w+2) + xi    ] * weight[f_start + c_start + 3];
-            sum += input[start + y_stride + (w+2) + xi + 1] * weight[f_start + c_start + 4];
-            sum += input[start + y_stride + (w+2) + xi + 2] * weight[f_start + c_start + 5];
+            sum += input[start + (w+2) + xi + 0] * weight[w_start + 3];
+            sum += input[start + (w+2) + xi + 1] * weight[w_start + 4];
+            sum += input[start + (w+2) + xi + 2] * weight[w_start + 5];
         
-            sum += input[start + y_stride + (w+2)*2 + xi    ] * weight[f_start + c_start + 6];
-            sum += input[start + y_stride + (w+2)*2 + xi + 1] * weight[f_start + c_start + 7];
-            sum += input[start + y_stride + (w+2)*2 + xi + 2] * weight[f_start + c_start + 8];
+            sum += input[start + (w+2)*2 + xi + 0] * weight[w_start + 6];
+            sum += input[start + (w+2)*2 + xi + 1] * weight[w_start + 7];
+            sum += input[start + (w+2)*2 + xi + 2] * weight[w_start + 8];
         }
 
         //sum = sum / 9.0;

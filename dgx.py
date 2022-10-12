@@ -99,35 +99,32 @@ void calc_cnn_roll(
     int ch_stride = (w+2)*(h+2);
     int b_stride = ch_stride*ch;
     int y_stride = yi*(w+2);
-
+    int i_start = b_stride*bi + y_stride;
+    
     //printf(\"CL : bi=%d\\n\", bi);
     
     for (int fi=0; fi<filter; fi++){
         float sum = 0.0;
-        //printf(\"CL : fi=%d\\n\", fi);
+        int f_start = fi*ch*3*3;
         
         for (int i=0; i<ch; i++){
-            int start = b_stride*bi + ch_stride*i;
+            int start = i_start + ch_stride*i; //b_stride*bi + ch_stride*i + y_stride;
+            int w_start = + f_start + i*3*3;
             
-            sum += input[start + y_stride + xi    ] * weight[fi*ch*3*3 + i*3*3    ];
-            sum += input[start + y_stride + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 1];
-            sum += input[start + y_stride + xi + 2] * weight[fi*ch*3*3 + i*3*3 + 2];
+            sum += input[start + xi    ] * weight[w_start + 0];
+            sum += input[start + xi + 1] * weight[w_start + 1];
+            sum += input[start + xi + 2] * weight[w_start + 2];
         
-            sum += input[start + y_stride + (w+2) + xi    ] * weight[fi*ch*3*3 + i*3*3 + 3];
-            sum += input[start + y_stride + (w+2) + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 4];
-            sum += input[start + y_stride + (w+2) + xi + 2] * weight[fi*ch*3*3 + i*3*3 + 5];
+            sum += input[start + (w+2) + xi    ] * weight[w_start + 3];
+            sum += input[start + (w+2) + xi + 1] * weight[w_start + 4];
+            sum += input[start + (w+2) + xi + 2] * weight[w_start + 5];
         
-            sum += input[start + y_stride + (w+2)*2 + xi    ] * weight[fi*ch*3*3 + i*3*3 + 6];
-            sum += input[start + y_stride + (w+2)*2 + xi + 1] * weight[fi*ch*3*3 + i*3*3 + 7];
-            sum += input[start + y_stride + (w+2)*2 + xi + 2] * weight[fi*ch*3*3 + i*3*3 + 8];
+            sum += input[start + (w+2)*2 + xi    ] * weight[w_start + 6];
+            sum += input[start + (w+2)*2 + xi + 1] * weight[w_start + 7];
+            sum += input[start + (w+2)*2 + xi + 2] * weight[w_start + 8];
         }
+        
         output[bi*w*h*filter + w*h*fi + yi*w+xi] = sum;
-        // relu
-        //if (sum<0.0){
-        //    output[bi*w*h*filter + w*h*fi + yi*w+xi] = 0.0;
-        //}else{
-        //    output[bi*w*h*filter + w*h*fi + yi*w+xi] = sum;
-        //}
     }
 }
 ''', 'calc_cnn_roll')

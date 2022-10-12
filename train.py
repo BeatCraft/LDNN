@@ -272,12 +272,27 @@ class Train:
         return ce
     
     def random_hit(self, delta, temperature):
-        A = np.exp(-np.abs(delta)/float(temperature)) / 1000.0
-        if random.random() < A:
+        if delta>=0:
+            #print("delta", delta)
+            return 0
+        #
+        A = np.exp(-delta/float(temperature))
+        if np.random.random() > A:
             print(delta, temperature, A)
-            #
             return 1
-            #
+        #
+        return 0
+        
+    def acceptance(self, ce1, ce2, temperature):
+        delta = ce2 - ce1
+        if delta<=0:
+            return 1
+        #
+        
+        A = np.exp(-delta/float(temperature))
+        if np.random.random() > A:
+            print(delta, temperature, A)
+            return 1
         #
         return 0
     
@@ -400,6 +415,11 @@ class Train:
         for i in attack_list:
             w = w_list[i]
             layer = r.get_layer_at(w.li)
+            #if layer._type==core.LAYER_TYPE_CONV_4:
+            #    layer.reset_weight_index(w.ni, w.ii)
+            #else:
+            #    layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            #
             layer.set_weight_index(w.ni, w.ii, w.wi_alt)
             #print(i, w.wi, w.wi_alt)
             if w.li in llist:
@@ -599,8 +619,7 @@ class Train:
         while atk_flag:
             ce, ret = self.multi_attack_t(ce, w_list, attack_num, temperature)
             if ret<0:
-                atk_flag = False
-                continue
+                return -1
             #
             num += 1
             part += ret
@@ -613,8 +632,8 @@ class Train:
                 s += a
             #
             rate = float(s)/float(num)
-            print("[%d:%d] %d [%s:%d] ce %09f (%d, %d) %06f"
-                    % (loop, temperature, num, wtype, attack_num, ce, part, s, rate))
+            print("[%d:%d] %d [%s:%d] (%d, %d) %06f, ce:"
+                    % (loop, temperature, num, wtype, attack_num, part, s, rate), ce)
             if num>min:
                 if num>10000 or rate<0.01:
                     atk_flag = False
@@ -636,6 +655,9 @@ class Train:
         for temperature in range(lv_max, -1, -1):
             attack_num = 2**temperature
             ce = self.loop_sa_t(loop, ce, temperature, attack_num, w_list, wtype)
+            if ce<0:
+                break
+            #
         #
         r.save()
 

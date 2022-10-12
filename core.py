@@ -141,35 +141,18 @@ class Layer(object):
         self._weight_index_matrix[ni][ii] = wi
         self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
     
-    def denominate(self, all=False):
-        for ni in range(self._num_node):
-            for ii in range(self._num_input):
-                wi = self.get_weight_index(ni, ii)
-                if all:
-                    v = WEIGHT_SET[wi]
-                    if v == 0:
-                        pass
-                    elif v>0:
-                        self.set_weight_index(ni, ii, wi-1)
-                    elif v<0:
-                        self.set_weight_index(ni, ii, wi+1)
-                    #
-                else:
-                    if wi == WEIGHT_INDEX_MAX :
-                        self.set_weight_index(ni, ii, wi-1)
-                    elif wi == WEIGHT_INDEX_MIN :
-                        self.set_weight_index(ni, ii, wi+1)
-                    #
-                #
-            #
+    def init_weight(self, ni, ii, wi=-1):
+        if wi<0:
+            wi = random.randrange(WEIGHT_INDEX_SIZE)
         #
-    
+        self.set_weight_index(ni, ii, wi)
+        
     def init_weight_with_random_index(self):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
-                wi = random.randrange(WEIGHT_INDEX_SIZE)
-                #wi = 0
-                self.set_weight_index(ni, ii, wi)
+                self.init_weight(ni, ii)
+                #wi = random.randrange(WEIGHT_INDEX_SIZE)
+                #self.set_weight_index(ni, ii, wi)
             #
         #
     
@@ -596,7 +579,7 @@ class Conv_4_Layer(Layer):
         self._ch = ch # number of inputs
         self._filter = filter # node / # number of outputs
         self._filter_size = 3 * 3 * ch # width and height of filter are fixed to 3
-        self._num_of_w = 3 * 3 * ch * filter
+        self._num_of_w = 3 * 3 * ch# * filter
         num_input = self._num_of_w # self._filter_size
         num_node = self._filter
         #
@@ -617,6 +600,21 @@ class Conv_4_Layer(Layer):
         #
         self._cache = 0 # cache for padding
         self.lock = False
+    
+    #def set_weight_index(self, ni, ii, wi):
+    #    self.reset_weight_index(ni, ii):
+    
+    def reset_weight_index(self, ni, ii, wi=-1):
+        #print("Conv_4_Layer::reset_weight_index(%d, %d)" % (ni, ii))
+        ch = int(ii/9)
+        #print(ch)
+        wi_list = []
+        for i in range(9):
+            wi = self.get_weight_index(ni, i)
+            wi_list.append(wi)
+            self.init_weight(ni, i)
+        #
+        return wi_list
         
     def prepare(self, batch_size):
         print(("Conv_4_Layer::prepare(%d)" %(batch_size)))
@@ -640,15 +638,17 @@ class Conv_4_Layer(Layer):
 
     def update_weight(self):
         if self._gpu:
-            if self._gpu.type==0:
-                self._gpu.copy(self._gpu_weight, self._weight_matrix)
-            elif self._gpu.type==1:
-                self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
-            #
-        else:
             pass
+        else:
+            return
         #
-       
+        
+        if self._gpu.type==0:
+            self._gpu.copy(self._gpu_weight, self._weight_matrix)
+        elif self._gpu.type==1:
+            self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
+        #
+    
     def reset(self):
         self._cache = 0
         

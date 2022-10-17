@@ -26,7 +26,7 @@ class Train:
     def __init__(self, r):
         self._r = r
         self.mode = 0
-        self.mode_w = 0
+        #self.mode_w = 0
         self.mode_e = 0
         self.mse_idex = -1
         #self.rank = 0
@@ -287,11 +287,13 @@ class Train:
         delta = ce2 - ce1
         if delta<=0:
             return 1
+        elif delta>ce1*0.005:
+            return 0
         #
-        
-        A = np.exp(-delta/float(temperature))
-        if np.random.random() > A:
-            print(delta, temperature, A)
+
+        A = np.exp(-delta/float(temperature)) / 100
+        if np.random.random()<A:
+            print(delta, "\t", temperature, A)
             return 1
         #
         return 0
@@ -437,21 +439,21 @@ class Train:
         
         ce_alt = self.evaluate()
         ret = 0
-
-        if ce_alt<=ce:
-            if ce_alt<0:
-                ret = -1
-            else:
-                ret = 1
-            #
-        else: # acceptance control
-            delta = ce_alt - ce
-            hit = self.random_hit(delta, temperature)
-            if hit==1:
-                ret = 1
-            else:
-                ret = 0
-            #
+        ret = self.acceptance(ce, ce_alt, temperature)
+        #if ce_alt<=ce:
+        #    if ce_alt<0:
+        #        ret = -1
+        #    else:
+        #        ret = 1
+        #    #
+        #else: # acceptance control
+        #    delta = ce_alt - ce
+        #    hit = self.random_hit(delta, temperature)
+        #    if hit==1:
+        #        ret = 1
+        #    else:
+        #        ret = 0
+        #    #
         #
         if ret<=0:
             self.undo_attack(w_list, attack_list)
@@ -715,8 +717,73 @@ class Train:
         #
 
         return ce
-#
-#
-#
+
+    def multi_attack_sa(self, ce, w_list, attack_num, temperature):
+        r = self._r
+        
+        attack_list = self.make_attack_list(attack_num, 0, w_list)
+        llist = []
+        w_num = len(attack_list)
+        
+        for i in attack_list:
+            w = w_list[i]
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
+        
+        for li in llist:
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+        
+        ce_alt = self.evaluate()
+        #print(ce_alt)
+        ret = 0
+        ret = self.acceptance(ce, ce_alt, temperature)
+        if ret<=0:
+            self.undo_attack(w_list, attack_list)
+        else:
+            ce = ce_alt
+            for i in attack_list:
+                w = w_list[i]
+                w.wi = w.wi_alt
+            #
+        #
+        return ce, ret
     
-    
+    def loop_sa(self, w_list, wtype, debug=0):
+        r = self._r
+        
+        w_num = len(w_list)
+        attack_num = 1
+        temperature = 100.0
+        #num = 0
+        
+        ce = r.evaluate()
+        print(ce)
+        
+        while temperature>0.1:
+            num = 0
+            while num<(w_num):
+                ce, ret = self.multi_attack_sa(ce, w_list, attack_num, temperature)
+                if ret<0:
+                    # ce => zero
+                    print(ret, "ce => zero")
+                    return # -1
+                #
+                print(temperature, "\t", num, ret, "\t", ce)
+                num += 1
+            #
+            temperature = temperature*0.95
+            r.save()
+            #print(temperature)
+        #
+        #return
+#
+#
+#

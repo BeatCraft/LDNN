@@ -388,7 +388,7 @@ __kernel void relu(__global float* out, int num, int stride, int mode)
 {
     int bi = get_global_id(0);
     int ni = get_global_id(1);
-    float k = 0.0;
+    //float k = 0.0;
     
     for (int i=0;i<num;i++){
         int idx = stride*bi + ni + i;

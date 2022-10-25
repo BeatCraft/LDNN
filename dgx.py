@@ -386,7 +386,7 @@ void calc_entropy(const double* x, const float *a, double* y, int size) {
 calc_batch_normalize = cp.RawKernel(r'''
 extern "C" __global__
 void calc_batch_normalize(float* data, const int b_num, int ch_size, int ch_num) {
-    int ci = blockIdx.x;//get_global_id(0);
+    int ci = blockIdx.x;
     int stride = ch_size * ch_num;
 
     float sum = 0.0;

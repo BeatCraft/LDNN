@@ -30,6 +30,10 @@ class Train:
         self.mode_e = 0
         self.mse_idex = -1
         
+        self.delta_num = 0.0
+        self.delta_sum = 0.0
+        self.delta_avg = 0.5
+        
         if com:
             if rank<0 or size<0:
                 return
@@ -38,6 +42,8 @@ class Train:
             self.com = com
             self.rank = rank
             self.size = size
+        else:
+            self.mpi = False
         #
         
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch,  batch_size, batch_offset):
@@ -121,7 +127,30 @@ class Train:
             #
         #
         return w_list
-       
+    
+    
+    def shift_weight(self, wi, mode=0):
+        wi_alt = wi
+        if mode==0: # random
+            wi_alt = random.randint(core.WEIGHT_INDEX_MIN, core.WEIGHT_INDEX_MAX)
+        elif mode==1: # neighbor
+            k = random.random()
+            if k<0.5: # increase
+                if wi==core.WEIGHT_INDEX_MAX:
+                    wi_alt = random.randint(core.WEIGHT_INDEX_MIN, core.WEIGHT_INDEX_MAX-1)
+                else:
+                    wi_alt = wi_alt + 1
+                #
+            else: # decrease
+                if wi==core.WEIGHT_INDEX_MIN:
+                    wi_alt = random.randint(core.WEIGHT_INDEX_MIN+1, core.WEIGHT_INDEX_MAX)
+                else:
+                    wi_alt = wi_alt -1
+                #
+            #
+        #
+        return wi_alt
+    
     def make_attack_list(self, attack_num, mode, w_list):
         r = self._r
         w_num = len(w_list)
@@ -132,7 +161,8 @@ class Train:
             attack_i = random.randrange(w_num)
             w = w_list[attack_i]
             while 1:
-                w.wi_alt = random.randint(core.WEIGHT_INDEX_MIN, core.WEIGHT_INDEX_MAX)
+                #w.wi_alt = random.randint(core.WEIGHT_INDEX_MIN, core.WEIGHT_INDEX_MAX)
+                w.wi_alt = self.shift_weight(w.wi, 1)
                 if w.wi_alt!=w.wi:
                     attack_list.append(attack_i)
                     break
@@ -202,9 +232,20 @@ class Train:
     def acceptance(self, ce1, ce2, temperature):
         delta = ce2 - ce1
         if delta<=0:
+            self.delta_num += 1.0
+            self.delta_sum += abs(delta)
+            self.delta_avg = self.delta_sum / self.delta_num
             return 1
-        elif delta>ce1*0.005:
+        #
+        #if self.delta_num==0:
+        #    return 0
+        #
+        if delta>self.delta_avg:
             return 0
+        #
+        
+        #elif delta>ce1*0.005:
+        #    return 0
         #
 
         A = np.exp(-delta/float(temperature)) / 100
@@ -419,7 +460,16 @@ class Train:
         
         while temperature>0.1:
             num = 0
+            self.delta_num = 0.0
+            self.delta_sum = 0.0
+            #self.delta_avg = 0.0
             while num<(total):
+                #attack_num = random.randint(1, 16)
+                #k = int(temperature)
+                #attack_num = random.randint(k/2, k)
+                #if attack_num<1:
+                #    attack_num = 1
+                #
                 ce, ret = self.multi_attack_sa(ce, w_list, attack_num, temperature)
                 if ret<0:
                     print(ret, "ce => zero")

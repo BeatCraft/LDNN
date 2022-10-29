@@ -203,12 +203,11 @@ class InputLayer(Layer):
         if debug:
             print("input")
             if self._gpu:
-                if self._gpu.type==0:
+                if self._gpu.type==0: # OpenCL
                     self._gpu.copy(self._output_array, self._gpu_output)
                     print((self._output_array[0]))
-                elif self._gpu.type==1:
+                elif self._gpu.type==1: # DGX
                     pass
-                    #self._gpu_output
                 #
             #
         #
@@ -300,10 +299,11 @@ class HiddenLayer(Layer):
         #   3 : y/20
         a_mode = 1
         
-        if self._gpu.type==0:
+        if self._gpu.type==0: # OpenCL
             self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
                               self._batch_size, self._num_node, self._num_input, a_mode)
             #self._gpu.copy(self._output_array, self._gpu_output)
+            #print((self._output_array.shape))
             #print((self._output_array[0]))
                     
             #self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
@@ -323,6 +323,7 @@ class HiddenLayer(Layer):
                 self._gpu.scale_layer(self._gpu_output, self._num_node, self._batch_size)
             #
             if debug:
+                print("scale", self._scale)
                 print(self._index, "hidden, input")
                 tarray = np.zeros((self._batch_size, self._num_input), dtype=np.float32)
                 self._gpu.copy(tarray, array_in)
@@ -332,7 +333,7 @@ class HiddenLayer(Layer):
                 self._gpu.copy(self._output_array, self._gpu_output)
                 print((self._output_array[0]))
             #
-        elif self._gpu.type==1:
+        elif self._gpu.type==1: # DGX
             self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
             #self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
             self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
@@ -795,7 +796,7 @@ class Roster:
         self._eval_mode = 0
         self._path = ""
         self._scale_input = 0
-        self.mem_save = 1
+        #self.mem_save = 1
         
     def set_path(self, path):
         self._path = path
@@ -843,8 +844,8 @@ class Roster:
                 self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
             elif self._gpu.type==1: # GDX
                 self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float64)
-                if self.mem_save==0:
-                    self._gpu_input = self._gpu.allocateArray(self._batch_data)
+                #if self.mem_save==0:
+                #    self._gpu_input = self._gpu.allocateArray(self._batch_data)
                 #
                 self._gpu_labels = self._gpu.allocateArray(self._labels)
                 self._gpu_entropy = self._gpu.allocateArray(self._batch_cross_entropy)
@@ -887,38 +888,24 @@ class Roster:
             elif self._scale_input==1: # scale
                 self._gpu.scale(self._gpu_input, self.input._gpu_output, data_size, float(255.0), self.input._num_node, batch_size, 0)
             elif self._scale_input==2: # batch normalize
-                print("1", data.shape)
-                #print(data[0])
                 data = data.transpose()
-                print("2", data.shape)
                 k = data.shape[0]
-                #print(k)
                 for i in range(k):
                     xmean = data[i].mean()
-                    #print(xmean)
                     xstd  = np.std(data[i])
-                    #print(xstd)
                     zscore = (data[i]-xmean)/xstd
                     max = zscore.max()
                     min = zscore.min()
                     if max < abs(min):
                         max = abs(min)
                     #
-                    #print(max)
                     zscore = zscore / max
                     data[i] = zscore / 2 + 0.5
                 #
                 data = data.transpose()
                 print("3", data.shape)
                 k = data.shape[0]
-                #print(data)
-                #for i in range(k):
-                #    print(i)
-                #    print(data[i])
-                #
                 self._gpu.copy(self.input._gpu_output, data)
-                #self._gpu.copy(self._gpu_output, zscore)
-            #    self._gpu.scale_exp(self._gpu_input, self.input._gpu_output, data_size, self.input._num_node, batch_size, 0)
             else:
                 return
             #
@@ -926,16 +913,19 @@ class Roster:
             if self._scale_input==0: # none
                 self.input._gpu_output = self._gpu_input
             elif self._scale_input==1: # scale 0.0 - 1.0
-                if self.mem_save==0:
-                    self._gpu_input = self._gpu.allocateArray(data)
-                    self._gpu_labels = self._gpu.allocateArray(label)
-                    self._gpu_input = self._gpu_input / 255.0
-                    self.input._gpu_output = self._gpu_input
-                else:
-                    self._gpu_labels = self._gpu.allocateArray(label)
-                    #temp = self._gpu.allocateArray(data)
-                    temp = data / 255.0
-                    self.input._gpu_output = self._gpu.allocateArray(temp)
+                #if self.mem_save==0:
+                #    self._gpu_input = self._gpu.allocateArray(data)
+                #    self._gpu_labels = self._gpu.allocateArray(label)
+                #    self._gpu_input = self._gpu_input / 255.0
+                #    self.input._gpu_output = self._gpu_input
+                #else:
+                #    self._gpu_labels = self._gpu.allocateArray(label)
+                #    #temp = self._gpu.allocateArray(data)
+                #    temp = data / 255.0
+                #    self.input._gpu_output = self._gpu.allocateArray(temp)
+                self._gpu_labels = self._gpu.allocateArray(label)
+                temp = data / 255.0
+                self.input._gpu_output = self._gpu.allocateArray(temp)
             else:
                 return
             #

@@ -26,7 +26,6 @@ class Train:
     def __init__(self, r, com=None, rank=-1, size=-1):
         self._r = r
         self.mode = 0
-        #self.mode_w = 0
         self.mode_e = 0
         self.mse_idex = -1
         
@@ -232,11 +231,12 @@ class Train:
     def acceptance(self, ce1, ce2, temperature):
         delta = ce2 - ce1
         if delta<=0:
-            self.delta_num += 1.0
-            self.delta_sum += abs(delta)
-            self.delta_avg = self.delta_sum / self.delta_num
+            #self.delta_num += 1.0
+            #self.delta_sum += abs(delta)
+            #self.delta_avg = self.delta_sum / self.delta_num
             return 1
         #
+        return 0
         #if self.delta_num==0:
         #    return 0
         #
@@ -382,6 +382,9 @@ class Train:
         
         if self.mpi==False or self.rank==0:
             attack_list = self.make_attack_list(attack_num, 0, w_list)
+            #print(len(attack_list))
+            #k = attack_list[0]
+            #print(w_list[k].wi, w_list[k].wi_alt)
             alt_list = []
             for i in attack_list:
                 w = w_list[i]
@@ -401,7 +404,7 @@ class Train:
             else:
                 idx = 0
                 for i in attack_list:
-                    #w = w_list[i]
+                    #print(i, idx, len(w_list))
                     w_list[i].wi_alt = alt_list[idx]
                     idx += 1
                 #
@@ -427,6 +430,7 @@ class Train:
         
         ce_alt = self.evaluate()
         if self.mpi==False or self.rank==0:
+            #print(ce_alt)
             ret = self.acceptance(ce, ce_alt, temperature)
         else:
             ret = 0
@@ -440,50 +444,49 @@ class Train:
         else:
             ce = ce_alt
             for i in attack_list:
-                #w = w_list[i]
                 w_list[i].wi = w.wi_alt
             #
         #
         return ce, ret
     
-    def loop_sa(self, w_list, wtype, debug=0):
+    def loop_sa(self, idx, w_list, wtype, debug=0):
         r = self._r
         
         w_num = len(w_list)
         attack_num = 1
         temperature = 100.0
-        total = 10000
+        total = 1 #10000
         #cnt = 0
         
         ce = r.evaluate()
         print(ce)
+        self.delta_avg = ce*0.1
         
         while temperature>0.1:
             num = 0
-            self.delta_num = 0.0
-            self.delta_sum = 0.0
+            self.delta_avg = ce*0.1
+            #self.delta_num = 0.0
+            #self.delta_sum = 0.0
             #self.delta_avg = 0.0
             while num<(total):
-                #attack_num = random.randint(1, 16)
-                #k = int(temperature)
-                #attack_num = random.randint(k/2, k)
-                #if attack_num<1:
-                #    attack_num = 1
-                #
                 ce, ret = self.multi_attack_sa(ce, w_list, attack_num, temperature)
                 if ret<0:
                     print(ret, "ce => zero")
                     return # -1
                 #
                 if self.mpi==False or self.rank==0:
-                    print("[%d/%d]"%(num, total), "T=%f"%(temperature), "\t", ret, "\t", ce)
+                    print(idx, "[%d/%d]"%(num, total), "T=%f"%(temperature), "\t", ret, "\t", ce)
                 #
                 num += 1
+                self.delta_avg = ce*0.1
             #
-            temperature = temperature*0.95
-            if self.mpi==False or self.rank==0:
-                r.save()
+            temperature = temperature*0.90 #0.95
+            #if self.mpi==False or self.rank==0:
+            #    r.save()
             #
+        #
+        #if self.mpi==False or self.rank==0:
+        #    r.save()
         #
 #
 #

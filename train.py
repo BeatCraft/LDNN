@@ -128,21 +128,29 @@ class Train:
         return w_list
     
     
-    def shift_weight(self, wi, mode=0):
+    def shift_weight(self, wi, mode=0, type=-1):
         wi_alt = wi
+        wi_min = 0
+        wi_max = 1
+        if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT:
+            wi_max = core.WEIGHT_INDEX_MAX
+        elif type==core.LAYER_TYPE_CONV_4:
+            wi_max = core.CNN_WEIGHT_INDEX_MAX
+        #
+        
         if mode==0: # random
-            wi_alt = random.randint(core.WEIGHT_INDEX_MIN, core.WEIGHT_INDEX_MAX)
+            wi_alt = random.randint(wi_min, wi_max)
         elif mode==1: # neighbor
             k = random.random()
             if k<0.5: # increase
-                if wi==core.WEIGHT_INDEX_MAX:
-                    wi_alt = random.randint(core.WEIGHT_INDEX_MIN, core.WEIGHT_INDEX_MAX-1)
+                if wi==wi_max:
+                    wi_alt = random.randint(wi_min, wi_max-1)
                 else:
                     wi_alt = wi_alt + 1
                 #
             else: # decrease
-                if wi==core.WEIGHT_INDEX_MIN:
-                    wi_alt = random.randint(core.WEIGHT_INDEX_MIN+1, core.WEIGHT_INDEX_MAX)
+                if wi==wi_min:
+                    wi_alt = random.randint(wi_min+1, wi_max)
                 else:
                     wi_alt = wi_alt -1
                 #
@@ -160,8 +168,9 @@ class Train:
             attack_i = random.randrange(w_num)
             w = w_list[attack_i]
             while 1:
-                #w.wi_alt = random.randint(core.WEIGHT_INDEX_MIN, core.WEIGHT_INDEX_MAX)
-                w.wi_alt = self.shift_weight(w.wi, 1)
+                #mode = 0 # 0:random, 1:neighbor
+                type = w.type
+                w.wi_alt = self.shift_weight(w.wi, mode, type)
                 if w.wi_alt!=w.wi:
                     attack_list.append(attack_i)
                     break
@@ -236,7 +245,7 @@ class Train:
             #self.delta_avg = self.delta_sum / self.delta_num
             return 1
         #
-        return 0
+        #return 0
         #if self.delta_num==0:
         #    return 0
         #
@@ -291,6 +300,7 @@ class Train:
         ce_alt = self.evaluate()
         ret = 0
         ret = self.acceptance(ce, ce_alt, temperature)
+        #ret = 0
         #if ce_alt<=ce:
         #    if ce_alt<0:
         #        ret = -1
@@ -381,7 +391,8 @@ class Train:
         r = self._r
         
         if self.mpi==False or self.rank==0:
-            attack_list = self.make_attack_list(attack_num, 0, w_list)
+            mode = 1 # 0:random, 1:neighbor
+            attack_list = self.make_attack_list(attack_num, mode, w_list)
             #print(len(attack_list))
             #k = attack_list[0]
             #print(w_list[k].wi, w_list[k].wi_alt)
@@ -432,6 +443,8 @@ class Train:
         if self.mpi==False or self.rank==0:
             #print(ce_alt)
             ret = self.acceptance(ce, ce_alt, temperature)
+            # tempo
+            #ret = 0
         else:
             ret = 0
         #
@@ -449,25 +462,19 @@ class Train:
         #
         return ce, ret
     
-    def loop_sa(self, idx, w_list, wtype, debug=0):
+    def loop_sa(self, idx, w_list, wtype, temperature, total, debug=0):
         r = self._r
         
         w_num = len(w_list)
         attack_num = 1
-        temperature = 100.0
-        total = 1 #10000
-        #cnt = 0
         
         ce = r.evaluate()
         print(ce)
         self.delta_avg = ce*0.1
         
-        while temperature>0.1:
+        while temperature>1.0:
             num = 0
             self.delta_avg = ce*0.1
-            #self.delta_num = 0.0
-            #self.delta_sum = 0.0
-            #self.delta_avg = 0.0
             while num<(total):
                 ce, ret = self.multi_attack_sa(ce, w_list, attack_num, temperature)
                 if ret<0:
@@ -480,9 +487,9 @@ class Train:
                 num += 1
                 self.delta_avg = ce*0.1
             #
-            temperature = temperature*0.90 #0.95
-            #if self.mpi==False or self.rank==0:
-            #    r.save()
+            temperature = temperature*0.95 #0.90, 0.95
+            if self.mpi==False or self.rank==0:
+                r.save()
             #
         #
         #if self.mpi==False or self.rank==0:

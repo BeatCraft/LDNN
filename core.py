@@ -25,7 +25,7 @@ from PIL import Image
 import gpu
 import util
 #
-sys.setrecursionlimit(10000)
+#sys.setrecursionlimit(10000)
 #
 # constant values
 #
@@ -43,23 +43,33 @@ WEIGHT_SET_4 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0] # 9
 WEIGHT_SET_5 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0.0625, 0.125, 0.25, 0.5, 1.0] # 10
 WEIGHT_SET_6 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 12
 WEIGHT_SET_7 = [-1.0, -0.5, -0.25, 0.25, 0.5, 1.0] # 6
+WEIGHT_SET_8 = [-1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0] # 9
+WEIGHT_SET_9 = [-1.0, -0.5, 0.0, 0.5, 1.0] # 5
 #
-WEIGHT_SET = WEIGHT_SET_3
+WEIGHT_SET = WEIGHT_SET_9
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
+
+CNN_WEIGHT_SET = [-2.0, -1.0, 0.0, 1.0, 2.0]
+CNN_WEIGHT_SET_1 = [-1.0, -0.5, 0.0, 0.5, 1.0]
+CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET_1)
+CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
+CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
+CNN_WEIGHT_INDEX_MIN = 0
 #
 #
 #
 class Weight:
-    def __init__(self, li, ni, ii, wi):
+    def __init__(self, li, ni, ii, wi, type=-1):
         self.li = li
         self.ni = ni
         self.ii = ii
         self.wi = wi
         self.wi_alt = wi
         self.mark = 0
+        self.type = type
 #
 #
 #
@@ -131,7 +141,7 @@ class Layer(object):
     
     def getWeight(self, ni, ii):
         wi = self._weight_index_matrix[ni][ii]
-        w = Weight(self._index, ni, ii, wi)
+        w = Weight(self._index, ni, ii, wi, self._type)
         return w
     
     def get_weight_index(self, ni, ii):
@@ -139,11 +149,19 @@ class Layer(object):
     
     def set_weight_index(self, ni, ii, wi): # wi : weight index
         self._weight_index_matrix[ni][ii] = wi
-        self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
+        if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
+            self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
+        elif self._type==LAYER_TYPE_CONV_4:
+            self._weight_matrix[ni][ii] = CNN_WEIGHT_SET[wi]
+        #
     
     def init_weight(self, ni, ii, wi=-1):
         if wi<0:
-            wi = random.randrange(WEIGHT_INDEX_SIZE)
+            if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
+                wi = random.randrange(WEIGHT_INDEX_SIZE)
+            elif self._type==LAYER_TYPE_CONV_4:
+                wi = random.randrange(CNN_WEIGHT_INDEX_SIZE)
+            #
         #
         self.set_weight_index(ni, ii, wi)
         
@@ -151,8 +169,6 @@ class Layer(object):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
                 self.init_weight(ni, ii)
-                #wi = random.randrange(WEIGHT_INDEX_SIZE)
-                #self.set_weight_index(ni, ii, wi)
             #
         #
     

@@ -303,6 +303,29 @@ void cals_layer_scale(float* x, int size) {
 }
 ''', 'cals_layer_scale')
 
+cals_filter_scale = cp.RawKernel(r'''
+extern "C" __global__
+void cals_layer_scale(float* x, int bsize, int fsize) {
+    int bi = blockIdx.x;
+    int fi = threadIdx.x;
+    int x_start = bsize * bi + fsize * fi;
+    float temp = 0.0;
+
+    for (int i=0;i<fsize;i++){
+        if (x[x_start+i]>temp){
+            temp = x[x_start+i];
+        }
+    }
+
+    if (temp>0.0){
+        for (int i=0;i<fsize;i++){
+            x[x_start+i] = x[x_start+i] / temp;
+        }
+    }
+}
+''', 'cals_filter_scale')
+
+
 cals_layer_normalize = cp.RawKernel(r'''
 extern "C" __global__
 void cals_layer_normalize(float* x, int size) {

@@ -237,7 +237,7 @@ class Train:
         #
         return ce, ret
             
-    def acceptance(self, ce1, ce2, temperature):
+    def acceptance(self, ce1, ce2, temperature, onoff=1):
         delta = ce2 - ce1
         if delta<=0:
             #self.delta_num += 1.0
@@ -245,16 +245,13 @@ class Train:
             #self.delta_avg = self.delta_sum / self.delta_num
             return 1
         #
-        #return 0
-        #if self.delta_num==0:
-        #    return 0
-        #
-        if delta>self.delta_avg:
+        
+        if onoff==0:
             return 0
         #
-        
-        #elif delta>ce1*0.005:
-        #    return 0
+            
+        if delta>self.delta_avg:
+            return 0
         #
 
         A = np.exp(-delta/float(temperature)) / 100
@@ -267,7 +264,7 @@ class Train:
     #
     # with acceptance control
     #
-    def multi_attack_t(self, ce, w_list, attack_num, temperature):
+    def multi_attack_t(self, ce, w_list, attack_num, temperature, asw=1):
         r = self._r
         
         attack_list = self.make_attack_list(attack_num, 0, w_list)
@@ -299,7 +296,7 @@ class Train:
         
         ce_alt = self.evaluate()
         ret = 0
-        ret = self.acceptance(ce, ce_alt, temperature)
+        ret = self.acceptance(ce, ce_alt, temperature, asw)
         #ret = 0
         #if ce_alt<=ce:
         #    if ce_alt<0:
@@ -331,7 +328,7 @@ class Train:
     #
     # a loop with a temperature
     #
-    def loop_sa_t(self, loop, ce, temperature, attack_num, w_list, wtype, debug=0):
+    def loop_sa_t(self, loop, ce, temperature, attack_num, w_list, wtype, debug=0, asw=1):
         r = self._r
         
         w_num = len(w_list)
@@ -343,7 +340,7 @@ class Train:
         atk_flag = True
         
         while atk_flag:
-            ce, ret = self.multi_attack_t(ce, w_list, attack_num, temperature)
+            ce, ret = self.multi_attack_t(ce, w_list, attack_num, temperature, asw)
             if ret<0:
                 return -1
             #
@@ -495,6 +492,57 @@ class Train:
         #if self.mpi==False or self.rank==0:
         #    r.save()
         #
+        
+    def loop_logathic_sa(self, idx, w_list, wtype):
+        r = self._r
+        
+        w_num = len(w_list)
+        lv_min = 0
+        lv_max = int(math.log(w_num/100, 2)) + 1 # 1 % max
+        ce = self.evaluate()
+        
+        
+        min = 200
+        
+        for temperature in range(lv_max, -1, -1):
+            attack_num = 2**temperature
+            hist = []
+            atk_flag = True
+            part = 0 # hit count
+            num = 0 # loop count
+        
+            while atk_flag:
+                ce, ret = self.multi_attack_sa(ce, w_list, attack_num, temperature)
+                if ret<0:
+                    print("exit from while :", ce, ret)
+                    #atk_flag = False
+                    break
+                #
+                num += 1
+                part += ret
+                hist.append(ret)
+                if len(hist)>min:
+                    hist = hist[1:]
+                #
+                s = 0 # hit conunt in the last 200
+                for a in hist:
+                    s += a
+                #
+                rate = float(s)/float(num)
+                print("[%d:%d] %d [%s:%d] (%d, %d) %06f, ce:"
+                    % (idx, temperature, num, wtype, attack_num, part, s, rate), ce)
+                if num>min:
+                    if num>10000 or rate<0.01:
+                        atk_flag = False
+                    #
+                #
+            # while
+            if ce<=0:
+                print("exit from for")
+                break
+            #
+        #
+        r.save()
 #
 #
 #

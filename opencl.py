@@ -274,6 +274,26 @@ __kernel void scale_layer(__global float* data, int size)
     }
 }
 
+__kernel void scale_filetr(__global float* data, int bsize, int fsize)
+{
+    int bi = get_global_id(0);
+    int fi = get_global_id(1);
+    int start = bsize * bi + fsize * fi;
+    float max = 0.0;
+    
+    for (int i=0;i<fsize;i++){
+        if (data[start+i]>max){
+            max = data[start+i];
+        }
+    }
+    
+    if (max>0.0){
+        for (int i=0;i<fsize;i++){
+            data[start+i] = (data[start+i]/max);
+        }
+    }
+}
+
 __kernel void mse(__global const float* infs, __global const float* labels, __global float* output, int num)
 {
     int bi = get_global_id(0); // batch index
@@ -569,7 +589,11 @@ class OpenCL(gpu.Gpu):
     def scale_layer(self, data, size, batch_size):
         event = self.prg.scale_layer(self._queue, (batch_size,), None, data, np.int32(size))
         event.wait()
-    
+        
+    def scale_filetr(self, batch_size, filetr_size, data, batch_stride, filetr_stride):
+        event = self.prg.scale_filetr(self._queue, (batch_size, filetr_size), None, data, np.int32(batch_stride), np.int32(filetr_stride))
+        event.wait()
+        
     def normalize_layer(self, data, size, batch_size):
         event = self.prg.normalize_layer(self._queue, (batch_size,), None, data, np.int32(size))
         event.wait()

@@ -305,12 +305,12 @@ void cals_layer_scale(float* x, int size) {
 
 cals_filter_scale = cp.RawKernel(r'''
 extern "C" __global__
-void cals_layer_scale(float* x, int bsize, int fsize) {
+void cals_filter_scale(float* x, int bsize, int fsize) {
     int bi = blockIdx.x;
     int fi = threadIdx.x;
     int x_start = bsize * bi + fsize * fi;
     float temp = 0.0;
-
+    
     for (int i=0;i<fsize;i++){
         if (x[x_start+i]>temp){
             temp = x[x_start+i];
@@ -324,7 +324,6 @@ void cals_layer_scale(float* x, int bsize, int fsize) {
     }
 }
 ''', 'cals_filter_scale')
-
 
 cals_layer_normalize = cp.RawKernel(r'''
 extern "C" __global__
@@ -467,7 +466,7 @@ class Dgx(gpu.Gpu):
 
     def layerScale(self, buf, size_batch, size_node):
         cals_layer_scale((size_batch,), (1,), (buf, size_node))
-        
+    
     def layerNormalize(self, buf, size_batch, size_node):
         cals_layer_normalize((size_batch,), (1,), (buf, size_node))
         
@@ -507,6 +506,9 @@ class Dgx(gpu.Gpu):
     
     def relu(self, buf, size_input, mode, batch_size, size_node):
         calc_relu((batch_size,), (size_node,), (buf, size_input, mode))
+
+    def filterScale(self, batch_size, filter_size, buf, batch_stride, filter_stride):
+        cals_filter_scale((batch_size,), (filter_size,), (buf, batch_stride, filter_stride))
 
     def make_attack_list(self, div, mode, w_list, result_gpu):
         pass

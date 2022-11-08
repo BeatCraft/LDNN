@@ -707,6 +707,7 @@ class Conv_4_Layer(Layer):
             size = self._w * self._h * self._filter
             self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, a_mode)
             #self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
+            self._gpu.scale_filetr(self._batch_size, self._filter, self._gpu_output, size, self._w * self._h)
             if debug:
                 print(self._index, "conv, scale")
                 self._gpu.copy(self._output_array, self._gpu_output)
@@ -740,6 +741,7 @@ class Conv_4_Layer(Layer):
                 darray = cp.asnumpy(self._gpu_output)
                 print(darray[0][0])
             #
+            self._gpu.filterScale(self._batch_size, self._filter, self._gpu_output, size, self._w * self._h)
         #
     
     def save_padded(self, bi, ci, data_array):
@@ -1217,6 +1219,37 @@ class Roster:
                     writer.writerows(data)
                 #
             #
+        #
+    
+    def export_weight_index_by_layer(self, idx):
+        layer = self.get_layer_at(idx)
+        data = layer.export_weight_index()
+        path = "./wi/%d.csv" % (idx)
+        with open(path, "w") as f:
+            writer = csv.writer(f, lineterminator='\n')
+            if data:
+                writer.writerows(data)
+            #
+        #
+    
+    def import_weight_index_by_layer(self, idx):
+        path = "./wi/%d.csv" % (idx)
+        with open(path, "r") as f:
+            reader = csv.reader(f)
+            layer = self.get_layer_at(idx)
+            nc  = layer._num_node
+            block = []
+            for row in reader:
+                line = []
+                for cell in row:
+                    line.append(cell)
+                #
+                block.append(line)
+                if len(block)==nc:
+                    break
+                #
+            #
+            layer.import_weight_index(block)
         #
         
     def import_weight(self, path):

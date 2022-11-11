@@ -52,9 +52,12 @@ WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
 
-CNN_WEIGHT_SET = [-2.0, -1.0, 0.0, 1.0, 2.0]
-CNN_WEIGHT_SET_1 = [-1.0, -0.5, 0.0, 0.5, 1.0]
-CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET_1)
+CNN_WEIGHT_SET_1 = [-2.0, -1.0, 0.0, 1.0, 2.0]
+CNN_WEIGHT_SET_2 = [-1.0, -0.5, 0.0, 0.5, 1.0]
+CNN_WEIGHT_SET_3 = [0.0, 1.0]
+CNN_WEIGHT_SET_4 = [0.0, 0.5, 1.0]
+CNN_WEIGHT_SET = CNN_WEIGHT_SET_3
+CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
 CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
 CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
 CNN_WEIGHT_INDEX_MIN = 0
@@ -155,6 +158,36 @@ class Layer(object):
             self._weight_matrix[ni][ii] = CNN_WEIGHT_SET[wi]
         #
     
+    def init_weight_mode(self, ni, ii, mode, wi=0):
+        if mode==0: # random
+            if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
+                wmax = WEIGHT_INDEX_SIZE
+            elif self._type==LAYER_TYPE_CONV_4:
+                wmax = CNN_WEIGHT_INDEX_SIZE
+            #
+            wi = random.randrange(wmax)
+            self.set_weight_index(ni, ii, wi)
+        elif mode==1: # random in rallow range
+            if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
+                wmin = 1
+                wmax = WEIGHT_INDEX_SIZE - 1
+            elif self._type==LAYER_TYPE_CONV_4:
+                wmin = 0
+                wmax = CNN_WEIGHT_INDEX_SIZE ### -1
+            #
+            wi = random.randrange(wmin, wmax, 1)
+            self.set_weight_index(ni, ii, wi)
+        elif mode==2: # fixed value
+            self.set_weight_index(ni, ii, wi)
+        #
+        
+    def init_weight_with_mode(self, mode=0, value=0):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                self.init_weight_mode(ni, ii, mode, value)
+            #
+        #
+
     def init_weight(self, ni, ii, wi=-1):
         if wi<0:
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
@@ -169,6 +202,13 @@ class Layer(object):
         for ni in range(self._num_node):
             for ii in range(self._num_input):
                 self.init_weight(ni, ii)
+            #
+        #
+    
+    def init_weight_with_value(self, value):
+        for ni in range(self._num_node):
+            for ii in range(self._num_input):
+                self.init_weight(ni, ii, value)
             #
         #
     
@@ -705,7 +745,7 @@ class Conv_4_Layer(Layer):
             #
             #self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._w * self._h, self._filter)
             size = self._w * self._h * self._filter
-            self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, a_mode)
+            #self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, a_mode)
             #self._gpu.scale_layer(self._gpu_output, size, self._batch_size)
             self._gpu.scale_filetr(self._batch_size, self._filter, self._gpu_output, size, self._w * self._h)
             if debug:
@@ -718,24 +758,20 @@ class Conv_4_Layer(Layer):
             #
         elif self._gpu.type==1: # GDX
             self._gpu.padding(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
-            #if debug:
-            #    print(self._index, "conv", "padded", )
-            #    darray = cp.asnumpy(self._gpu_padded)
-            #    print((darray.shape, type(darray[0])))
+            if debug:
+                print(self._index, "conv", "padded", )
+                darray = cp.asnumpy(self._gpu_padded)
+                print((darray.shape, type(darray[0])))
             #
             self._gpu.convolusion(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
-            
             if debug:
                 print(self._index, "conv ret")
                 darray = cp.asnumpy(self._gpu_output)
                 print((darray.shape, type(darray[0])))
                 print(darray[0][0])
             #
-            
-            #h = self._w * self._h
-            #self._gpu.batchNormalize(self._gpu_output, self._batch_size, h, self._filter)
             size = self._w * self._h * self._filter
-            self._gpu.relu(self._gpu_output, size, a_mode, self._batch_size, self._filter)
+            #self._gpu.relu(self._gpu_output, size, a_mode, self._batch_size, self._filter)
             if debug:
                 print(self._index, "conv, scale")
                 darray = cp.asnumpy(self._gpu_output)
@@ -832,7 +868,9 @@ class Roster:
         if os.path.isfile(self._path):
             self.import_weight(self._path)
         else:
-            self.init_weight()
+            mode = 1
+            value = 0
+            self.init_weight(mode, value)
             self.export_weight(self._path)
         #
 
@@ -1007,7 +1045,7 @@ class Roster:
             #
         #
 
-    def init_weight(self):
+    def init_weight(self, mode=0, value=0):
         c = self.count_layers()
         for i in range(c):
             layer = self.get_layer_at(i)
@@ -1015,10 +1053,21 @@ class Roster:
             if type==LAYER_TYPE_MAX or type==LAYER_TYPE_INPUT:
                 pass
             else:
-                layer.init_weight_with_random_index()
+                #layer.init_weight_with_random_index()
+                layer.init_weight_with_mode(mode, value)
             #
         #
-
+        
+    def init_weight_by_layer(self, idx, mode, value=0):
+        layer = self.get_layer_at(idx)
+        if layer.count_weight()>0:
+            if mode==0: # random
+                layer.init_weight_with_random_index()
+            elif mode==1: # a value
+                layer.init_weight_with_value(value)
+            #
+        #
+        
     def reset(self):
     # flush a batch depending cache when switching batches
         c = self.count_layers()

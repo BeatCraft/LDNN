@@ -116,17 +116,29 @@ class Train:
                 #
                 for ni in range(layer._num_node):
                     for ii in range(layer._num_input):
-                        #wi = layer.get_weight_index(ni, ii)
-                        #wi_alt = wi
-                        #mark = 0
-                        #w_list.append((li, ni, ii, wi, wi_alt, mark))
                         w_list.append(layer.getWeight(ni, ii))
                     #
                 #
             #
         #
         return w_list
-    
+
+    def make_w_list_by_index(self, idx_list):
+        r = self._r
+        #
+        w_list  = []
+        for li in idx_list:
+            layer = r.get_layer_at(li)
+            cw = layer.count_weight()
+            if cw > 0:
+                for ni in range(layer._num_node):
+                    for ii in range(layer._num_input):
+                        w_list.append(layer.getWeight(ni, ii))
+                    #
+                #
+            #
+        #
+        return w_list
     
     def shift_weight(self, wi, mode=0, type=-1):
         wi_alt = wi
@@ -438,10 +450,7 @@ class Train:
         
         ce_alt = self.evaluate()
         if self.mpi==False or self.rank==0:
-            #print(ce_alt)
             ret = self.acceptance(ce, ce_alt, temperature, asw)
-            # tempo
-            #ret = 0
         else:
             ret = 0
         #
@@ -475,7 +484,7 @@ class Train:
             self.delta_avg = ce*0.1
             while num<(total):
                 ce, ret = self.multi_attack_sa(ce, w_list, attack_num, temperature, asw)
-                if ret<0:
+                if ce<0:
                     print(ret, "ce => zero")
                     return # -1
                 #

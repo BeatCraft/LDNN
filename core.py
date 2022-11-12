@@ -56,7 +56,7 @@ CNN_WEIGHT_SET_1 = [-2.0, -1.0, 0.0, 1.0, 2.0]
 CNN_WEIGHT_SET_2 = [-1.0, -0.5, 0.0, 0.5, 1.0]
 CNN_WEIGHT_SET_3 = [0.0, 1.0]
 CNN_WEIGHT_SET_4 = [0.0, 0.5, 1.0]
-CNN_WEIGHT_SET = CNN_WEIGHT_SET_3
+CNN_WEIGHT_SET = CNN_WEIGHT_SET_4
 CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
 CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
 CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
@@ -173,7 +173,7 @@ class Layer(object):
                 wmax = WEIGHT_INDEX_SIZE - 1
             elif self._type==LAYER_TYPE_CONV_4:
                 wmin = 0
-                wmax = CNN_WEIGHT_INDEX_SIZE ### -1
+                wmax = CNN_WEIGHT_INDEX_SIZE -1
             #
             wi = random.randrange(wmin, wmax, 1)
             self.set_weight_index(ni, ii, wi)

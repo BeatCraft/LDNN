@@ -478,6 +478,7 @@ class Train:
         print(ce)
         self.delta_avg = ce*0.1
         t_min = 0.1 # 1.0, 0.1, 0.01
+        lp = 0
         
         while temperature>t_min:
             num = 0
@@ -489,11 +490,12 @@ class Train:
                     return # -1
                 #
                 if self.mpi==False or self.rank==0:
-                    print(idx, "[%d/%d]"%(num, total), "T=%f"%(temperature), "\t", ret, "\t", ce)
+                    print(idx, "[%d/%d]"%(num, total), "T=%f"%(temperature), "(%d)"%(lp), "\t", ret, "\t", ce)
                 #
                 num += 1
                 self.delta_avg = ce*0.1
             #
+            lp = lp +1
             temperature = temperature*0.95 #0.90, 0.95
             if self.mpi==False or self.rank==0:
                 r.save()

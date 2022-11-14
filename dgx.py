@@ -7,6 +7,69 @@ import cupyx
 
 import gpu
 
+calc_get_std = cp.RawKernel(r'''
+extern "C" __global__
+void calc_get_std(
+    float* data,
+    const int stride,
+    const double mean,
+    const double div)
+{
+    int bi = blockIdx.x;
+    int start = bi * stride;
+    float sum = 0.0;
+
+    for (int i=0;i<stride;i++){
+        float k = data[start + i] - mean;
+        data[start + i] = k / div;
+    }
+}
+''', 'calc_get_std')
+
+calc_get_dsum = cp.RawKernel(r'''
+extern "C" __global__
+void calc_get_dsum(
+    const float* input,
+    float* output,
+    const int stride,
+    const double mean)
+{
+    int bi = blockIdx.x;
+    int start = bi * stride;
+    float dsum = 0.0;
+    
+    //mean = 2.726485252380371;
+    //printf("stride=%d, mean=%f\n", stride, mean);
+            
+    for (int i=0;i<stride;i++){
+        float k = input[start + i] - mean;
+        dsum += (k*k);
+        //printf("[%d] %f - %f = %f\n", i, input[start + i], mean, k);
+    }
+    
+    output[bi] = dsum;
+}
+''', 'calc_get_dsum')
+
+calc_get_sum = cp.RawKernel(r'''
+extern "C" __global__
+void calc_get_sum(
+    const float* input,
+    float* output,
+    const int stride)
+{
+    int bi = blockIdx.x;
+    int start = bi * stride;
+    float sum = 0.0;
+
+    for (int i=0;i<stride;i++){
+        sum += input[start + i];
+    }
+    
+    output[bi] = sum;
+}
+''', 'calc_get_sum')
+
 calc_layer_mse = cp.RawKernel(r'''
 extern "C" __global__
 void calc_layer_mse(
@@ -16,7 +79,6 @@ void calc_layer_mse(
     const int w,
     const int h)
 {
-    //int bi = get_global_id(0);
     int bi = blockIdx.x;
     
     int ch_stride = w*h;
@@ -33,7 +95,6 @@ void calc_layer_mse(
     }
 }
 ''', 'calc_layer_mse')
-
 
 calc_cnn_max = cp.RawKernel(r'''
 extern "C" __global__
@@ -303,9 +364,9 @@ void cals_layer_scale(float* x, int size) {
 }
 ''', 'cals_layer_scale')
 
-cals_filter_scale = cp.RawKernel(r'''
+calc_filter_scale = cp.RawKernel(r'''
 extern "C" __global__
-void cals_filter_scale(float* x, int bsize, int fsize) {
+void calc_filter_scale(float* x, int bsize, int fsize) {
     int bi = blockIdx.x;
     int fi = threadIdx.x;
     int x_start = bsize * bi + fsize * fi;
@@ -323,7 +384,7 @@ void cals_filter_scale(float* x, int bsize, int fsize) {
         }
     }
 }
-''', 'cals_filter_scale')
+''', 'calc_filter_scale')
 
 cals_layer_normalize = cp.RawKernel(r'''
 extern "C" __global__
@@ -504,15 +565,25 @@ class Dgx(gpu.Gpu):
     def layer_mse(self, buf_x, buf_y, ch, w, h, batch_size):
         calc_layer_mse((batch_size,), (1,), (buf_x, buf_y, ch, w, h))
     
-    def relu(self, buf, size_input, mode, batch_size, size_node):
+    def relu(self, batch_size, size_node, buf, size_input, mode):
         calc_relu((batch_size,), (size_node,), (buf, size_input, mode))
 
     def filterScale(self, batch_size, filter_size, buf, batch_stride, filter_stride):
-        cals_filter_scale((batch_size,), (filter_size,), (buf, batch_stride, filter_stride))
+        calc_filter_scale((batch_size,), (filter_size,), (buf, batch_stride, filter_stride))
 
     def make_attack_list(self, div, mode, w_list, result_gpu):
         pass
     
+    #
+    def get_sum(self, batch_size, buf, out, stride):
+        calc_get_sum((batch_size,), (1,), (buf, out, stride))
+    
+    def get_dsum(self, batch_size, buf, out, stride, mean):
+        #print("get_dsum()", mean, type(mean), len(mean))
+        calc_get_dsum((batch_size,), (1,), (buf, out, stride, mean))
+        
+    def get_std(self, batch_size, buf, stride, mean, div):
+        calc_get_std((batch_size,), (1,), (buf, stride, mean, div))
     
 def main():
     return 0

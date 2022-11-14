@@ -14,6 +14,74 @@ import gpu
 #os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
 KERNEL_CODE = """
+
+__kernel void get_std(
+    __global float* buf,
+    const int batch_stride,
+    const float mean,
+    const float div)
+{
+    int bi = get_global_id(0);
+    int start = bi * batch_stride;
+    
+    for (int i=0; i<batch_stride; i++){
+        float k = buf[start + i] - mean;
+        buf[start + i] = k / div;
+    }
+}
+
+__kernel void get_dsum(
+    __global float* buf,
+    __global float* out,
+    const int batch_stride,
+    const float mean)
+{
+    int bi = get_global_id(0);
+    int start = bi * batch_stride;
+    float dsum = 0.0;
+        
+    for (int i=0; i<batch_stride; i++){
+        float k = buf[start + i] - mean;
+        dsum += (k*k);
+    }
+    
+    out[bi] = dsum;
+}
+
+__kernel void get_sum(
+    __global float* buf,
+    __global float* out,
+    const int batch_stride)
+{
+    int bi = get_global_id(0);
+    int start = bi * batch_stride;
+    float sum = 0.0;
+    
+    for (int i=0; i<batch_stride; i++){
+        sum += buf[start + i];
+    }
+    
+    out[bi] = sum;
+}
+
+__kernel void get_max(
+    __global float* buf,
+    __global float* out,
+    const int batch_stride)
+{
+    int bi = get_global_id(0);
+    float max = 0.0;
+    int start = bi * batch_stride;
+    
+    for (int i=0; i<batch_stride; i++){
+        if (buf[start + i]>max){
+            max = buf[start + i];
+        }
+    }
+    
+    out[bi] = max;
+}
+        
 __kernel void normalize_batch(
     __global float* data, 
     const int b_num, 
@@ -586,7 +654,7 @@ class OpenCL(gpu.Gpu):
                               data_out, np.int32(size), np.int32(num_node), np.int32(mode))
         event.wait()
     
-    def scale_layer(self, data, size, batch_size):
+    def scale_layer(self, batch_size, data, size):
         event = self.prg.scale_layer(self._queue, (batch_size,), None, data, np.int32(size))
         event.wait()
         
@@ -630,10 +698,30 @@ class OpenCL(gpu.Gpu):
 
     #normalize_batch(__global float* data, int b_num, int ch_size, int ch_num)
     def normalize_batch(self, buf, b_num, ch_size, ch_num):
-        event = self.prg.normalize_batch(self._queue, (ch_num,), None, 
+        event = self.prg.normalize_batch(self._queue, (ch_num,), None,
                                          buf, np.int32(b_num), np.int32(ch_size), np.int32(ch_num))
         event.wait()
-    
+ 
+    def get_std(self, batch_size, buf, batch_stride, mean, std):
+        event = self.prg.get_std(self._queue, (batch_size,), None,
+                                 buf, np.int32(batch_stride), np.float32(mean), np.float32(std))
+        event.wait()
+        
+    def get_dsum(self, batch_size, buf, out, batch_stride, mean):
+        event = self.prg.get_dsum(self._queue, (batch_size,), None,
+                                     buf, out, np.int32(batch_stride), np.float32(mean))
+        event.wait()
+        
+    def get_sum(self, batch_size, buf, out, batch_stride):
+        event = self.prg.get_sum(self._queue, (batch_size,), None,
+                                     buf, out, np.int32(batch_stride))
+        event.wait()
+        
+    def get_max(self, batch_size, buf, out, batch_stride):
+        event = self.prg.get_max(self._queue, (batch_size,), None,
+                                     buf, out, np.int32(batch_stride))
+        event.wait()
+        
     def k_test(self, value):
         event = self.prg.k_test(self._queue, (1,), None, np.float32(value))
         event.wait()

@@ -738,8 +738,8 @@ class Conv_4_Layer(Layer):
                 self._gpu.copy(self._padded_array, self._gpu_padded)
                 print(self._padded_array[0])
                 self.save_padded(0, 0, self._padded_array[0])
-                self.save_padded(0, 1, self._padded_array[0])
-                self.save_padded(0, 2, self._padded_array[0])
+                #self.save_padded(0, 1, self._padded_array[0])
+                #self.save_padded(0, 2, self._padded_array[0])
             #
             self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output,
                                         self._w, self._h, self._ch, self._filter,
@@ -755,14 +755,10 @@ class Conv_4_Layer(Layer):
             self._gpu.get_sum(self._batch_size, self._gpu_output, self._gpu_sum, size)
             self._gpu.copy(self._sum_array, self._gpu_sum)
             mean = self._sum_array.sum() / float(self._batch_size*size)
-            #print("mean:", mean)
             self._gpu.get_dsum(self._batch_size, self._gpu_output, self._gpu_sum, size, mean)
             self._gpu.copy(self._sum_array, self._gpu_sum)
-            #print(self._sum_array)
             div2 = self._sum_array.sum() / float(self._batch_size*size)
-            #print("div2:", div2)
             div = np.sqrt(div2) +  0.0000001;
-            #print("div:", div)
             self._gpu.get_std(self._batch_size, self._gpu_output, size, mean, div)
             #
             
@@ -770,14 +766,15 @@ class Conv_4_Layer(Layer):
             self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, a_mode)
             
             # scale
-            self._gpu.scale_layer(self._batch_size, self._gpu_output, size)
+            #self._gpu.scale_layer(self._batch_size, self._gpu_output, size)
             if debug:
                 print(self._index, "conv, scale")
                 self._gpu.copy(self._output_array, self._gpu_output)
                 print((self._output_array[0][0]))
                 #
                 #self.save_output()
-                self.save_filter_out(0, 0, self._output_array[0][0])
+                #self.save_filter_out(0, 0, self._output_array[0][0])
+                self.save_debug("ocl.txt", self._w, self._h, self._output_array[0][0])
             #
         elif self._gpu.type==1: # GDX
             self._gpu.padding(array_in, self._gpu_padded, self._w, self._h, self._ch, self._batch_size)
@@ -785,6 +782,7 @@ class Conv_4_Layer(Layer):
                 print(self._index, "conv", "padded", )
                 darray = cp.asnumpy(self._gpu_padded)
                 print((darray.shape, type(darray[0])))
+                self.save_padded(0, 0, darray[0])
             #
             self._gpu.convolusion(self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, self._batch_size)
             if debug:
@@ -796,39 +794,30 @@ class Conv_4_Layer(Layer):
             
             # normalize
             size = self._w * self._h * self._filter
-            # sum, mean, div2, div
             self._gpu.get_sum(self._batch_size, self._gpu_output, self._gpu_sum, size)
-            #sum_array = cp.asnumpy(self._gpu_sum)
-            #mean = float(sum_array.sum()) / float(self._batch_size * size)
             mean = float( self._gpu_sum.sum() / float(self._batch_size * size) )
-            #print("mean:", mean, type(mean))
             self._gpu.get_dsum(self._batch_size, self._gpu_output, self._gpu_sum, size, mean)
-            
-            #d2array = cp.asnumpy(self._gpu_dsum)
-            #print(self._gpu_dsum.sum())
-            #print(d2array.sum())
-            #print(d2array, self._batch_size, self._w, self._h, self._filter)
-            
-            #print(darray[0])
             div2 = float(self._gpu_sum.sum() / float(self._batch_size * size))
-            #print("div2:", div2)
             div = float(np.sqrt(div2) + 0.0000001);
-            #print("div:", div)
             self._gpu.get_std(self._batch_size, self._gpu_output, size, mean, div)
             
             #relu
             self._gpu.relu(self._batch_size, self._filter, self._gpu_output, size, a_mode)
-            
+
             # scale
-            self._gpu.layerScale(self._gpu_output, self._batch_size, size)
+            #self._gpu.layerScale(self._gpu_output, self._batch_size, size)
             
             if debug:
                 print(self._index, "conv, scale")
                 darray = cp.asnumpy(self._gpu_output)
                 print(darray[0][0])
+                #
+                self.save_filter_out(0, 0, darray[0][0])
+                self.save_debug("dgx.txt", self._w, self._h, darray[0][0])
             #
-            self._gpu.filterScale(self._batch_size, self._filter, self._gpu_output, size, self._w * self._h)
+            #self._gpu.filterScale(self._batch_size, self._filter, self._gpu_output, size, self._w * self._h)
         #
+        
     
     def save_padded(self, bi, ci, data_array):
         w = self._w + 2
@@ -883,6 +872,24 @@ class Conv_4_Layer(Layer):
             for fi in range(self._filter):
                 data_array = self._output_array[bi][fi]
                 self.save_filter_out(bi, fi, data_array)
+            #
+        #
+    
+    def save_array_to_png(self, data_array):
+        for bi in range(self._batch_size):
+            for fi in range(self._filter):
+                data = data_array[bi][fi]
+                self.save_filter_out(bi, fi, data)
+            #
+        #
+        
+    def save_debug(self, name, w, h, darray):
+        fname = "./debug/" + name
+        print("### fname:",fname)
+        size = w * h
+        with open(fname, 'wt') as f:
+            for i in range(size):
+                f.write("%f\n" %(darray[i]))
             #
         #
 #
@@ -965,7 +972,7 @@ class Roster:
     
     # batch for classification
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch, size, offset):
-        print("Roster::set_batch(%d, %d, %d, %d)" % (data_size, num_class, size, offset))
+        #print("Roster::set_batch(%d, %d, %d, %d)" % (data_size, num_class, size, offset))
         data_array = np.zeros((size, data_size), dtype=np.float32)
         labels = np.zeros((size, num_class), dtype=np.float32)
         for j in range(size):
@@ -978,7 +985,7 @@ class Roster:
         self.set_data(data_array, data_size, labels, size)
                 
     def set_data(self, data, data_size, label, batch_size):
-        print("Roster::set_data(%d, %d)" % (data_size, batch_size))
+        #print("Roster::set_data(%d, %d)" % (data_size, batch_size))
         if self._gpu:
             pass
         else:
@@ -1192,7 +1199,7 @@ class Roster:
         return output._output_array
 
     def get_answer(self):
-        print("roster::get_answer()")
+        #print("roster::get_answer()")
         ret = []
         #c = self.count_layers()
         output = self.output #self.get_layer_at(c-1)

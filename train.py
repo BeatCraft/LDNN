@@ -497,8 +497,8 @@ class Train:
             #
             lp = lp +1
             temperature = temperature*0.95 #0.90, 0.95
-            if self.mpi==False or self.rank==0:
-                r.save()
+            #if self.mpi==False or self.rank==0:
+            #    r.save()
             #
         #
         #if self.mpi==False or self.rank==0:

@@ -37,22 +37,21 @@ def print_result(ca, eval_size, num_class, dist, rets, oks):
     #
     print("---------------------------------")
     
-def classification(r, data_size, num_class, batch_size, batch_image, batch_label, n):
-    #test_image_batch = util.pickle_load(image_batch_path)
-    #test_label_batch = util.pickle_load(label_batch_path)
+def classification(r, data_size, num_class, batch_size, batch_image, batch_label, n, debug=0, single=0):
     
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
     print((">>test(%d) = %d" % (n, batch_size)))
     print(num_class)
-    #
     it, left = divmod(batch_size, n)
-    #
+    
     # for single test
-    #it = 1
-    #n = 1
+    if single==1:
+        it = 1
+        n = 1
     #
+    
     if left>0:
         print(("error : n(=%d) is not appropriate" % (n)))
     #
@@ -69,7 +68,7 @@ def classification(r, data_size, num_class, batch_size, batch_image, batch_label
         #
         r.set_batch(data_size, num_class, data_array, class_array, n, 0)
         start_time = time.time()
-        r.propagate(0)
+        r.propagate(debug)
         elapsed_time += (time.time() - start_time)
         #
         #infs = r.get_inference()

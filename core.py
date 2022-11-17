@@ -391,10 +391,7 @@ class HiddenLayer(Layer):
             #
         elif self._gpu.type==1: # DGX
             self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
-            #self._gpu.layerNormalize(self._gpu_output, self._batch_size, self._num_node)
             self._gpu.layerScale(self._gpu_output, self._batch_size, self._num_node)
-            #mx = cp.max(self._gpu_output)
-            #self._gpu_output = self._gpu_output/mx
             if debug:
                 print(self._index, "hidden, input")
                 darray = cp.asnumpy(array_in)
@@ -475,7 +472,6 @@ class OutputLayer(Layer):
                     print((self._output_array[0]))
                 #
             elif self._gpu.type==1: # DGX
-                #self._gpu.mac(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input)
                 self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 0)
                 self._gpu.softmax(self._gpu_output, self._gpu_softmax, self._batch_size, self._num_node)
                 if debug:
@@ -752,14 +748,14 @@ class Conv_4_Layer(Layer):
             
             # normalize
             size = self._w * self._h * self._filter
-            self._gpu.get_sum(self._batch_size, self._gpu_output, self._gpu_sum, size)
-            self._gpu.copy(self._sum_array, self._gpu_sum)
-            mean = self._sum_array.sum() / float(self._batch_size*size)
-            self._gpu.get_dsum(self._batch_size, self._gpu_output, self._gpu_sum, size, mean)
-            self._gpu.copy(self._sum_array, self._gpu_sum)
-            div2 = self._sum_array.sum() / float(self._batch_size*size)
-            div = np.sqrt(div2) +  0.0000001;
-            self._gpu.get_std(self._batch_size, self._gpu_output, size, mean, div)
+            #self._gpu.get_sum(self._batch_size, self._gpu_output, self._gpu_sum, size)
+            #self._gpu.copy(self._sum_array, self._gpu_sum)
+            #mean = self._sum_array.sum() / float(self._batch_size*size)
+            #self._gpu.get_dsum(self._batch_size, self._gpu_output, self._gpu_sum, size, mean)
+            #self._gpu.copy(self._sum_array, self._gpu_sum)
+            #div2 = self._sum_array.sum() / float(self._batch_size*size)
+            #div = np.sqrt(div2) +  0.0000001;
+            #self._gpu.get_std(self._batch_size, self._gpu_output, size, mean, div)
             #
             
             # relu

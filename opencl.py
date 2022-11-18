@@ -215,6 +215,63 @@ __kernel void conv_4_roll_batch(
     }
 };
 
+__kernel void conv_5_roll_batch(
+    __global float* input,
+    __global float* weight,
+    __global float* output,
+    const int in_w,
+    const int in_h,
+    const int out_w,
+    const int out_h,
+    const int ch,
+    const int filter,
+    const int filter_len,
+    const int stride)
+{
+    int bi = get_global_id(0); // index in batch
+    int xi = get_global_id(1); // x in output
+    int yi = get_global_id(2); // y in output
+    int in_ch_stride = in_w * in_h;
+    int out_ch_stride = out_w * out_h;
+    int in_batch_stride = in_ch_stride*ch;
+    int out_stride = out_ch_stride*filter;
+    int in_y_stride = yi * in_w;
+    int in_start = in_batch_stride * bi + in_y_stride + xi;
+    
+    for (int fi=0; fi<filter; fi++){
+    
+        float sum = 0.0;
+        int f_start = filter_len*filter_len*fi*ch;
+                    
+        for (int i=0; i<ch; i++){
+            int start = in_start + in_ch_stride*i;
+            int w_start = + f_start + filter_len*filter_len*i;
+            
+    
+            for (int fy=0; i<filter_len; fy++){
+                for (int fx=0; i<filter_len; fx++){
+                    sum += input[start + in_w*fy + fx] * weight[w_start + filter_len*fy + fx];
+                }
+            }
+            
+            
+            sum += input[start + 0] * weight[w_start + 0];
+            sum += input[start + 1] * weight[w_start + 1];
+            sum += input[start + 2] * weight[w_start + 2];
+        
+            sum += input[start + in_w + 0] * weight[w_start + 3];
+            sum += input[start + in_w + 1] * weight[w_start + 4];
+            sum += input[start + in_w + 2] * weight[w_start + 5];
+        
+            sum += input[start + in_w*2 + 0] * weight[w_start + 6];
+            sum += input[start + in_w*2 + 1] * weight[w_start + 7];
+            sum += input[start + in_w*2 + 2] * weight[w_start + 8];
+        }
+        
+        output[bi*w*h*filter + w*h*fi + yi*w+xi] = sum;
+    }
+};
+
 __kernel void max_batch(
     __global float* input,
     __global float* output,

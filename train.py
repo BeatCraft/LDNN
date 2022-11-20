@@ -102,7 +102,7 @@ class Train:
     def make_w_list(self, type_list=None):
         r = self._r
         if type_list is None:
-            type_list = [core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT, core.LAYER_TYPE_CONV_4]
+            type_list = [core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT, core.LAYER_TYPE_CONV]
         #
         w_list  = []
         c = r.count_layers()
@@ -140,34 +140,66 @@ class Train:
         #
         return w_list
     
-    def shift_weight(self, wi, mode=0, type=-1):
+    def shift_weight(self, w, wi, mode=0, type=-1):
+        #print("shift_weight", wi, type)
         wi_alt = wi
         wi_min = 0
         wi_max = 1
+        
         if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT:
             wi_max = core.WEIGHT_INDEX_MAX
-        elif type==core.LAYER_TYPE_CONV_4:
+        elif type==core.LAYER_TYPE_CONV:
             wi_max = core.CNN_WEIGHT_INDEX_MAX
+        #
+        
+        if type==core.LAYER_TYPE_CONV:
+            if wi>2 or wi_alt>2:
+                print("AAA(%d, %d, %d), wi=%d, alt=%d, max=%d (%d)"
+                        % (w.li, w.ni, w.ii, wi, wi_alt, wi_max, w.mark))
+            #
         #
         
         if mode==0: # random
             wi_alt = random.randint(wi_min, wi_max)
+            if type==core.LAYER_TYPE_CONV and wi>2:
+                print("FUCK!!")
+                print(" (%d, %d, %d)" %(w.li, w.ni, w.ii) )
+                print(" wi=%d, alt=%d, max=%d (%d)" % (wi, wi_alt, wi_max, w.mark))
+            #
         elif mode==1: # neighbor
             k = random.random()
+
             if k<0.5: # increase
                 if wi==wi_max:
                     wi_alt = random.randint(wi_min, wi_max-1)
                 else:
-                    wi_alt = wi_alt + 1
+                    wi_alt = wi + 1
+                    if type==core.LAYER_TYPE_CONV and wi_alt>2:
+                        print("FUCK!!")
+                        print(" (%d, %d, %d)" %(w.li, w.ni, w.ii) )
+                        print(" wi=%d, alt=%d, max=%d (%d) %f" % (wi, wi_alt, wi_max, w.mark, k))
+                    #
                 #
             else: # decrease
                 if wi==wi_min:
                     wi_alt = random.randint(wi_min+1, wi_max)
                 else:
-                    wi_alt = wi_alt -1
+                    wi_alt = wi - 1
+                #
+                if type==core.LAYER_TYPE_CONV and wi_alt>2:
+                    print("FUCK!!")
+                    print(" (%d, %d, %d)" %(w.li, w.ni, w.ii) )
+                    print(" wi=%d, alt=%d, max=%d (%d) %f" % (wi, wi_alt, wi_max, w.mark, k))
                 #
             #
         #
+        
+        if type==core.LAYER_TYPE_CONV:
+            if wi>2 or wi_alt>2:
+                print("KKK(%d, %d, %d), wi=%d, alt=%d, max=%d (%d)" % (w.li, w.ni, w.ii, wi, wi_alt, wi_max, w.mark))
+            #
+        #
+        w.mark = w.mark + 1
         return wi_alt
     
     def make_attack_list(self, attack_num, mode, w_list):
@@ -179,14 +211,27 @@ class Train:
         for i in range(attack_num):
             attack_i = random.randrange(w_num)
             w = w_list[attack_i]
-            while 1:
-                #mode = 0 # 0:random, 1:neighbor
-                type = w.type
-                w.wi_alt = self.shift_weight(w.wi, mode, type)
-                if w.wi_alt!=w.wi:
-                    attack_list.append(attack_i)
-                    break
+            type = w.type
+            if type==core.LAYER_TYPE_CONV:
+                if w.wi>2 or w.wi_alt>2:
+                    print("CCC(%d, %d, %d), wi=%d, alt=%d, (%d)" %
+                        (w.li, w.ni, w.ii, w.wi, w.wi_alt, w.mark))
                 #
+            #
+            
+            # mode : 0=random, 1=neighbor
+            w.wi_alt = self.shift_weight(w, w.wi, mode, type)
+            if type==3 and w.wi_alt>2:
+                print("KOKO:", type, w.wi, mode, w.wi_alt, w.ni, w.ii, w.mark)
+            #
+            attack_list.append(attack_i)
+        #
+        for idx in attack_list:
+            aw = w_list[idx]
+            if aw.type==3 and aw.wi_alt>2:
+                print("DDDDD")
+                print(" (%d, %d, %d)" %(aw.li, aw.ni, aw.ii) )
+                print(" wi=%d, alt=%d (%d)" % (aw.wi, aw.wi_alt, w.mark))
             #
         #
         return attack_list
@@ -282,11 +327,10 @@ class Train:
         attack_list = self.make_attack_list(attack_num, 0, w_list)
         llist = []
         w_num = len(attack_list)
-        
         for i in attack_list:
             w = w_list[i]
             layer = r.get_layer_at(w.li)
-            #if layer._type==core.LAYER_TYPE_CONV_4:
+            #if layer._type==core.LAYER_TYPE_CONV:
             #    layer.reset_weight_index(w.ni, w.ii)
             #else:
             #    layer.set_weight_index(w.ni, w.ii, w.wi_alt)
@@ -299,7 +343,6 @@ class Train:
                 llist.append(w.li)
             #
         #
-        #print(llist)
         
         for li in llist:
             layer = r.get_layer_at(li)
@@ -398,10 +441,18 @@ class Train:
 
     def multi_attack_sa(self, ce, w_list, attack_num, temperature, asw=1):
         r = self._r
-        
+        #attack_list = []
         if self.mpi==False or self.rank==0:
             mode = 1 # 0:random, 1:neighbor
             attack_list = self.make_attack_list(attack_num, mode, w_list)
+            for a in attack_list:
+                w = w_list[a]
+                if w.type==core.LAYER_TYPE_CONV and w.wi>2:
+                    print("*** (%d, %d, %d), wi=%d, alt=%d (%d)" %
+                        (w.li, w.ni, w.ii, w.wi, w.wi_alt, w.mark))
+                #
+            #
+            
             #print(len(attack_list))
             #k = attack_list[0]
             #print(w_list[k].wi, w_list[k].wi_alt)
@@ -436,6 +487,12 @@ class Train:
         for i in attack_list:
             w = w_list[i]
             layer = r.get_layer_at(w.li)
+            #
+            if w.type==core.LAYER_TYPE_CONV and w.wi>2:
+                print("$$$ (%d, %d, %d), wi=%d, alt=%d (%d)" % (w.li, w.ni, w.ii, w.wi, w.wi_alt, w.mark))
+                #
+            #
+            
             layer.set_weight_index(w.ni, w.ii, w.wi_alt)
             if w.li in llist:
                 pass
@@ -468,16 +525,15 @@ class Train:
         #
         return ce, ret
     
-    def loop_sa(self, idx, w_list, wtype, temperature, total, debug=0, asw=1):
+    def loop_sa(self, idx, ce, w_list, wtype, temperature, total, minimum=0.1, debug=0, asw=1):
         r = self._r
         
         w_num = len(w_list)
         attack_num = 1
-        
         ce = r.evaluate()
-        print(ce)
-        self.delta_avg = ce*0.1
-        t_min = 0.1 # 1.0, 0.1, 0.01
+        print("ce:", ce)
+        self.delta_avg = ce * 0.1
+        t_min = minimum # 1.0, 0.1, 0.01
         lp = 0
         
         while temperature>t_min:
@@ -497,12 +553,13 @@ class Train:
             #
             lp = lp +1
             temperature = temperature*0.95 #0.90, 0.95
-            if self.mpi==False or self.rank==0:
-                r.save()
+            #if self.mpi==False or self.rank==0:
+            #    r.save()
             #
         #
-        if self.mpi==False or self.rank==0:
-            r.save()
+        return ce
+        #if self.mpi==False or self.rank==0:
+        #    r.save()
         #
         
     def loop_logathic_sa(self, idx, w_list, wtype, asw=1):
@@ -515,11 +572,11 @@ class Train:
         
         min = 200
         for temperature in range(lv_max, 0, -1):
-            attack_num = temperature#2**temperature
+            attack_num = 2 ** temperature
             hist = []
             atk_flag = True
             part = 0 # hit count
-            num = 0 # loop count
+            num = 0  # loop count
             while atk_flag:
                 ce, ret = self.multi_attack_sa(ce, w_list, attack_num, temperature, asw)
                 if ret<0:

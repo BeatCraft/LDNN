@@ -239,36 +239,20 @@ __kernel void conv_5_roll_batch(
     int in_start = in_batch_stride * bi + in_y_stride + xi;
     
     for (int fi=0; fi<filter; fi++){
-    
         float sum = 0.0;
         int f_start = filter_len*filter_len*fi*ch;
                     
         for (int i=0; i<ch; i++){
             int start = in_start + in_ch_stride*i;
             int w_start = + f_start + filter_len*filter_len*i;
-            
-    
-            for (int fy=0; i<filter_len; fy++){
-                for (int fx=0; i<filter_len; fx++){
+            for (int fy=0; fy<filter_len; fy++){
+                for (int fx=0; fx<filter_len; fx++){
                     sum += input[start + in_w*fy + fx] * weight[w_start + filter_len*fy + fx];
                 }
             }
-            
-            
-            sum += input[start + 0] * weight[w_start + 0];
-            sum += input[start + 1] * weight[w_start + 1];
-            sum += input[start + 2] * weight[w_start + 2];
-        
-            sum += input[start + in_w + 0] * weight[w_start + 3];
-            sum += input[start + in_w + 1] * weight[w_start + 4];
-            sum += input[start + in_w + 2] * weight[w_start + 5];
-        
-            sum += input[start + in_w*2 + 0] * weight[w_start + 6];
-            sum += input[start + in_w*2 + 1] * weight[w_start + 7];
-            sum += input[start + in_w*2 + 2] * weight[w_start + 8];
         }
         
-        output[bi*w*h*filter + w*h*fi + yi*w+xi] = sum;
+        output[bi*out_stride + out_w*out_h*fi + out_w*yi + xi] = sum;
     }
 };
 
@@ -753,7 +737,18 @@ class OpenCL(gpu.Gpu):
                                            input, weight, output, np.int32(w), np.int32(h), np.int32(ch), np.int32(filter), np.int32(activation))
         event.wait()
 
-    #normalize_batch(__global float* data, int b_num, int ch_size, int ch_num)
+
+    def conv_5_roll_batch(self, batch_size, out_w, out_h,
+                                input, weight, output,
+                                in_w, in_h, ch, filter, filter_len, stride):
+        event = self.prg.conv_5_roll_batch(self._queue, (batch_size, out_w, out_h), None,
+                                                         input, weight, output,
+                                                         np.int32(in_w), np.int32(in_h),
+                                                         np.int32(out_w), np.int32(out_h),
+                                                         np.int32(ch), np.int32(filter),
+                                                         np.int32(filter_len), np.int32(stride))
+        event.wait()
+
     def normalize_batch(self, buf, b_num, ch_size, ch_num):
         event = self.prg.normalize_batch(self._queue, (ch_num,), None,
                                          buf, np.int32(b_num), np.int32(ch_size), np.int32(ch_num))

@@ -91,8 +91,8 @@ class Node:
 LAYER_TYPE_INPUT   = 0
 LAYER_TYPE_HIDDEN  = 1
 LAYER_TYPE_OUTPUT  = 2
-LAYER_TYPE_CONV_4  = 3
-LAYER_TYPE_MAX     = 4 # MAX
+LAYER_TYPE_CONV    = 3
+LAYER_TYPE_MAX     = 4
 #
 class Layer(object):
     # i         : index of layers
@@ -151,18 +151,29 @@ class Layer(object):
         return self._weight_index_matrix[ni][ii]
     
     def set_weight_index(self, ni, ii, wi): # wi : weight index
+        pre = self._weight_index_matrix[ni][ii]
         self._weight_index_matrix[ni][ii] = wi
         if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
             self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
-        elif self._type==LAYER_TYPE_CONV_4:
-            self._weight_matrix[ni][ii] = CNN_WEIGHT_SET[wi]
+        elif self._type==LAYER_TYPE_CONV:
+            #print(ni, ii, wi)
+            try:
+                self._weight_matrix[ni][ii] = CNN_WEIGHT_SET[wi]
+            except:
+                print("set_weight_index()")
+                print(" [%d] type=%d" % (self._index, self._type))
+                print(" (%d, %d) wi=%d, pre=%d" % (ni, ii, wi, pre))
+                print(" num_node:", self._num_node)
+                print(" num_input:", self._num_input)
+                #print(self._weight_matrix.shape)
+                exit(0)
         #
     
     def init_weight_mode(self, ni, ii, mode, wi=0):
         if mode==0: # random
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
                 wmax = WEIGHT_INDEX_SIZE
-            elif self._type==LAYER_TYPE_CONV_4:
+            elif self._type==LAYER_TYPE_CONV:
                 wmax = CNN_WEIGHT_INDEX_SIZE
             #
             wi = random.randrange(wmax)
@@ -171,7 +182,7 @@ class Layer(object):
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
                 wmin = 1
                 wmax = WEIGHT_INDEX_SIZE - 1
-            elif self._type==LAYER_TYPE_CONV_4:
+            elif self._type==LAYER_TYPE_CONV:
                 wmin = 0
                 wmax = CNN_WEIGHT_INDEX_SIZE -1
             #
@@ -182,6 +193,7 @@ class Layer(object):
         #
         
     def init_weight_with_mode(self, mode=0, value=0):
+        #print(self._num_node, self._num_input)
         for ni in range(self._num_node):
             for ii in range(self._num_input):
                 self.init_weight_mode(ni, ii, mode, value)
@@ -192,7 +204,7 @@ class Layer(object):
         if wi<0:
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
                 wi = random.randrange(WEIGHT_INDEX_SIZE)
-            elif self._type==LAYER_TYPE_CONV_4:
+            elif self._type==LAYER_TYPE_CONV:
                 wi = random.randrange(CNN_WEIGHT_INDEX_SIZE)
             #
         #
@@ -636,7 +648,7 @@ class Conv_4_Layer(Layer):
         num_input = self._num_of_w # self._filter_size
         num_node = self._filter
         #
-        super(Conv_4_Layer, self).__init__(i, LAYER_TYPE_CONV_4, num_input, num_node, pre, gpu)
+        super(Conv_4_Layer, self).__init__(i, LAYER_TYPE_CONV, num_input, num_node, pre, gpu)
         #
         # mems for weights
         self._weight_index_matrix = np.zeros( (self._filter, self._num_of_w), dtype=np.int32)
@@ -891,26 +903,33 @@ class Conv_4_Layer(Layer):
         
 class Conv_5_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, size, stride, pre, gpu=None):
-        print("Convolution Layer ver.4 ::__init__()")
+        print("Convolution Layer ver.5 ::__init__()")
         
         self._w = w
         self._h = h
         self._ch = ch # number of inputs
         self._filter = filter # node / # number of outputs
         self._filter_len = size
-        self._filter_size = size * size * ch # width and height of filter are fixed to 3
-        self._num_of_w = self._filter_size * ch # * filter
-        num_input = self._num_of_w # self._filter_size
+        self._filter_size = size * size * ch
+        # width and height of filter are fixed to 3
+        #self._num_of_w = self._filter_size * ch # * filter
+        #num_input = self._num_of_w # self._filter_size
+        
         num_node = self._filter
+        num_input = self._filter_size
+        
         self._stride = stride
         self._out_w = self._w - (self._filter_len - self._stride)
         self._out_h = self._h - (self._filter_len - self._stride)
         #
-        super(Conv_4_Layer, self).__init__(i, LAYER_TYPE_CONV_4, num_input, num_node, pre, gpu)
+        super(Conv_5_Layer, self).__init__(i, LAYER_TYPE_CONV, num_input, num_node, pre, gpu)
         #
         # mems for weights
-        self._weight_index_matrix = np.zeros( (self._filter, self._num_of_w), dtype=np.int32)
-        self._weight_matrix = np.zeros( (self._filter, self._num_of_w), dtype=np.float32)
+        self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
+        print(self._weight_index_matrix.shape)
+        
+        
+        self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float32)
         if self._gpu:
             if self._gpu.type==0:
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
@@ -920,9 +939,9 @@ class Conv_5_Layer(Layer):
         else:
             print("error")
         #
-
+        
     def prepare(self, batch_size):
-        print(("Conv_4_Layer::prepare(%d)" %(batch_size)))
+        print(("Conv_5_Layer::prepare(%d)" %(batch_size)))
         
         self._batch_size = batch_size
         # intermidiate
@@ -933,11 +952,9 @@ class Conv_5_Layer(Layer):
         
         if self._gpu:
             if self._gpu.type==0:
-                self._gpu_padded = self._gpu.dev_malloc(self._padded_array)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
                 self._gpu_sum = self._gpu.dev_malloc(self._sum_array)
             elif self._gpu.type==1:
-                self._gpu_padded = self._gpu.allocateArray(self._padded_array)
                 self._gpu_output = self._gpu.allocateArray(self._output_array)
                 self._gpu_sum = self._gpu.allocateArray(self._sum_array)
                 self._gpu_dsum = self._gpu.allocateArray(self._dsum_array)
@@ -973,31 +990,73 @@ class Conv_5_Layer(Layer):
         # 3 : y/20
         a_mode = 1
         if self._gpu.type==0: # OpenCL
-            self._gpu.conv_4_roll_batch(array_in, self._gpu_weight, self._gpu_output,
-                                        self._w, self._h, self._ch, self._filter,
-                                        self._batch_size, 0)
-                                        
+            #self._gpu.conv_4_roll_batch(array_in, self._gpu_weight, self._gpu_output,
+            #                            self._w, self._h, self._ch, self._filter,
+            #                            self._batch_size, 0)
+            self._gpu.conv_5_roll_batch(self._batch_size, self._out_w, self._out_h,
+                                        array_in, self._gpu_weight, self._gpu_output,
+                                        self._w, self._h,
+                                        self._ch, self._filter,
+                                        self._filter_len, self._stride)
             if debug:
                 print(self._index, "conv ret")
                 self._gpu.copy(self._output_array, self._gpu_output)
                 print((self._output_array[0][0]))
             #
             
-            # relu
             size = self._out_w * self._out_h * self._filter
+            # normalize
+            
+            self._gpu.get_sum(self._batch_size, self._gpu_output, self._gpu_sum, size)
+            self._gpu.copy(self._sum_array, self._gpu_sum)
+            mean = self._sum_array.sum() / float(self._batch_size*size)
+            self._gpu.get_dsum(self._batch_size, self._gpu_output, self._gpu_sum, size, mean)
+            self._gpu.copy(self._sum_array, self._gpu_sum)
+            div2 = self._sum_array.sum() / float(self._batch_size*size)
+            div = np.sqrt(div2) +  0.0000001;
+            self._gpu.get_std(self._batch_size, self._gpu_output, size, mean, div)
+            
+            # relu
+            
             self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, a_mode)
             if debug:
                 print(self._index, "conv, scale")
                 self._gpu.copy(self._output_array, self._gpu_output)
                 print((self._output_array[0][0]))
                 #
-                #self.save_output()
-                #self.save_filter_out(0, 0, self._output_array[0][0])
-                #self.save_debug("ocl.txt", self._w, self._h, self._output_array[0][0])
+                for i in range(self._filter):
+                    name = "debug_%d" % (i)
+                    self.save_png(name, self._output_array[0][i])
+                #
+                
             #
         elif self._gpu.type==1: # GDX
             pass
         #
+        
+    def save_png(self, name, data_array):
+        #size = self._w * self._h
+        max = np.max(data_array)
+        min = np.min(data_array)
+        print(("max=%f, min=%f" % (max, min)))
+        
+        img = Image.new("L", (self._out_w, self._out_h), 0)
+        pix = img.load()
+        for y in range(self._out_h):
+            for x in range(self._out_w):
+                v = data_array[self._out_w*y + x]
+                if max>0.0:
+                    v1 = int(v*255/max)
+                    pix[x,y] = v1
+                else:
+                    pix[x,y] = 0
+                #
+            #
+        #
+        spath = "./debug/%s.png" % (name)
+        print(spath)
+        img.save(spath)
+
 #
 #
 #
@@ -1291,7 +1350,7 @@ class Roster:
             layer = OutputLayer(c, num_input, num_node, self._gpu)
             self.layers.append(layer)
             return layer
-        elif type==LAYER_TYPE_CONV_4:
+        elif type==LAYER_TYPE_CONV:
             print("not yet")
             return
         elif type==LAYER_TYPE_MAX:

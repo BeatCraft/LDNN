@@ -44,6 +44,7 @@ class Train:
         else:
             self.mpi = False
         #
+        self.w_list = []
         
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch,  batch_size, batch_offset):
         self._batch_size = batch_size
@@ -256,57 +257,15 @@ class Train:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
-        
-    def multi_attack(self, ce, w_list, mode=1, div=0):
-        r = self._r
-        attack_list = self.make_attack_list(div, mode, w_list)
-       
-        llist = []
-        w_num = len(attack_list)
-        for i in attack_list:
-            w = w_list[i]
-            layer = r.get_layer_at(w.li)
-            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
-            if w.li in llist:
-                pass
-            else:
-                llist.append(w.li)
-            #
-        #
-
-        for li in llist:
-            layer = r.get_layer_at(li)
-            layer.update_weight()
-        #
-        
-        ce_alt = self.evaluate()
-        ret = 0
-
-        if ce_alt<=ce:
-            ce = ce_alt
-            ret = 1
-            for i in attack_list:
-                w = w_list[i]
-                w.wi = w.wi_alt
-            #
-        else:
-            self.undo_attack(w_list, attack_list)
-        #
-        return ce, ret
             
     def acceptance(self, ce1, ce2, temperature, onoff=1):
         delta = ce2 - ce1
         if delta<=0:
-            #self.delta_num += 1.0
-            #self.delta_sum += abs(delta)
-            #self.delta_avg = self.delta_sum / self.delta_num
             return 1
         #
-        
         if onoff==0:
             return 0
         #
-            
         if delta>self.delta_avg:
             return 0
         #
@@ -317,127 +276,6 @@ class Train:
             return 1
         #
         return 0
-        
-    #
-    # with acceptance control
-    #
-    def multi_attack_t(self, ce, w_list, attack_num, temperature, asw=1):
-        r = self._r
-        
-        attack_list = self.make_attack_list(attack_num, 0, w_list)
-        llist = []
-        w_num = len(attack_list)
-        for i in attack_list:
-            w = w_list[i]
-            layer = r.get_layer_at(w.li)
-            #if layer._type==core.LAYER_TYPE_CONV:
-            #    layer.reset_weight_index(w.ni, w.ii)
-            #else:
-            #    layer.set_weight_index(w.ni, w.ii, w.wi_alt)
-            #
-            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
-            #print(i, w.wi, w.wi_alt)
-            if w.li in llist:
-                pass
-            else:
-                llist.append(w.li)
-            #
-        #
-        
-        for li in llist:
-            layer = r.get_layer_at(li)
-            layer.update_weight()
-        #
-        
-        ce_alt = self.evaluate()
-        ret = 0
-        ret = self.acceptance(ce, ce_alt, temperature, asw)
-        #ret = 0
-        #if ce_alt<=ce:
-        #    if ce_alt<0:
-        #        ret = -1
-        #    else:
-        #        ret = 1
-        #    #
-        #else: # acceptance control
-        #    delta = ce_alt - ce
-        #    hit = self.random_hit(delta, temperature)
-        #    if hit==1:
-        #        ret = 1
-        #    else:
-        #        ret = 0
-        #    #
-        #
-        if ret<=0:
-            self.undo_attack(w_list, attack_list)
-        else:
-            #print(ret, ce, ce_alt)
-            ce = ce_alt
-            for i in attack_list:
-                w = w_list[i]
-                w.wi = w.wi_alt
-            #
-        #
-        return ce, ret
-
-    #
-    # a loop with a temperature
-    #
-    def loop_sa_t(self, loop, ce, temperature, attack_num, w_list, wtype, debug=0, asw=1):
-        r = self._r
-        
-        w_num = len(w_list)
-        ret = 0
-        part = 0 # hit count
-        num = 0 # loop count
-        min = 200
-        hist = []
-        atk_flag = True
-        
-        while atk_flag:
-            ce, ret = self.multi_attack_t(ce, w_list, attack_num, temperature, asw)
-            if ret<0:
-                return -1
-            #
-            num += 1
-            part += ret
-            hist.append(ret)
-            if len(hist)>min:
-                hist = hist[1:]
-            #
-            s = 0 # hit conunt in the last 200
-            for a in hist:
-                s += a
-            #
-            rate = float(s)/float(num)
-            print("[%d:%d] %d [%s:%d] (%d, %d) %06f, ce:"
-                    % (loop, temperature, num, wtype, attack_num, part, s, rate), ce)
-            if num>min:
-                if num>10000 or rate<0.01:
-                    atk_flag = False
-                #
-            #
-        # while
-        
-        return ce
-
-
-    def logathic_loop(self, loop, w_list, wtype):
-        r = self._r
-        
-        w_num = len(w_list)
-        lv_min = 0
-        lv_max = int(math.log(w_num/100, 2)) + 1 # 1 % max
-        ce = self.evaluate()
-        
-        for temperature in range(lv_max, -1, -1):
-            attack_num = 2**temperature
-            ce = self.loop_sa_t(loop, ce, temperature, attack_num, w_list, wtype)
-            if ce<0:
-                break
-            #
-        #
-        r.save()
 
     def multi_attack_sa(self, ce, w_list, attack_num, temperature, asw=1):
         r = self._r
@@ -613,6 +451,221 @@ class Train:
         if self.mpi==False or self.rank==0:
             r.save()
         #
+    
+    def shift_weight_2(self, type, wi, mode=0):
+        wi_alt = wi
+        wi_min = 0
+        wi_max = 1
+        
+        if type==core.LAYER_TYPE_HIDDEN:
+            wi_max = core.WEIGHT_INDEX_MAX
+        if type==core.LAYER_TYPE_OUTPUT:
+            wi_max = core.WEIGHT_INDEX_MAX
+        elif type==core.LAYER_TYPE_CONV:
+            wi_max = core.CNN_WEIGHT_INDEX_MAX
+            if wi_alt>wi_max:
+                print("error :", wi)
+            #
+        #
+        
+        if mode==0: # random
+            wi_alt = random.randint(wi_min, wi_max)
+        elif mode==1: # neighbor
+            k = random.random()
+            if k<0.5: # increase
+                if wi==wi_max:
+                    wi_max = wi_max - 1
+                    wi_alt = random.randint(wi_min, wi_max)
+                else:
+                    wi_alt = wi + 1
+                    #
+                    if type==3 and wi_alt>2:
+                        print("error in increase", wi, ">", wi_alt)
+                    #
+                #
+            else: # decrease
+                if wi==wi_min:
+                    wi_min = 1
+                    wi_alt = random.randint(wi_min, wi_max)
+                else:
+                    wi_alt = wi - 1
+                #
+                if type==3 and wi_alt>2:
+                    print("error in decrease", wi_alt)
+                #
+            #
+        #
+        return wi_alt
+        
+    def undo_attack_2(self, attack_list):
+        r = self._r
+       
+        llist = []
+        for i in attack_list:
+            w = self.w_list[i]
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi)
+            #w.wi_alt = w.wi
+            self.w_list[i].wi_alt = w.wi
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
+
+        for li in llist:
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+        
+    def make_attack_list_2(self, attack_num, mode):
+        r = self._r
+        w_num = len(self.w_list)
+        
+        attack_list = []
+        while len(attack_list)<=attack_num:
+            attack_i = random.randrange(w_num)
+            if attack_list.count(attack_i)>0:
+                continue;
+            #
+            w = self.w_list[attack_i]
+            type = w.type
+            # mode : 0=random, 1=neighbor
+            alt = self.shift_weight_2(type, w.wi, mode)
+            self.w_list[attack_i].wi_alt = alt
+            attack_list.append(attack_i)
+        #
+        return attack_list
+    
+    def multi_attack(self, ce, attack_num, temperature, asw=1):
+        r = self._r
+        
+        attack_list = []
+        mode = 1 # 0:random, 1:neighbor
+        attack_list = self.make_attack_list_2(attack_num, mode)
+        #
+        # mpi
+        #
+        llist = []
+        w_num = len(attack_list)
+        for i in attack_list:
+            w = self.w_list[i]
+            layer = r.get_layer_at(w.li)
+            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            if w.li in llist:
+                pass
+            else:
+                llist.append(w.li)
+            #
+        #
+        for li in llist:
+            layer = r.get_layer_at(li)
+            layer.update_weight()
+        #
+        
+        ce_alt = self.evaluate()
+        #
+        # mpi
+        #
+        ret = self.acceptance(ce, ce_alt, temperature, asw)
+        if ret<=0:
+            self.undo_attack_2(attack_list)
+        else:
+            ce = ce_alt
+            for i in attack_list:
+                self.w_list[i].wi = self.w_list[i].wi_alt
+            #
+        #
+        return ce, ret
+        
+    def main_loop_logathic(self, idx, wtype, asw=1):
+        r = self._r
+        
+        w_num = len(self.w_list)
+        lv_min = 0
+        lv_max = int(math.log(w_num/100, 2)) + 1 # 1 % max
+        ce = self.evaluate()
+        
+        min = 200
+        for temperature in range(lv_max, 0, -1):
+            #self.delta_avg = ce * 0.1
+            attack_num = 2 ** temperature
+            hist = []
+            atk_flag = True
+            part = 0 # hit count
+            num = 0  # loop count
+            while atk_flag:
+                self.delta_avg = ce * 0.1
+                ce, ret = self.multi_attack(ce, attack_num, temperature, asw)
+                if ret<0:
+                    print("exit from while :", ce, ret)
+                    break
+                #
+                num += 1
+                part += ret
+                hist.append(ret)
+                if len(hist)>min:
+                    hist = hist[1:]
+                #
+                s = 0 # hit conunt in the last 200
+                for a in hist:
+                    s += a
+                #
+                rate = float(s)/float(num)
+                #
+                # mpi
+                #
+                print("[%d:%d] %d [%s:%d] (%d, %d) %06f, ce:"
+                        % (idx, temperature, num, wtype, attack_num, part, s, rate), ce)
+                #
+                if num>min:
+                    if num>10000 or rate<0.01:
+                        atk_flag = False
+                    #
+                #
+            # while
+            
+            if ce<=0:
+                print("exit from for")
+                break
+            #
+        #
+        r.save()
+        
+    def main_loop(self, idx, ce, wtype, temperature, total, minimum=0.1, debug=0, asw=1):
+        r = self._r
+        
+        w_num = len(self.w_list)
+        attack_num = 1
+        ce = r.evaluate()
+        print("ce:", ce)
+        self.delta_avg = ce * 0.1
+        t_min = minimum # 1.0, 0.1, 0.01
+        lp = 0
+        
+        while temperature>t_min:
+            num = 0
+            self.delta_avg = ce*0.1
+            while num<total:
+                ce, ret = self.multi_attack(ce, attack_num, temperature, asw)
+                if ce<0:
+                    print(ret, "ce => zero")
+                    return # -1
+                #
+                print(idx, "[%d/%d]"%(num, total), "T=%f"%(temperature), "(%d)"%(lp), "\t", ret, "\t", ce)
+                #
+                num += 1
+                self.delta_avg = ce*0.1
+            #
+            lp = lp +1
+            temperature = temperature*0.95 #0.90, 0.95
+        #
+        return ce
+        #if self.mpi==False or self.rank==0:
+        #    r.save()
+        #
+        
 #
 #
 #

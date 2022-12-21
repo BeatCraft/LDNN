@@ -10,6 +10,8 @@ def main():
     argc = len(argvs)
     print(argc)
     #
+    
+    
 
     import plat
     if plat.ID==0: # MBP

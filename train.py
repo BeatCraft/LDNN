@@ -365,15 +365,17 @@ class Train:
     
     def loop_sa(self, idx, ce, w_list, wtype, temperature, total, minimum=0.1, debug=0, asw=1):
         r = self._r
+        print("loop_sa()")
         
         w_num = len(w_list)
         attack_num = 1
         ce = r.evaluate()
-        print("ce:", ce)
+        print(self.rank, "ce:", ce)
         self.delta_avg = ce * 0.1
         t_min = minimum # 1.0, 0.1, 0.01
         lp = 0
         
+        print(temperature, t_min, self.mpi, self.rank)
         while temperature>t_min:
             num = 0
             self.delta_avg = ce*0.1
@@ -543,10 +545,16 @@ class Train:
         
         attack_list = []
         mode = 1 # 0:random, 1:neighbor
-        attack_list = self.make_attack_list_2(attack_num, mode)
-        #
+        #attack_list = self.make_attack_list_2(attack_num, mode)
         # mpi
+        #if self.mpi==True:
+        if self.mpi==False or self.rank==0:
+            attack_list = self.make_attack_list_2(attack_num, mode)
         #
+        if self.mpi==True:
+            attack_list = self.com.bcast(attack_list, root=0)
+        #
+        
         llist = []
         w_num = len(attack_list)
         for i in attack_list:
@@ -563,12 +571,18 @@ class Train:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
-        
         ce_alt = self.evaluate()
-        #
+        
         # mpi
+        if self.mpi==False or self.rank==0:
+            ret = self.acceptance(ce, ce_alt, temperature, asw)
+        else:
+            ret = 0
         #
-        ret = self.acceptance(ce, ce_alt, temperature, asw)
+        if self.mpi==True:
+            ret = self.com.bcast(ret, root=0)
+        #
+        
         if ret<=0:
             self.undo_attack_2(attack_list)
         else:
@@ -584,11 +598,13 @@ class Train:
         
         w_num = len(self.w_list)
         lv_min = 0
-        lv_max = int(math.log(w_num/100, 2)) + 1 # 1 % max
+        kk = int(w_num/100)
+        print(w_num, kk)
+        lv_max = int(math.log(kk, 2)) + 1 # 1 % max
         ce = self.evaluate()
         
         min = 200
-        for temperature in range(lv_max, 0, -1):
+        for temperature in range(lv_max, -2, -1):
             #self.delta_avg = ce * 0.1
             attack_num = 2 ** temperature
             hist = []
@@ -613,11 +629,10 @@ class Train:
                     s += a
                 #
                 rate = float(s)/float(num)
-                #
                 # mpi
-                #
-                print("[%d:%d] %d [%s:%d] (%d, %d) %06f, ce:"
-                        % (idx, temperature, num, wtype, attack_num, part, s, rate), ce)
+                if self.mpi==False or self.rank==0:
+                    print("[%d:%d] %d [%s:%d] (%d, %d) %06f, ce:"
+                            % (idx, temperature, num, wtype, attack_num, part, s, rate), ce)
                 #
                 if num>min:
                     if num>10000 or rate<0.01:
@@ -625,7 +640,9 @@ class Train:
                     #
                 #
             # while
-            
+            if self.mpi==False or self.rank==0:
+                r.save()
+            #
             if ce<=0:
                 print("exit from for")
                 break
@@ -653,7 +670,8 @@ class Train:
                     print(ret, "ce => zero")
                     return # -1
                 #
-                print(idx, "[%d/%d]"%(num, total), "T=%f"%(temperature), "(%d)"%(lp), "\t", ret, "\t", ce)
+                if self.mpi==False or self.rank==0:
+                    print(idx, "[%d/%d]"%(num, total), "T=%f"%(temperature), "(%d)"%(lp), "\t", ret, "\t", ce)
                 #
                 num += 1
                 self.delta_avg = ce*0.1

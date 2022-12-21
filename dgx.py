@@ -268,9 +268,9 @@ void calc_mac_relu3(const float* x, const float* w, float* y, int xsize, int wsi
     if (temp>=0){
         y[y_start] = temp;
     } else {
-        //y[y_start] = 0;
+        y[y_start] = 0;
         //y[y_start] = 0.000001;
-        y[y_start] = temp/20;
+        //y[y_start] = temp/20;
     }
 }
 ''', 'calc_mac_relu3')

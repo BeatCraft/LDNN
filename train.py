@@ -83,22 +83,24 @@ class Train:
         if self.mpi==False:
             return ce
         #
-        
         ce_list = self.com.gather(ce, root=0)
         sum = 0.0
+        avg = 0.0
         if self.rank==0:
             for i in ce_list:
                 sum = sum + i
             #
             avg = sum/float(self.size)
+            avg = self.com.bcast(avg, root=0)
         #
-        if self.rank==0:
-            ce_avg_list = [avg]*self.size
-        else:
-            ce_avg_list = None
+        return avg
+        #if self.rank==0:
+        #    ce_avg_list = [avg]*self.size
+        #else:
+        #    ce_avg_list = None
         #
-        ce_avg = self.com.scatter(ce_avg_list, root=0)
-        return ce_avg
+        #ce_avg = self.com.scatter(ce_avg_list, root=0)
+        #return ce_avg
     
     def make_w_list(self, type_list=None):
         r = self._r
@@ -545,14 +547,14 @@ class Train:
         
         attack_list = []
         mode = 1 # 0:random, 1:neighbor
-        #attack_list = self.make_attack_list_2(attack_num, mode)
-        # mpi
-        #if self.mpi==True:
-        if self.mpi==False or self.rank==0:
-            attack_list = self.make_attack_list_2(attack_num, mode)
-        #
+        
         if self.mpi==True:
-            attack_list = self.com.bcast(attack_list, root=0)
+            if self.rank==0:
+                attack_list = self.make_attack_list_2(attack_num, mode)
+                attack_list = self.com.bcast(attack_list, root=0)
+            #
+        else:
+            attack_list = self.make_attack_list_2(attack_num, mode)
         #
         
         llist = []
@@ -574,13 +576,14 @@ class Train:
         ce_alt = self.evaluate()
         
         # mpi
-        if self.mpi==False or self.rank==0:
-            ret = self.acceptance(ce, ce_alt, temperature, asw)
-        else:
-            ret = 0
-        #
+        ret = 0
         if self.mpi==True:
-            ret = self.com.bcast(ret, root=0)
+            if self.rank==0:
+                ret = self.acceptance(ce, ce_alt, temperature, asw)
+                ret = self.com.bcast(ret, root=0)
+            #
+        else:
+            ret = self.acceptance(ce, ce_alt, temperature, asw)
         #
         
         if ret<=0:
@@ -679,10 +682,12 @@ class Train:
             lp = lp +1
             temperature = temperature*0.95 #0.90, 0.95
         #
-        return ce
-        #if self.mpi==False or self.rank==0:
-        #    r.save()
+        
+            if self.mpi==False or self.rank==0:
+                r.save()
+            #
         #
+        return ce
         
 #
 #

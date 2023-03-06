@@ -1137,7 +1137,8 @@ class Roster:
     
     # batch for classification
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch, size, offset):
-        #print("Roster::set_batch(%d, %d, %d, %d)" % (data_size, num_class, size, offset))
+        print("Roster::set_batch(%d, %d, %d, %d)" % (data_size, num_class, size, offset))
+        
         data_array = np.zeros((size, data_size), dtype=np.float32)
         labels = np.zeros((size, num_class), dtype=np.float32)
         for j in range(size):
@@ -1436,8 +1437,6 @@ class Roster:
                         k += self._batch_cross_entropy[i]
                     #
                     print(k)
-                    
-                    
                 #
                 s = np.sum(self._batch_cross_entropy)
                 s = s/float(self._batch_size)

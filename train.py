@@ -57,7 +57,7 @@ class Train:
     def set_path(path):
         self._path = path
     
-    def evaluate(self):#, mode=0, idx=0):
+    def evaluate(self, debug=0):#, mode=0, idx=0):
         r = self._r
         ce = 0.0
         
@@ -80,19 +80,26 @@ class Train:
         else:
             print("Train::evaluate() N/A")
         #
+        if debug:
+            print("[%d] Train::evaluate() = %f" % (self.rank, ce))
+        #
         if self.mpi==False:
             return ce
         #
         ce_list = self.com.gather(ce, root=0)
-        sum = 0.0
-        avg = 0.0
+        #print(self.rank, ce_list)
+                    
         if self.rank==0:
+            sum = 0.0
             for i in ce_list:
                 sum = sum + i
             #
             avg = sum/float(self.size)
-            avg = self.com.bcast(avg, root=0)
+        else:
+            avg = 0.0
         #
+        
+        avg = self.com.bcast(avg, root=0)
         return avg
         #if self.rank==0:
         #    ce_avg_list = [avg]*self.size
@@ -505,17 +512,23 @@ class Train:
         r = self._r
        
         llist = []
-        for i in attack_list:
-            w = self.w_list[i]
+        for atk in attack_list:
+            #atk = self.w_list[i]
+            idx = atk[0]
+            wi = atk[1]
+            wi_alt = atk[2]
+            #
+            w = self.w_list[idx]
             layer = r.get_layer_at(w.li)
-            layer.set_weight_index(w.ni, w.ii, w.wi)
+            layer.set_weight_index(w.ni, w.ii, wi)
             #w.wi_alt = w.wi
-            self.w_list[i].wi_alt = w.wi
+            #self.w_list[i].wi_alt = w.wi
             if w.li in llist:
                 pass
             else:
                 llist.append(w.li)
             #
+            #print("[%d] (c) %d, %d" % (self.rank, w.wi, w.wi_alt))
         #
 
         for li in llist:
@@ -528,7 +541,7 @@ class Train:
         w_num = len(self.w_list)
         
         attack_list = []
-        while len(attack_list)<=attack_num:
+        while len(attack_list)<attack_num:
             attack_i = random.randrange(w_num)
             if attack_list.count(attack_i)>0:
                 continue;
@@ -537,8 +550,10 @@ class Train:
             type = w.type
             # mode : 0=random, 1=neighbor
             alt = self.shift_weight_2(type, w.wi, mode)
-            self.w_list[attack_i].wi_alt = alt
-            attack_list.append(attack_i)
+            #alt = self.com.bcast(alt, root=0)
+            #self.w_list[attack_i].wi_alt = alt
+            #print(self.rank, "make_attack_list_2", alt, w.wi_alt, self.w_list[attack_i].wi_alt)
+            attack_list.append([attack_i, w.wi, alt])
         #
         return attack_list
     
@@ -549,20 +564,28 @@ class Train:
         mode = 1 # 0:random, 1:neighbor
         
         if self.mpi==True:
+            #attack_list = self.make_attack_list_2(attack_num, mode)
             if self.rank==0:
                 attack_list = self.make_attack_list_2(attack_num, mode)
-                attack_list = self.com.bcast(attack_list, root=0)
             #
+            attack_list = self.com.bcast(attack_list, root=0)
         else:
             attack_list = self.make_attack_list_2(attack_num, mode)
         #
+        #print("attack_list:", self.rank, attack_list[0])
         
         llist = []
-        w_num = len(attack_list)
-        for i in attack_list:
-            w = self.w_list[i]
+        #w_num = len(attack_list)
+        for atk in attack_list:
+            #atk = self.w_list[i]
+            idx = atk[0]
+            wi = atk[1]
+            wi_alt = atk[2]
+            w = self.w_list[idx]
+            #print("w :", self.rank, w.li, w.ni, w.ii)
             layer = r.get_layer_at(w.li)
-            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
+            #print("[%d] (a) %d, %d" % (self.rank, w.wi, wi_alt))
+            layer.set_weight_index(w.ni, w.ii, wi_alt)
             if w.li in llist:
                 pass
             else:
@@ -573,27 +596,36 @@ class Train:
             layer = r.get_layer_at(li)
             layer.update_weight()
         #
+        #print("[%d] (b) %d, %d" % (self.rank, w.wi, w.wi_alt))
         ce_alt = self.evaluate()
+        #print(ce_alt)
         
         # mpi
-        ret = 0
+        #ret = 0
         if self.mpi==True:
             if self.rank==0:
                 ret = self.acceptance(ce, ce_alt, temperature, asw)
-                ret = self.com.bcast(ret, root=0)
+            else:
+                ret = 0
             #
+            ret = self.com.bcast(ret, root=0)
         else:
             ret = self.acceptance(ce, ce_alt, temperature, asw)
         #
-        
+        #print(self.rank, ret)
         if ret<=0:
             self.undo_attack_2(attack_list)
         else:
             ce = ce_alt
-            for i in attack_list:
-                self.w_list[i].wi = self.w_list[i].wi_alt
+            for atk in attack_list:
+                idx = atk[0]
+                wi = atk[1]
+                wi_alt = atk[2]
+                #w = self.w_list[idx]
+                self.w_list[idx].wi = wi #self.w_list[i].wi_alt
             #
         #
+        #print("[%d] (c) %d, %d" % (self.rank, w.wi, w.wi_alt))
         return ce, ret
         
     def main_loop_logathic(self, idx, wtype, asw=1):
@@ -668,12 +700,17 @@ class Train:
             num = 0
             self.delta_avg = ce*0.1
             while num<total:
+                #print(num, self.rank)
                 ce, ret = self.multi_attack(ce, attack_num, temperature, asw)
                 if ce<0:
                     print(ret, "ce => zero")
                     return # -1
                 #
-                if self.mpi==False or self.rank==0:
+                if self.mpi==True:
+                    if self.rank==0:
+                        print(idx, "[%d/%d]"%(num, total), "T=%f"%(temperature), "(%d)"%(lp), "\t", ret, "\t", ce)
+                    #
+                else:
                     print(idx, "[%d/%d]"%(num, total), "T=%f"%(temperature), "(%d)"%(lp), "\t", ret, "\t", ce)
                 #
                 num += 1
@@ -681,9 +718,12 @@ class Train:
             #
             lp = lp +1
             temperature = temperature*0.95 #0.90, 0.95
-        #
-        
-            if self.mpi==False or self.rank==0:
+            #
+            if self.mpi==True:
+                if self.rank==0:
+                    r.save()
+                #
+            else:
                 r.save()
             #
         #

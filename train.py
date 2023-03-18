@@ -279,9 +279,10 @@ class Train:
             return 0
         #
 
-        A = np.exp(-delta/float(temperature)) / 100
+        A = np.exp(-delta/float(temperature)) / 10#0
+        
         if np.random.random()<A:
-            print(delta, "\t", temperature, A)
+            print(delta, self.delta_avg, "\t", temperature, A)
             return 1
         #
         return 0
@@ -420,7 +421,7 @@ class Train:
         ce = self.evaluate()
         
         min = 200
-        for temperature in range(lv_max, 0, -1):
+        for temperature in range(lv_max, -1, -1):
             attack_num = 2 ** temperature
             hist = []
             atk_flag = True
@@ -630,16 +631,17 @@ class Train:
         
     def main_loop_logathic(self, idx, wtype, asw=1):
         r = self._r
-        
+        ce = self.evaluate()
+                
         w_num = len(self.w_list)
         lv_min = 0
-        kk = int(w_num/100)
-        print(w_num, kk)
-        lv_max = int(math.log(kk, 2)) + 1 # 1 % max
-        ce = self.evaluate()
-        
-        min = 200
-        for temperature in range(lv_max, -2, -1):
+        #kk = int(w_num/100)
+        kk = int(w_num/200)
+        #print(w_num, kk)
+        lv_max = int(math.log(kk, 2))# + 1 # 1 % max
+        min = 100#200
+        #for temperature in range(lv_max, -2, -1):
+        for temperature in range(lv_max, -1, -1):
             #self.delta_avg = ce * 0.1
             attack_num = 2 ** temperature
             hist = []
@@ -648,7 +650,9 @@ class Train:
             num = 0  # loop count
             while atk_flag:
                 self.delta_avg = ce * 0.1
-                ce, ret = self.multi_attack(ce, attack_num, temperature, asw)
+                #ce, ret = self.multi_attack(ce, attack_num, temperature, asw)
+                #asw = 0
+                ce, ret = self.multi_attack(ce, attack_num, attack_num, asw)
                 if ret<0:
                     print("exit from while :", ce, ret)
                     break
@@ -670,7 +674,8 @@ class Train:
                             % (idx, temperature, num, wtype, attack_num, part, s, rate), ce)
                 #
                 if num>min:
-                    if num>10000 or rate<0.01:
+                    #if num>10000 or rate<0.01:
+                    if num>1000 or rate<0.01:
                         atk_flag = False
                     #
                 #

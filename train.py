@@ -211,61 +211,6 @@ class Train:
         #
         w.mark = w.mark + 1
         return wi_alt
-    
-    def make_attack_list(self, attack_num, mode, w_list):
-        r = self._r
-        w_num = len(w_list)
-        
-        attack_list = []
-        #while len(attack_list)<attack_num:
-        for i in range(attack_num):
-            attack_i = random.randrange(w_num)
-            w = w_list[attack_i]
-            type = w.type
-            if type==core.LAYER_TYPE_CONV:
-                if w.wi>2 or w.wi_alt>2:
-                    print("CCC(%d, %d, %d), wi=%d, alt=%d, (%d)" %
-                        (w.li, w.ni, w.ii, w.wi, w.wi_alt, w.mark))
-                #
-            #
-            
-            # mode : 0=random, 1=neighbor
-            w.wi_alt = self.shift_weight(w, w.wi, mode, type)
-            if type==3 and w.wi_alt>2:
-                print("KOKO:", type, w.wi, mode, w.wi_alt, w.ni, w.ii, w.mark)
-            #
-            attack_list.append(attack_i)
-        #
-        for idx in attack_list:
-            aw = w_list[idx]
-            if aw.type==3 and aw.wi_alt>2:
-                print("DDDDD")
-                print(" (%d, %d, %d)" %(aw.li, aw.ni, aw.ii) )
-                print(" wi=%d, alt=%d (%d)" % (aw.wi, aw.wi_alt, w.mark))
-            #
-        #
-        return attack_list
-
-    def undo_attack(self, w_list, attack_list):
-        r = self._r
-       
-        llist = []
-        for i in attack_list:
-            w = w_list[i]
-            layer = r.get_layer_at(w.li)
-            layer.set_weight_index(w.ni, w.ii, w.wi)
-            w.wi_alt = w.wi
-            if w.li in llist:
-                pass
-            else:
-                llist.append(w.li)
-            #
-        #
-
-        for li in llist:
-            layer = r.get_layer_at(li)
-            layer.update_weight()
-        #
             
     def acceptance(self, ce1, ce2, temperature, onoff=1):
         delta = ce2 - ce1
@@ -279,190 +224,13 @@ class Train:
             return 0
         #
 
-        A = np.exp(-delta/float(temperature)) / 10#0
-        
+        #A = np.exp(-delta/float(temperature)) / 10#0
+        A = np.exp(-1/float(temperature))/10.0
         if np.random.random()<A:
             print(delta, self.delta_avg, "\t", temperature, A)
             return 1
         #
         return 0
-
-    def multi_attack_sa(self, ce, w_list, attack_num, temperature, asw=1):
-        r = self._r
-        #attack_list = []
-        if self.mpi==False or self.rank==0:
-            mode = 1 # 0:random, 1:neighbor
-            attack_list = self.make_attack_list(attack_num, mode, w_list)
-            for a in attack_list:
-                w = w_list[a]
-                if w.type==core.LAYER_TYPE_CONV and w.wi>2:
-                    print("*** (%d, %d, %d), wi=%d, alt=%d (%d)" %
-                        (w.li, w.ni, w.ii, w.wi, w.wi_alt, w.mark))
-                #
-            #
-            
-            #print(len(attack_list))
-            #k = attack_list[0]
-            #print(w_list[k].wi, w_list[k].wi_alt)
-            alt_list = []
-            for i in attack_list:
-                w = w_list[i]
-                alt_list.append(w.wi_alt)
-            #
-        else:
-            attack_list = []
-            alt_list = []
-        #
-        
-        if self.mpi==True:
-            attack_list = self.com.bcast(attack_list, root=0)
-            alt_list = self.com.bcast(alt_list, root=0)
-            
-            if self.rank==0:
-                pass
-            else:
-                idx = 0
-                for i in attack_list:
-                    #print(i, idx, len(w_list))
-                    w_list[i].wi_alt = alt_list[idx]
-                    idx += 1
-                #
-            #
-        #
-        
-        llist = []
-        w_num = len(attack_list)
-        for i in attack_list:
-            w = w_list[i]
-            layer = r.get_layer_at(w.li)
-            #
-            if w.type==core.LAYER_TYPE_CONV and w.wi>2:
-                print("$$$ (%d, %d, %d), wi=%d, alt=%d (%d)" % (w.li, w.ni, w.ii, w.wi, w.wi_alt, w.mark))
-                #
-            #
-            
-            layer.set_weight_index(w.ni, w.ii, w.wi_alt)
-            if w.li in llist:
-                pass
-            else:
-                llist.append(w.li)
-            #
-        #
-        for li in llist:
-            layer = r.get_layer_at(li)
-            layer.update_weight()
-        #
-        
-        ce_alt = self.evaluate()
-        if self.mpi==False or self.rank==0:
-            ret = self.acceptance(ce, ce_alt, temperature, asw)
-        else:
-            ret = 0
-        #
-        if self.mpi==True:
-            ret = self.com.bcast(ret, root=0)
-        #
-        
-        if ret<=0:
-            self.undo_attack(w_list, attack_list)
-        else:
-            ce = ce_alt
-            for i in attack_list:
-                w_list[i].wi = w.wi_alt
-            #
-        #
-        return ce, ret
-    
-    def loop_sa(self, idx, ce, w_list, wtype, temperature, total, minimum=0.1, debug=0, asw=1):
-        r = self._r
-        print("loop_sa()")
-        
-        w_num = len(w_list)
-        attack_num = 1
-        ce = r.evaluate()
-        print(self.rank, "ce:", ce)
-        self.delta_avg = ce * 0.1
-        t_min = minimum # 1.0, 0.1, 0.01
-        lp = 0
-        
-        print(temperature, t_min, self.mpi, self.rank)
-        while temperature>t_min:
-            num = 0
-            self.delta_avg = ce*0.1
-            while num<(total):
-                ce, ret = self.multi_attack_sa(ce, w_list, attack_num, temperature, asw)
-                if ce<0:
-                    print(ret, "ce => zero")
-                    return # -1
-                #
-                if self.mpi==False or self.rank==0:
-                    print(idx, "[%d/%d]"%(num, total), "T=%f"%(temperature), "(%d)"%(lp), "\t", ret, "\t", ce)
-                #
-                num += 1
-                self.delta_avg = ce*0.1
-            #
-            lp = lp +1
-            temperature = temperature*0.95 #0.90, 0.95
-            #if self.mpi==False or self.rank==0:
-            #    r.save()
-            #
-        #
-        return ce
-        #if self.mpi==False or self.rank==0:
-        #    r.save()
-        #
-        
-    def loop_logathic_sa(self, idx, w_list, wtype, asw=1):
-        r = self._r
-        
-        w_num = len(w_list)
-        lv_min = 0
-        lv_max = int(math.log(w_num/100, 2)) + 1 # 1 % max
-        ce = self.evaluate()
-        
-        min = 200
-        for temperature in range(lv_max, -1, -1):
-            attack_num = 2 ** temperature
-            hist = []
-            atk_flag = True
-            part = 0 # hit count
-            num = 0  # loop count
-            while atk_flag:
-                ce, ret = self.multi_attack_sa(ce, w_list, attack_num, temperature, asw)
-                if ret<0:
-                    print("exit from while :", ce, ret)
-                    #atk_flag = False
-                    break
-                #
-                num += 1
-                part += ret
-                hist.append(ret)
-                if len(hist)>min:
-                    hist = hist[1:]
-                #
-                s = 0 # hit conunt in the last 200
-                for a in hist:
-                    s += a
-                #
-                rate = float(s)/float(num)
-                if self.mpi==False or self.rank==0:
-                    print("[%d:%d] %d [%s:%d] (%d, %d) %06f, ce:"
-                        % (idx, temperature, num, wtype, attack_num, part, s, rate), ce)
-                #
-                if num>min:
-                    if num>10000 or rate<0.01:
-                        atk_flag = False
-                    #
-                #
-            # while
-            if ce<=0:
-                print("exit from for")
-                break
-            #
-        #
-        if self.mpi==False or self.rank==0:
-            r.save()
-        #
     
     def shift_weight_2(self, type, wi, mode=0):
         wi_alt = wi
@@ -636,7 +404,7 @@ class Train:
         w_num = len(self.w_list)
         lv_min = 0
         #kk = int(w_num/100)
-        kk = int(w_num/200)
+        kk = int(w_num/400) # 100, 200, 400
         #print(w_num, kk)
         lv_max = int(math.log(kk, 2))# + 1 # 1 % max
         min = 100#200

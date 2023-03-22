@@ -225,9 +225,11 @@ class Train:
         #
 
         #A = np.exp(-delta/float(temperature)) / 10#0
-        A = np.exp(-1/float(temperature))/10.0
-        if np.random.random()<A:
-            print(delta, self.delta_avg, "\t", temperature, A)
+        #A = np.exp(-1/float(temperature))/10.0
+        A = self.dy*temperature
+        R = np.random.random()
+        if R<A:
+            print(delta, self.delta_avg, "\t", temperature, R, A)
             return 1
         #
         return 0
@@ -404,10 +406,15 @@ class Train:
         w_num = len(self.w_list)
         lv_min = 0
         #kk = int(w_num/100)
-        kk = int(w_num/400) # 100, 200, 400
+        kk = int(w_num/1000) # 100, 200, 400
         #print(w_num, kk)
         lv_max = int(math.log(kk, 2))# + 1 # 1 % max
         min = 100#200
+        
+        self.dy = (0.1 - 0.01)/float(lv_max)
+        #y = [dy*float(i) for i in range(1,nx+1)]
+        
+        
         #for temperature in range(lv_max, -2, -1):
         for temperature in range(lv_max, -1, -1):
             #self.delta_avg = ce * 0.1
@@ -420,7 +427,7 @@ class Train:
                 self.delta_avg = ce * 0.1
                 #ce, ret = self.multi_attack(ce, attack_num, temperature, asw)
                 #asw = 0
-                ce, ret = self.multi_attack(ce, attack_num, attack_num, asw)
+                ce, ret = self.multi_attack(ce, attack_num, temperature, asw)
                 if ret<0:
                     print("exit from while :", ce, ret)
                     break

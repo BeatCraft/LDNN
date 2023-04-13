@@ -213,23 +213,25 @@ class Train:
         return wi_alt
             
     def acceptance(self, ce1, ce2, temperature, onoff=1):
-        delta = ce2 - ce1
-        if delta<=0:
+        delta = ce1 - ce2
+        if delta>=0:
             return 1
         #
         if onoff==0:
             return 0
         #
-        if delta>self.delta_avg:
-            return 0
+        #if delta>self.delta_avg:
+        #    return 0
         #
-
+        #A = np.exp(delta/float(temperature))
         #A = np.exp(-delta/float(temperature)) / 10#0
         #A = np.exp(-1/float(temperature))/10.0
-        A = self.dy*temperature
+        A = self.dy*temperature/2.0
         R = np.random.random()
         if R<A:
-            print(delta, self.delta_avg, "\t", temperature, R, A)
+            print(delta, self.delta_avg)
+            print(self.dy, R, A)
+            print(temperature)
             return 1
         #
         return 0
@@ -402,7 +404,7 @@ class Train:
     def main_loop_logathic(self, idx, wtype, asw=1):
         r = self._r
         ce = self.evaluate()
-                
+        #asw = 0
         w_num = len(self.w_list)
         lv_min = 0
         #kk = int(w_num/100)
@@ -411,11 +413,8 @@ class Train:
         lv_max = int(math.log(kk, 2))# + 1 # 1 % max
         min = 100#200
         
-        self.dy = (0.1 - 0.01)/float(lv_max)
-        #y = [dy*float(i) for i in range(1,nx+1)]
-        
-        
-        #for temperature in range(lv_max, -2, -1):
+        #self.dy = (0.1 - 0.01)/float(lv_max)
+        self.dy = (0.1)/float(lv_max)
         for temperature in range(lv_max, -1, -1):
             #self.delta_avg = ce * 0.1
             attack_num = 2 ** temperature

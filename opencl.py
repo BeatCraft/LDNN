@@ -247,12 +247,16 @@ __kernel void conv_5_roll_batch(
             int w_start = + f_start + filter_len*filter_len*i;
             for (int fy=0; fy<filter_len; fy++){
                 for (int fx=0; fx<filter_len; fx++){
-                    sum += input[start + in_w*fy + fx] * weight[w_start + filter_len*fy + fx];
+                    float w = weight[w_start + filter_len*fy + fx];
+                    float t = input[start + in_w*fy + fx] * w;
+                    sum += t;
+                    //printf(\"w=%f\\n\", w);
                 }
             }
         }
         
         output[bi*out_stride + out_w*out_h*fi + out_w*yi + xi] = sum;
+        //printf(\"%f\\n\", sum);
     }
 };
 

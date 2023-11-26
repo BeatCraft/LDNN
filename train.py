@@ -409,7 +409,7 @@ class Train:
         lv_min = 0
         #kk = int(w_num/100)
         kk = int(w_num/1000) # 100, 200, 400
-        #print(w_num, kk)
+        print(w_num, kk)
         lv_max = int(math.log(kk, 2))# + 1 # 1 % max
         min = 100#200
         

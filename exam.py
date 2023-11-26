@@ -95,6 +95,20 @@ def classification(r, data_size, num_class, batch_size, batch_image, batch_label
 
     print("done")
     return float(ca) / float(batch_size)
+    
+    
+def inference(r, num_class, data, data_size, debug=0):
+    #data_array = np.zeros((1, data_size), dtype=np.float32)
+    #data_array[0] = data[0]
+    data_array = np.array([data,])
+    print(data_array.shape)
+    class_array = np.zeros(1, dtype=np.int32)
+    class_array[0] = 0 # dummy
+    #
+    r.set_batch(data_size, num_class, data_array, class_array, 1, 0)
+    r.propagate(debug)
+    answers = r.get_answer()
+    return answers[0]
 #
 #
 #

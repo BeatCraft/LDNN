@@ -112,7 +112,7 @@ class Train:
     def make_w_list(self, type_list=None):
         r = self._r
         if type_list is None:
-            type_list = [core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT, core.LAYER_TYPE_CONV]
+            type_list = [core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT]
         #
         w_list  = []
         c = r.count_layers()
@@ -506,6 +506,58 @@ class Train:
                 r.save()
             #
         #
+        return ce
+    
+    
+    def main_simple_loop(self, idx, ce, loop_max, attack_num, debug=0):
+        r = self._r
+        w_num = len(self.w_list)
+        num = 0
+        
+        while num<loop_max:
+            attack_list = []
+            while len(attack_list)<attack_num:
+                widx = random.randint(0, w_num-1)
+                w = self.w_list[widx]
+                wi = w.wi
+                attack_list.append((widx, wi))
+            #
+        
+            # attack
+            for ws in attack_list:
+                widx = ws[0]
+                wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
+                w = self.w_list[widx]
+                w.wi = wi_alt
+                layer = r.get_layer_at(w.li)
+                layer.set_weight_index(w.ni, w.ii, wi_alt)
+                #r.set_weight_index(ni, ii, wi):
+                #w.set_wi(wi_alt)
+                self.w_list[idx].wi = wi
+            #
+            r.update_weight()
+            
+            ce_alt = self.evaluate()
+            if ce_alt<=ce: # keep
+                print(idx, "[%d/%d]"%(num, loop_max), "\t", ce, ">", ce_alt)
+                ce = ce_alt
+                ret = 1
+            else: # undo
+                print(idx, "[%d/%d]"%(num, loop_max), "\t", ce)
+                for ws in attack_list:
+                    widx = ws[0]
+                    wi = ws[1]
+                    w = self.w_list[widx]
+                    w.wi = wi
+                    layer = r.get_layer_at(w.li)
+                    layer.set_weight_index(w.ni, w.ii, wi)
+                    self.w_list[idx].wi = wi
+                #
+                r.update_weight()
+            #
+            num += 1
+        #
+        r.save()
         return ce
         
 #

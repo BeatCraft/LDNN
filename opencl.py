@@ -225,12 +225,13 @@ __kernel void conv_5_roll_batch(
     const int out_h,
     const int ch,
     const int filter,
-    const int filter_len,
+    const int ksize,
     const int stride)
 {
     int bi = get_global_id(0); // index in batch
     int xi = get_global_id(1); // x in output
     int yi = get_global_id(2); // y in output
+    
     int in_ch_stride = in_w * in_h;
     int out_ch_stride = out_w * out_h;
     int in_batch_stride = in_ch_stride*ch;
@@ -238,16 +239,19 @@ __kernel void conv_5_roll_batch(
     int in_y_stride = yi * in_w;
     int in_start = in_batch_stride * bi + in_y_stride + xi;
     
+    // filter_len is kernel size, 3
+    // ch is input, filter is output
+    
     for (int fi=0; fi<filter; fi++){
         float sum = 0.0;
-        int f_start = filter_len*filter_len*fi*ch;
-                    
+        int f_start = ksize * ksize * fi * ch;
         for (int i=0; i<ch; i++){
-            int start = in_start + in_ch_stride*i;
-            int w_start = + f_start + filter_len*filter_len*i;
-            for (int fy=0; fy<filter_len; fy++){
-                for (int fx=0; fx<filter_len; fx++){
-                    float w = weight[w_start + filter_len*fy + fx];
+            int start = in_start + in_ch_stride * i;
+            int w_start = f_start + ksize * ksize * i;
+            
+            for (int fy=0; fy<ksize; fy++){
+                for (int fx=0; fx<ksize; fx++){
+                    float w = weight[w_start + ksize*fy + fx];
                     float t = input[start + in_w*fy + fx] * w;
                     sum += t;
                     //printf(\"w=%f\\n\", w);

@@ -55,8 +55,9 @@ WEIGHT_INDEX_MIN = 0
 CNN_WEIGHT_SET_1 = [-2.0, -1.0, 0.0, 1.0, 2.0]
 CNN_WEIGHT_SET_2 = [-1.0, -0.5, 0.0, 0.5, 1.0]
 CNN_WEIGHT_SET_3 = [0.0, 1.0]
-CNN_WEIGHT_SET_4 = [-0.125, 0.0, 0.125, 0.25, 0.5]
-CNN_WEIGHT_SET = CNN_WEIGHT_SET_4
+CNN_WEIGHT_SET_4 = [-0.25, -0.125, 0.0, 0.125, 0.25, 0.5]
+#CNN_WEIGHT_SET_4 = [0.0, 0.125, 0.25, 0.5]
+CNN_WEIGHT_SET = WEIGHT_SET_4#CNN_WEIGHT_SET_4
 CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
 CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
 CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
@@ -83,7 +84,9 @@ class Node:
 
     def add_weight(self, w_id):
         self._w_id_list.append(w_id)
-
+#
+#
+#
 LAYER_TYPE_INPUT   = 0
 LAYER_TYPE_HIDDEN  = 1
 LAYER_TYPE_OUTPUT  = 2
@@ -587,7 +590,11 @@ class MaxLayer(Layer):
         super(MaxLayer, self).__init__(i, LAYER_TYPE_MAX, num_input, num_node, pre, gpu)
         #
         self.lock = False
+        self.cache = 0
     
+    def reset(self):
+        self.cache = 0
+        
     def set_weight_index(self, ni, ii, wi):
         pass
         
@@ -627,6 +634,9 @@ class MaxLayer(Layer):
         else:
             return
         #
+        if self.cache:
+            return
+        #
         
         if self._gpu.type==0: # opencl
             self._gpu.max_batch(array_in, self._gpu_output,
@@ -640,6 +650,7 @@ class MaxLayer(Layer):
         elif self._gpu.type==1: # GDX
             self._gpu.max(array_in, self._gpu_output, self._ch, self._x, self._y, self._batch_size)
         #
+        self.cache = 1
 
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
@@ -1053,17 +1064,20 @@ class Conv_5_Layer(Layer):
 class FCNN_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
         print("Fixed CNN Layer::__init__()")
-        size = 3
+        #size = 3
+        self.cache = 0
+        self.ksize = 3 # kernel size
         stride = 1
         self._w = w
         self._h = h
         self._ch = ch # number of input channels
         self._filter = filter # node / # number of output channels
-        self._filter_len = size # size of kernel
-        self._filter_size = size * size * ch
+        #self._filter_len = size # size of kernel
+        self._filter_size = self.ksize * self.ksize * ch
+        #self.wsize = size * size * ch
         self._stride = stride
-        self._out_w = self._w - (self._filter_len - self._stride)
-        self._out_h = self._h - (self._filter_len - self._stride)
+        self._out_w = self._w - (self.ksize - self._stride)
+        self._out_h = self._h - (self.ksize - self._stride)
         #
         num_node = self._filter
         num_input = self._filter_size
@@ -1083,7 +1097,10 @@ class FCNN_Layer(Layer):
         else:
             print("error")
         #
-
+        
+    def reset(self):
+        self.cache = 0
+        
     def prepare(self, batch_size):
         print(("FCNN_Layer::prepare(%d)" %(batch_size)))
         
@@ -1135,6 +1152,10 @@ class FCNN_Layer(Layer):
             return
         #
         
+        if self.cache:
+            return
+        #
+        
         # activation mode
         # 0 : none
         # 1 : normal
@@ -1146,38 +1167,42 @@ class FCNN_Layer(Layer):
                                         array_in, self._gpu_weight, self._gpu_output,
                                         self._w, self._h,
                                         self._ch, self._filter,
-                                        self._filter_len, self._stride)
+                                        self.ksize, self._stride)
             if debug:
-                if self._index==1:
+                #if self._index==1:
                     #self._pre.debug()
                     #temp = np.zeros(3072, dtype=np.float32)
                     #self._gpu.copy(temp, array_in)
                     #print(temp)
-                    print(self._weight_index_matrix)
-                    print(self._weight_matrix)
+                #    print(self._weight_index_matrix)
+                #    print(self._weight_matrix)
                 #
                 print(self._index, "FCNN")
                 self._gpu.copy(self._output_array, self._gpu_output)
-                print((self._output_array[0][0]))
+                print(self._output_array.shape)
+                print(self._output_array[0][0])
             #
             
             # normalize
-            size = self._out_w * self._out_h * self._filter
-            self._gpu.get_sum(self._batch_size, self._gpu_output, self._gpu_sum, size)
-            self._gpu.copy(self._sum_array, self._gpu_sum)
-            mean = self._sum_array.sum() / float(self._batch_size*size)
-            self._gpu.get_dsum(self._batch_size, self._gpu_output, self._gpu_sum, size, mean)
-            self._gpu.copy(self._sum_array, self._gpu_sum)
-            div2 = self._sum_array.sum() / float(self._batch_size*size)
-            div = np.sqrt(div2) +  0.0000001;
-            self._gpu.get_std(self._batch_size, self._gpu_output, size, mean, div)
+            #size = self._out_w * self._out_h * self._filter
+            #self._gpu.get_sum(self._batch_size, self._gpu_output, self._gpu_sum, size)
+            #self._gpu.copy(self._sum_array, self._gpu_sum)
+            #mean = self._sum_array.sum() / float(self._batch_size*size)
+            #self._gpu.get_dsum(self._batch_size, self._gpu_output, self._gpu_sum, size, mean)
+            #self._gpu.copy(self._sum_array, self._gpu_sum)
+            #div2 = self._sum_array.sum() / float(self._batch_size*size)
+            #div = np.sqrt(div2) +  0.0000001;
+            #self._gpu.get_std(self._batch_size, self._gpu_output, size, mean, div)
             
             # relu
+            size = self._out_w * self._out_h
             self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, a_mode)
             if debug:
-                print(self._index, "conv, scale")
+                print(self._index, "FCNN, reru(),", self._batch_size, self._filter, size)
+                print(self._out_w, self._out_h, self._filter)
                 self._gpu.copy(self._output_array, self._gpu_output)
-                print((self._output_array[0][0]))
+                print(self._output_array.shape)
+                print(self._output_array[0][0])
                 #
                 #for i in range(self._filter):
                 #    name = "debug_%d" % (i)
@@ -1187,6 +1212,7 @@ class FCNN_Layer(Layer):
         elif self._gpu.type==1: # GDX
             pass
         #
+        self.cache = 1
         
 class Roster:
     def __init__(self):
@@ -1285,7 +1311,7 @@ class Roster:
         else:
             return
         #
-        self.reset()
+        #self.reset()
         
         if self._gpu.type==0: # OpenCL
             self._gpu.copy(self._gpu_input, data)
@@ -1347,7 +1373,7 @@ class Roster:
         for j in range(size):
             data_array[j] = train_data_batch[offset+j]
         #
-        self.reset()
+        #self.reset()
         
         self._gpu.copy(self._gpu_input, data_array)
 
@@ -1369,7 +1395,7 @@ class Roster:
         for j in range(size):
             labels[j] = train_label_batch[offset+j]
         #
-        self.reset()
+        #self.reset()
         self._gpu.copy(self._gpu_labels, labels)
     
     

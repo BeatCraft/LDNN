@@ -66,11 +66,14 @@ def classification(r, data_size, num_class, batch_size, batch_image, batch_label
             data_array[j] = batch_image[i*n+j]
             class_array[j] = batch_label[i*n+j]
         #
+        r.reset()
         r.set_batch(data_size, num_class, data_array, class_array, n, 0)
         start_time = time.time()
+        print("test 0")
         r.propagate(debug)
         elapsed_time += (time.time() - start_time)
         #
+        print("test 1")
         #infs = r.get_inference()
         answers = r.get_answer()
         #print(answers)

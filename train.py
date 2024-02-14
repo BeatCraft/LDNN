@@ -57,28 +57,29 @@ class Train:
     def set_path(path):
         self._path = path
     
-    def evaluate(self, debug=0):#, mode=0, idx=0):
+    def evaluate(self, mode=0, debug=0):#, mode=0, idx=0):
         r = self._r
         ce = 0.0
         
-        if self.mode_e==0: # normal
+        if mode==0: # normal, CE
             ce = r.evaluate()
-        elif self.mode_e==1: # layer MSE
+        elif mode==1: # layer MSE
             r.propagate()
             layer = r.get_layer_at(mse_idex) # 2, 4
             ent = layer.mse(0)
-        elif self.mode_e==2: # MSE for autoencoder
+        elif mode==2: # MSE for autoencoder
             r.propagate()
             r._gpu.mse(r.output._gpu_output, r.input._gpu_output, r._gpu_entropy, self._data_size, self._batch_size)
             r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
             ce = np.sum(r._batch_cross_entropy)/np.float32(self._batch_size)
-        elif self.mode_e==3: # MSE for regression
+        elif mode==3: # MSE for regression
             r.propagate()
             r._gpu.mse(r.output._gpu_output, r._gpu_labels, r._gpu_entropy, self._data_size, self._batch_size)
             r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
             ce = np.sum(r._batch_cross_entropy)/np.float32(self._batch_size)
         else:
             print("Train::evaluate() N/A")
+            return None
         #
         if debug:
             print("[%d] Train::evaluate() = %f" % (self.rank, ce))
@@ -539,11 +540,11 @@ class Train:
             
             ce_alt = self.evaluate()
             if ce_alt<=ce: # keep
-                print(idx, "[%d/%d]"%(num, loop_max), "\t", ce, ">", ce_alt)
+                print(idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce, ">", ce_alt)
                 ce = ce_alt
                 ret = 1
             else: # undo
-                print(idx, "[%d/%d]"%(num, loop_max), "\t", ce)
+                print(idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce)
                 for ws in attack_list:
                     widx = ws[0]
                     wi = ws[1]

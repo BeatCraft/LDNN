@@ -112,6 +112,27 @@ def inference(r, num_class, data, data_size, debug=0):
     r.propagate(debug)
     answers = r.get_answer()
     return answers[0]
+    
+def inference2(r, num_class, data, data_size, debug=0):
+    data_array = np.array([data,])
+    print(data_array.shape)
+    class_array = np.zeros(1, dtype=np.int32)
+    class_array[0] = 0 # dummy
+    #
+    r.set_batch(data_size, num_class, data_array, class_array, 1, 0)
+    r.propagate(debug)
+    inf = r.get_inference()
+    #r.get_answer()
+    
+    max_index = -1
+    max = -1.0
+    for j in range(num_class):
+        if inf[0][j]>max:
+            max = inf[0][j]
+            max_index = j
+        #
+    #
+    return max_index, max
 #
 #
 #

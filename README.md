@@ -1,4 +1,4 @@
-# LesserDNN : a DNN with Discrete Weights  
+# LesserDNN : a DNN with Quantized Weights  
 
 
 ## Following python modules are required  

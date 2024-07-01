@@ -29,7 +29,7 @@ else:
 def getGpu(idx=0):
     if ID==0: # MBP
         platform_id = 0
-        device_id = 1
+        device_id = 1 # 0, 1
         my_gpu = opencl.OpenCL(platform_id, device_id)
         my_gpu.set_kernel_code()
     elif ID==1: # tr

@@ -5,7 +5,6 @@ import os, sys, time, math
 from stat import *
 import random
 import copy
-#import multiprocessing as mp
 import pickle
 import numpy as np
 
@@ -24,29 +23,13 @@ from PIL import Image
 # LDNN Modules
 import gpu
 import util
-#
-#sys.setrecursionlimit(10000)
+
 #
 # constant values
 #
-WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625, -0.0078125,
-                0.0,
-                0.0078125, 0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 17
-WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, -0.015625,
-                0.0,
-                0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 15
-WEIGHT_SET_2 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125,
-                0.0,
-                0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 13
-WEIGHT_SET_3 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0, 0.0625, 0.125, 0.25, 0.5, 1.0] # 11
-WEIGHT_SET_4 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0] # 9
-WEIGHT_SET_5 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0.0625, 0.125, 0.25, 0.5, 1.0] # 10
-WEIGHT_SET_6 = [-1.0, -0.5, -0.25, -0.125, -0.0625, -0.03125, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0] # 12
-WEIGHT_SET_7 = [-1.0, -0.5, -0.25, 0.25, 0.5, 1.0] # 6
-WEIGHT_SET_8 = [-1.0, -0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75, 1.0] # 9
-WEIGHT_SET_9 = [-1.0, -0.5, 0.0, 0.5, 1.0] # 5
+WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0] # 9
 #
-WEIGHT_SET = WEIGHT_SET_4
+WEIGHT_SET = WEIGHT_SET_0
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = WEIGHT_INDEX_SIZE/2
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -1323,12 +1306,17 @@ class Roster:
         #
         self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.float32)
         self._labels = np.zeros((batch_size, num_class), dtype=np.float32)
+        #print(type(self._labels), self._labels.shape)
         #self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float64)
+        print("prepare()", self._gpu.type)
         if self._gpu:
             if self._gpu.type==0: # OpenCL
+                #print("OpenCL")
                 self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
                 self._gpu_input = self._gpu.dev_malloc(self._batch_data)
                 self._gpu_labels = self._gpu.dev_malloc(self._labels)
+                print(self._gpu_labels)
+                
                 self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
             elif self._gpu.type==1: # GDX
                 self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float64)
@@ -1339,8 +1327,10 @@ class Roster:
                 self._gpu_entropy = self._gpu.allocateArray(self._batch_cross_entropy)
             #
         #
+        
         self.input = self.get_layer_at(0)
         for layer in self.layers:
+            #print(layer._index)
             layer.prepare(batch_size)
         #
         self.output = layer
@@ -1454,12 +1444,16 @@ class Roster:
         #self.reset()
         self._gpu.copy(self._gpu_labels, labels)
     
-    
     def direct_set_data(self, data_array):
         self._gpu.copy(self._gpu_input, data_array)
         self._gpu.copy(self.input._gpu_output, self._gpu_input)
-        
+    
     def direct_set_label(self, label_array):
+        # copy(dist, src)
+        #print(self._gpu.type)
+        #print("from :", type(label_array), label_array.shape)
+        #print("To :", type(self._gpu_labels), self._labels.shape)
+        #print(label_array[0][0])
         self._gpu.copy(self._gpu_labels, label_array)
     
     def set_scale_input(self, scale):
@@ -1615,17 +1609,18 @@ class Roster:
         return ret
     
     def evaluate(self, debug=0):
-        #print("Roster::evaluate()")
+        #print("Roster::evaluate()", self._eval_mode)
         self.propagate(debug)
         #
         if self._eval_mode==0: # CE for classification
             ce = self.get_cross_entropy(debug)
-        elif self._eval_mode ==1: # MSE for autoencoder
+        elif self._eval_mode==1: # MSE for autoencoder
             self._gpu.mse(self.output._gpu_output, self.input._gpu_output, self._gpu_entropy, self._data_size, self._batch_size)
             self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
             ce = np.sum(self._batch_cross_entropy)/np.float32(self._batch_size)
-        elif self._eval_mode ==2: # MSE for regression
-            self._gpu.mse(self.output._gpu_output, self._gpu_labels, self._gpu_entropy, self._data_size, self._batch_size)
+        elif self._eval_mode==2: # MSE for regression
+            #print(self._batch_size, self._data_size)
+            self._gpu.mse(self.output._gpu_output, self._gpu_labels, self._gpu_entropy, self.num_class, self._batch_size)
             self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
             ce = np.sum(self._batch_cross_entropy)/np.float32(self._batch_size)
         #

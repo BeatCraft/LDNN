@@ -654,9 +654,9 @@ class OpenCL(gpu.Gpu):
         return buf
         
     def copy(self, dist, src):
+        #print("OpenCL::copy()")
         event = cl.enqueue_copy(self._queue, dist, src)
         event.wait()
-
     #
     #
     #

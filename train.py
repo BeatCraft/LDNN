@@ -69,14 +69,20 @@ class Train:
             ent = layer.mse(0)
         elif mode==2: # MSE for autoencoder
             r.propagate()
-            r._gpu.mse(r.output._gpu_output, r.input._gpu_output, r._gpu_entropy, self._data_size, self._batch_size)
+            r._gpu.mse(r.output._gpu_output, r.input._gpu_output, r._gpu_entropy, r.num_class, r._batch_size)
             r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
-            ce = np.sum(r._batch_cross_entropy)/np.float32(self._batch_size)
+            ce = np.sum(r._batch_cross_entropy)/np.float32(r._batch_size)
         elif mode==3: # MSE for regression
             r.propagate()
             r._gpu.mse(r.output._gpu_output, r._gpu_labels, r._gpu_entropy, self._data_size, self._batch_size)
             r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
             ce = np.sum(r._batch_cross_entropy)/np.float32(self._batch_size)
+        elif mode==4: # MSE for regression
+            #print("MSE for regression")
+            r.propagate()
+            r._gpu.mse(r.output._gpu_output, r._gpu_labels, r._gpu_entropy, r.num_class, r._batch_size)
+            r._gpu.copy(r._batch_cross_entropy, r._gpu_entropy)
+            ce = np.sum(r._batch_cross_entropy)/np.float32(r._batch_size)
         else:
             print("Train::evaluate() N/A")
             return None
@@ -509,16 +515,17 @@ class Train:
         #
         return ce
     
-    
     def main_simple_loop(self, idx, ce, loop_max, attack_num, debug=0):
         r = self._r
         w_num = len(self.w_list)
         num = 0
-        
+        hit = 0
+                        
         while num<loop_max:
             attack_list = []
             while len(attack_list)<attack_num:
                 widx = random.randint(0, w_num-1)
+                #print(widx)
                 w = self.w_list[widx]
                 wi = w.wi
                 attack_list.append((widx, wi))
@@ -532,17 +539,16 @@ class Train:
                 w.wi = wi_alt
                 layer = r.get_layer_at(w.li)
                 layer.set_weight_index(w.ni, w.ii, wi_alt)
-                #r.set_weight_index(ni, ii, wi):
-                #w.set_wi(wi_alt)
                 self.w_list[idx].wi = wi
             #
             r.update_weight()
             
-            ce_alt = self.evaluate()
+            ce_alt = r.evaluate(0)
             if ce_alt<=ce: # keep
                 print(idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce, ">", ce_alt)
                 ce = ce_alt
                 ret = 1
+                hit = hit + 1
             else: # undo
                 print(idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce)
                 for ws in attack_list:
@@ -558,9 +564,9 @@ class Train:
             #
             num += 1
         #
+        print("hit rate:", hit, "/", loop_max, "=", float(hit/loop_max))
         r.save()
         return ce
-        
 #
 #
 #

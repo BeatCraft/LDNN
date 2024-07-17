@@ -57,7 +57,7 @@ class Train:
     def set_path(path):
         self._path = path
     
-    def evaluate(self, mode=0, debug=0):#, mode=0, idx=0):
+    def evaluate(self, mode=0, debug=0): # *** this is ONLY for openMPI ***
         r = self._r
         ce = 0.0
         
@@ -539,7 +539,8 @@ class Train:
                 w.wi = wi_alt
                 layer = r.get_layer_at(w.li)
                 layer.set_weight_index(w.ni, w.ii, wi_alt)
-                self.w_list[idx].wi = wi
+                #self.w_list[idx].wi = wi
+                #self.w_list[widx].wi = wi
             #
             r.update_weight()
             
@@ -558,7 +559,8 @@ class Train:
                     w.wi = wi
                     layer = r.get_layer_at(w.li)
                     layer.set_weight_index(w.ni, w.ii, wi)
-                    self.w_list[idx].wi = wi
+                    #self.w_list[idx].wi = wi
+                    #self.w_list[widx].wi = wi
                 #
                 r.update_weight()
             #
@@ -567,6 +569,64 @@ class Train:
         print("hit rate:", hit, "/", loop_max, "=", float(hit/loop_max))
         r.save()
         return ce
-#
-#
-#
+
+    def mini_batch_loop(self, idx, ce, loop_max, attack_num, debug=0):
+        r = self._r
+        w_num = len(self.w_list)
+        num = 0
+        hit = 0
+        
+        if ce==0.0:
+            ce = r.evaluate(0)
+            ce_pre = ce
+        else:
+            ce_pre = ce
+            ce = r.evaluate(0)
+                        
+        #while ce>ce_pre or num<loop_max:
+        while num<loop_max:
+            attack_list = []
+            while len(attack_list)<attack_num:
+                widx = random.randint(0, w_num-1)
+                w = self.w_list[widx]
+                wi = w.wi
+                attack_list.append((widx, wi))
+            #
+        
+            # attack
+            for ws in attack_list:
+                widx = ws[0]
+                wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
+                w = self.w_list[widx]
+                w.wi = wi_alt
+                layer = r.get_layer_at(w.li)
+                layer.set_weight_index(w.ni, w.ii, wi_alt)
+                self.w_list[widx].wi = wi
+            #
+            r.update_weight()
+            
+            ce_alt = r.evaluate(0)
+            #print(ce_alt)
+            if ce_alt<=ce: # keep
+                print(idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce, ">", ce_alt)
+                ce = ce_alt
+                ret = 1
+                hit = hit + 1
+            else: # undo
+                print(idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce)
+                for ws in attack_list:
+                    widx = ws[0]
+                    wi = ws[1]
+                    w = self.w_list[widx]
+                    w.wi = wi
+                    layer = r.get_layer_at(w.li)
+                    layer.set_weight_index(w.ni, w.ii, wi)
+                    self.w_list[widx].wi = wi
+                #
+                r.update_weight()
+            #
+            num += 1
+        #
+        print("hit rate:", hit, "/", loop_max, "=", float(hit/loop_max))
+        r.save()
+        return ce

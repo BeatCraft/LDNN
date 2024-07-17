@@ -1573,6 +1573,39 @@ class Roster:
         output._gpu.copy(output._output_array, output._gpu_output)
         return output._output_array
 
+    def get_answer_with_confidence(self):
+        ret = []
+        output = self.output
+        if self._gpu:
+            if self._gpu.type==0:
+                output._gpu.copy(output._output_array, output._gpu_output)
+            elif self._gpu.type==1:
+                output._output_array = self._gpu.allocateArray(output._gpu_softmax)
+            #
+        else:
+            pass
+        #
+
+        for i in range(self._batch_size):
+            if self._gpu.type==0:
+                inf = output._output_array[i]
+            elif self._gpu.type==1: # cupy
+                inf = cp.asnumpy(output._output_array)[i]
+            else:
+                return -1
+            #
+            max_index = -1
+            max = -1.0
+            for j in range(self.num_class):
+                if inf[j]>max:
+                    max = inf[j]
+                    max_index = j
+                #
+            #
+            ret.append((max_index, max))
+        #
+        return ret
+
     def get_answer(self):
         #print("roster::get_answer()")
         ret = []

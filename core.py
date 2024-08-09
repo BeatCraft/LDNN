@@ -1445,8 +1445,11 @@ class Roster:
         self._gpu.copy(self._gpu_labels, labels)
     
     def direct_set_data(self, data_array):
+        #print("fuck 0")
         self._gpu.copy(self._gpu_input, data_array)
+        #print("fuck 1")
         self._gpu.copy(self.input._gpu_output, self._gpu_input)
+        #print("fuck 2")
     
     def direct_set_label(self, label_array):
         # copy(dist, src)

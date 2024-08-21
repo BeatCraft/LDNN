@@ -119,7 +119,7 @@ class Train:
     def make_w_list(self, type_list=None):
         r = self._r
         if type_list is None:
-            type_list = [core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT]
+            type_list = [core.LAYER_TYPE_CONV, core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_OUTPUT]
         #
         w_list  = []
         c = r.count_layers()
@@ -515,7 +515,7 @@ class Train:
         #
         return ce
     
-    def main_simple_loop(self, idx, ce, loop_max, attack_num, debug=0):
+    def main_simple_loop(self, loop, idx, ce, loop_max, attack_num, debug=0):
         r = self._r
         w_num = len(self.w_list)
         num = 0
@@ -525,7 +525,6 @@ class Train:
             attack_list = []
             while len(attack_list)<attack_num:
                 widx = random.randint(0, w_num-1)
-                #print(widx)
                 w = self.w_list[widx]
                 wi = w.wi
                 attack_list.append((widx, wi))
@@ -534,24 +533,27 @@ class Train:
             # attack
             for ws in attack_list:
                 widx = ws[0]
-                wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
                 w = self.w_list[widx]
-                w.wi = wi_alt
+                #wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
                 layer = r.get_layer_at(w.li)
+                if layer._type==core.LAYER_TYPE_HIDDEN or layer._type==core.LAYER_TYPE_OUTPUT:
+                    wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
+                else:
+                    wi_alt = random.randint(0, len(core.CNN_WEIGHT_SET)-1)
+                #
+                w.wi = wi_alt
                 layer.set_weight_index(w.ni, w.ii, wi_alt)
-                #self.w_list[idx].wi = wi
-                #self.w_list[widx].wi = wi
             #
             r.update_weight()
             
             ce_alt = r.evaluate(0)
             if ce_alt<=ce: # keep
-                print(idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce, ">", ce_alt)
+                print(loop, idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce, ">", ce_alt)
                 ce = ce_alt
                 ret = 1
                 hit = hit + 1
             else: # undo
-                print(idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce)
+                print(loop, idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce)
                 for ws in attack_list:
                     widx = ws[0]
                     wi = ws[1]
@@ -559,8 +561,6 @@ class Train:
                     w.wi = wi
                     layer = r.get_layer_at(w.li)
                     layer.set_weight_index(w.ni, w.ii, wi)
-                    #self.w_list[idx].wi = wi
-                    #self.w_list[widx].wi = wi
                 #
                 r.update_weight()
             #

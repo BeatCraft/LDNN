@@ -41,7 +41,7 @@ CNN_WEIGHT_SET_3 = [0.0, 1.0]
 CNN_WEIGHT_SET_4 = [-0.25, -0.125, 0.0, 0.125, 0.25, 0.5]
 CNN_WEIGHT_SET_5 = [-0.5, 0.0, 0.5]
 
-CNN_WEIGHT_SET = CNN_WEIGHT_SET_4
+CNN_WEIGHT_SET = WEIGHT_SET_0#CNN_WEIGHT_SET_4
 CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
 CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
 CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
@@ -153,7 +153,12 @@ class Layer(object):
             elif self._type==LAYER_TYPE_FCNN2:
                 self._weight_matrix[ni][ii] = CNN_WEIGHT_SET2[wi]
             #
-        except:
+        # except:
+        except Exception as inst:
+            print(type(inst))    # the exception type
+            print(inst.args)     # arguments stored in .args
+            print(inst)
+            
             print("set_weight_index()")
             print(" [%d] type=%d" % (self._index, self._type))
             print(" (%d, %d) wi=%d, pre=%d" % (ni, ii, wi, pre))
@@ -1265,7 +1270,6 @@ class Roster:
         self._eval_mode = 0
         self._path = ""
         self._scale_input = 0
-        #self.mem_save = 1
         
     def set_path(self, path):
         self._path = path
@@ -1306,23 +1310,21 @@ class Roster:
         #
         self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.float32)
         self._labels = np.zeros((batch_size, num_class), dtype=np.float32)
-        #print(type(self._labels), self._labels.shape)
-        #self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float64)
+        
         print("prepare()", self._gpu.type)
         if self._gpu:
             if self._gpu.type==0: # OpenCL
-                #print("OpenCL")
+                print("Roster::prepare(), OpenCL")
                 self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
                 self._gpu_input = self._gpu.dev_malloc(self._batch_data)
                 self._gpu_labels = self._gpu.dev_malloc(self._labels)
                 print(self._gpu_labels)
                 
                 self._gpu_entropy = self._gpu.dev_malloc(self._batch_cross_entropy)
-            elif self._gpu.type==1: # GDX
+            elif self._gpu.type==1: # nvidia
+                print("Roster::prepare(), CUPY")
                 self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float64)
-                #if self.mem_save==0:
-                #    self._gpu_input = self._gpu.allocateArray(self._batch_data)
-                #
+                self._gpu_input = self._gpu.allocateArray(self._batch_data)
                 self._gpu_labels = self._gpu.allocateArray(self._labels)
                 self._gpu_entropy = self._gpu.allocateArray(self._batch_cross_entropy)
             #
@@ -1337,27 +1339,26 @@ class Roster:
     
     # batch for classification
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch, size, offset):
+        print("Roster::set_batch = obsolute")
         print("Roster::set_batch(%d, %d, %d, %d)" % (data_size, num_class, size, offset))
         
         data_array = np.zeros((size, data_size), dtype=np.float32)
         labels = np.zeros((size, num_class), dtype=np.float32)
         for j in range(size):
             data_array[j] = train_data_batch[offset+j]
-            #print(offset+j, type(train_label_batch[offset+j]))
             k = int(train_label_batch[offset+j])
-            #print(k)
             labels[j][k] = 1.0
         #
         self.set_data(data_array, data_size, labels, size)
                 
     def set_data(self, data, data_size, label, batch_size):
-        #print("Roster::set_data(%d, %d)" % (data_size, batch_size))
+        print("Roster::set_data = obsolute")
         if self._gpu:
             pass
         else:
+            print("Roster::set_data() = error, no gpu")
             return
         #
-        #self.reset()
         
         if self._gpu.type==0: # OpenCL
             self._gpu.copy(self._gpu_input, data)
@@ -1386,24 +1387,18 @@ class Roster:
                 k = data.shape[0]
                 self._gpu.copy(self.input._gpu_output, data)
             else:
+                print("Roster::set_data() = error, self._scale_input=%d" % ( self._scale_input))
                 return
             #
-        elif self._gpu.type==1: # GDX
+        elif self._gpu.type==1: # nvidia
             if self._scale_input==0: # none
-                self.input._gpu_output = self._gpu_input
+                self._gpu_labels = self._gpu.allocateArray(label)
+                self._gpu_input = self._gpu.allocateArray(data)
+                self.input._gpu_output = self._gpu.allocateArray(data)
             elif self._scale_input==1: # scale 0.0 - 1.0
-                #if self.mem_save==0:
-                #    self._gpu_input = self._gpu.allocateArray(data)
-                #    self._gpu_labels = self._gpu.allocateArray(label)
-                #    self._gpu_input = self._gpu_input / 255.0
-                #    self.input._gpu_output = self._gpu_input
-                #else:
-                #    self._gpu_labels = self._gpu.allocateArray(label)
-                #    #temp = self._gpu.allocateArray(data)
-                #    temp = data / 255.0
-                #    self.input._gpu_output = self._gpu.allocateArray(temp)
                 self._gpu_labels = self._gpu.allocateArray(label)
                 temp = data / 255.0
+                self._gpu_input = self._gpu.allocateArray(temp)
                 self.input._gpu_output = self._gpu.allocateArray(temp)
             else:
                 return
@@ -1413,16 +1408,15 @@ class Roster:
         #
     
     def set_batch_data(self, data_size, train_data_batch, size, offset, scale=0):
+        print("Roster::set_batch_data = obsolute")
         print("Roster::set_batch_data(%d, %d, %d, %d)" % (data_size, size, offset, scale))
         
         data_array = np.zeros((size, data_size), dtype=np.float32)
         for j in range(size):
             data_array[j] = train_data_batch[offset+j]
         #
-        #self.reset()
         
         self._gpu.copy(self._gpu_input, data_array)
-
         if self._scale_input==0:
             self._gpu.copy(self.input._gpu_output, self._gpu_input)
         elif self._scale_input==1:
@@ -1436,20 +1430,21 @@ class Roster:
         #
         
     def set_batch_label(self, data_size, train_label_batch, size, offset, scale=0):
+        print("Roster::set_batch_label = obsolute")
         print("Roster::set_batch_label(%d, %d, %d, %d)" % (data_size, size, offset, scale))
         labels = np.zeros((size, data_size), dtype=np.float32)
         for j in range(size):
             labels[j] = train_label_batch[offset+j]
         #
-        #self.reset()
         self._gpu.copy(self._gpu_labels, labels)
     
     def direct_set_data(self, data_array):
-        #print("fuck 0")
-        self._gpu.copy(self._gpu_input, data_array)
-        #print("fuck 1")
-        self._gpu.copy(self.input._gpu_output, self._gpu_input)
-        #print("fuck 2")
+        if self._gpu.type==0: # opencl
+            self._gpu.copy(self._gpu_input, data_array) # copy(dist, src)
+            self._gpu.copy(self.input._gpu_output, self._gpu_input)
+        elif self._gpu.type==1: # nvidia
+            self.input._gpu_input = self._gpu.allocateArray(data_array)
+        #
     
     def direct_set_label(self, label_array):
         # copy(dist, src)
@@ -1457,8 +1452,12 @@ class Roster:
         #print("from :", type(label_array), label_array.shape)
         #print("To :", type(self._gpu_labels), self._labels.shape)
         #print(label_array[0][0])
-        self._gpu.copy(self._gpu_labels, label_array)
-    
+        if self._gpu.type==0: # opencl
+            self._gpu.copy(self._gpu_labels, label_array)
+        elif self._gpu.type==1: # GDX
+            self._gpu_labels = self._gpu.allocateArray(label_array)
+        #
+        
     def set_scale_input(self, scale):
         self._scale_input = scale
     
@@ -1663,7 +1662,6 @@ class Roster:
         return ce
     
     def get_cross_entropy(self, debug=0):
-        #print("Roster::get_cross_entropy()")
         c = self.count_layers()
         output = self.get_layer_at(c-1)
 
@@ -1705,7 +1703,7 @@ class Roster:
                     #
                 #
                 return s
-            elif self._gpu.type==1: # DGX
+            elif self._gpu.type==1: # nvidia
                 self._gpu.crossEntropy(output._gpu_softmax, self._gpu_labels, self._gpu_entropy, self._batch_size, output._num_node)
                 total = self._gpu_entropy.sum()
                 avg = total / float(self._batch_size)

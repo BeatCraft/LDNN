@@ -513,7 +513,8 @@ void calc_batch_normalize(float* data, const int b_num, int ch_size, int ch_num)
 class Dgx(gpu.Gpu):
     def __init__(self, device_id):
         super(gpu.Gpu, self).__init__()
-        self.name = "nvidia DGX V100"
+        #self.name = "nvidia DGX V100"
+        self.name = "nvidia"
         self.id = device_id
         cp.cuda.Device(device_id).use()
         # -1:unknown, 0:OpenCL, 1:CuPy/DGX

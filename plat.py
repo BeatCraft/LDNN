@@ -29,7 +29,10 @@ else:
 def getGpu(idx=0):
     if ID==0: # MBP
         platform_id = 0
-        device_id = 1 # 0, 1
+        device_id = 1
+        # 0 : Intel(R) Core(TM) i7-7660U CPU @ 2.50GH
+        # 1 : Intel(R) Iris(TM) Plus Graphics 64
+        # 2 : AMD Radeon Pro 580 Compute Engine
         my_gpu = opencl.OpenCL(platform_id, device_id)
         my_gpu.set_kernel_code()
     elif ID==1: # tr

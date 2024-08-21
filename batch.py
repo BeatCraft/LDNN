@@ -61,9 +61,9 @@ class Batch:
         for i in range(self.batch_size):
             self.mini_batch_idx_list.append(i)
         #
-        random.shuffle(self.mini_batch_idx_list)
-        random.shuffle(self.mini_batch_idx_list)
-        random.shuffle(self.mini_batch_idx_list)
+        #random.shuffle(self.mini_batch_idx_list)
+        #random.shuffle(self.mini_batch_idx_list)
+        #random.shuffle(self.mini_batch_idx_list)
     
     def get_batch(self, size, offset=0):
         data_array = np.zeros((size, self.data_size), dtype=np.float32)
@@ -76,13 +76,15 @@ class Batch:
     
     def get_mini_batch(self, offset):
         data_array = np.zeros((self.mini_batch_size, self.data_size), dtype=np.float32)
-        print("debug", data_array.shape)
         label_array = np.zeros((self.mini_batch_size, self.class_num), dtype=np.float32)
         
+        #print("mini", data_array.shape, self.mini_batch_size)
+        
         idx_offset = self.mini_batch_size * offset
-        print(self.batch_size, idx_offset)
+        #print("offset", offset, idx_offset)
         for i in range(self.mini_batch_size):
             idx = self.mini_batch_idx_list[idx_offset + i]
+            #print(idx)
             data_array[i] = self.data_array[idx]
             label_array[i] = self.label_array[idx]
         #

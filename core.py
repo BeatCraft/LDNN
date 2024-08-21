@@ -368,11 +368,13 @@ class HiddenLayer(Layer):
         if self._gpu:
             pass
         else:
+            print("HiddenLayer::propagate() = error, no gpu")
             return
         #
+    
+        #stride_1 = self._num_node * self._num_input
+        #stride_2 = self._num_input
         
-        stride_1 = self._num_node * self._num_input
-        stride_2 = self._num_input
         # activation mode
         #   0 : none
         #   1 : normal
@@ -446,17 +448,16 @@ class OutputLayer(Layer):
 
     def prepare(self, batch_size):
         print("OutputLayer::prepare(%d)" % (batch_size))
-            
         self._batch_size = batch_size
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-        self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float64)
-        
+        #self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float64)
         if self._gpu:
             if self._gpu.type==0:
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
-                self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
+                #self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
             elif self._gpu.type==1:
-                print("output:dgx")
+                print("output : nvidia")
+                self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float64)
                 self._gpu_output = self._gpu.allocateArray(self._output_array)
                 self._gpu_softmax = self._gpu.allocateArray(self._softmax_array)
             #
@@ -476,37 +477,37 @@ class OutputLayer(Layer):
         #
         
     def propagate(self, array_in, debug=0):
-        stride_1 = self._num_node * self._num_input
-        stride_2 = self._num_input
-        activation = 1
-
+        #stride_1 = self._num_node * self._num_input
+        #stride_2 = self._num_input
+        #activation = 1
         if self._gpu:
-            if self._gpu.type==0: # OpenCL
-                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
-                                  self._batch_size, self._num_node, self._num_input, 0)
-                # softmax
-                if debug:
-                    print("output")
-                    self._gpu.copy(self._output_array, self._gpu_output)
-                    print((self._output_array[0]))
-                #
-                self._gpu.softmax(self._gpu_output, self._num_node, self._batch_size)
-                if debug:
-                    print("softmax")
-                    self._gpu.copy(self._output_array, self._gpu_output)
-                    print((self._output_array[0]))
-                #
-            elif self._gpu.type==1: # DGX
-                self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 0)
-                self._gpu.softmax(self._gpu_output, self._gpu_softmax, self._batch_size, self._num_node)
-                if debug:
-                    print("softmax", self._index)
-                    darray = cp.asnumpy(self._gpu_softmax)
-                    print(darray[0])
-                #
-            #
-        else:
             pass
+        else:
+            print("OutputLayer::propagate() = error, no gpu")
+        #
+        if self._gpu.type==0: # OpenCL
+            self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
+                              self._batch_size, self._num_node, self._num_input, 0)
+            # softmax
+            if debug:
+                print("output")
+                self._gpu.copy(self._output_array, self._gpu_output)
+                print((self._output_array[0]))
+            #
+            self._gpu.softmax(self._gpu_output, self._num_node, self._batch_size)
+            if debug:
+                print("softmax")
+                self._gpu.copy(self._output_array, self._gpu_output)
+                print((self._output_array[0]))
+            #
+        elif self._gpu.type==1: # DGX
+            self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 0)
+            self._gpu.softmax(self._gpu_output, self._gpu_softmax, self._batch_size, self._num_node)
+            if debug:
+                print("softmax", self._index)
+                darray = cp.asnumpy(self._gpu_softmax)
+                print(darray[0])
+            #
         #
 
 class RegressionOutputLayer(Layer):
@@ -559,25 +560,25 @@ class RegressionOutputLayer(Layer):
         stride_2 = self._num_input
         # multiple
         if self._gpu:
-            if self._gpu.type==0:
-                self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
-                                                self._batch_size, stride_1, stride_2,
-                                                self._num_input, self._num_node)
-                # sum
-                activation = 1 # relu=0, skip=1
-                self._gpu.sum(self._gpu_product, self._gpu_output,
-                            self._num_input, self._num_node, activation, self._batch_size)
-                #
-                if debug:
-                    print("output", self._index)
-                    self._gpu.copy(self._output_array, self._gpu_output)
-                    print((self._output_array[0]))
-                #
-            elif self._gpu.type==1:
-                pass
-            #
-        else:
             pass
+        else:
+            print("RegressionOutputLayer::propagate() = error, no gpu")
+        #
+        self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
+                                        self._batch_size, stride_1, stride_2,
+                                        self._num_input, self._num_node)
+        # sum
+        activation = 1 # relu=0, skip=1
+        self._gpu.sum(self._gpu_product, self._gpu_output,
+                    self._num_input, self._num_node, activation, self._batch_size)
+        #
+        if debug:
+            print("output", self._index)
+            self._gpu.copy(self._output_array, self._gpu_output)
+            print((self._output_array[0]))
+        #
+        elif self._gpu.type==1:
+            print("RegressionOutputLayer::propagate() = not yet impremented")
         #
 #
 # 2 x 2 simple max filter for 2D image data
@@ -1166,6 +1167,7 @@ class FCNN_Layer(Layer):
         if self._gpu:
             pass
         else:
+            print("FCNN_Layer::propagate() = error, no gpu")
             return
         #
         

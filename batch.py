@@ -61,7 +61,7 @@ class Batch:
         for i in range(self.batch_size):
             self.mini_batch_idx_list.append(i)
         #
-        #random.shuffle(self.mini_batch_idx_list)
+        random.shuffle(self.mini_batch_idx_list)
         #random.shuffle(self.mini_batch_idx_list)
         #random.shuffle(self.mini_batch_idx_list)
     

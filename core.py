@@ -339,29 +339,32 @@ class HiddenLayer(Layer):
         self._batch_size = batch_size
         #self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
         self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-
         if self._gpu:
-            if self._gpu.type==0:
-                #self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
-                #self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
-                self._gpu_output = self._gpu.dev_malloc(self._output_array)
-            elif self._gpu.type==1:
-                #self._gpu_product = self._gpu.allocateArray(self._product_matrix)
-                self._gpu_output = self._gpu.allocateArray(self._output_array)
-            #
-        else:
             pass
+        else:
+            print("HiddenLayer::prepare() = error, no gpu")
+            return
+        #
+        if self._gpu.type==0:
+            #self._product_matrix = np.zeros( (self._batch_size, self._num_node, self._num_input), dtype=np.float32)
+            #self._gpu_product = self._gpu.dev_malloc(self._product_matrix)
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        elif self._gpu.type==1:
+            #self._gpu_product = self._gpu.allocateArray(self._product_matrix)
+            self._gpu_output = self._gpu.allocateArray(self._output_array)
         #
 
     def update_weight(self):
         if self._gpu:
-            if self._gpu.type==0:
-                self._gpu.copy(self._gpu_weight, self._weight_matrix)
-            elif self._gpu.type==1:
-                self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
-            #
-        else:
             pass
+        else:
+            print("HiddenLayer::update_weight() = error, no gpu")
+            return
+        #
+        if self._gpu.type==0:
+            self._gpu.copy(self._gpu_weight, self._weight_matrix)
+        elif self._gpu.type==1:
+            self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
         #
 
     def propagate(self, array_in, debug=0):
@@ -385,14 +388,6 @@ class HiddenLayer(Layer):
         if self._gpu.type==0: # OpenCL
             self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
                               self._batch_size, self._num_node, self._num_input, a_mode)
-            #self._gpu.copy(self._output_array, self._gpu_output)
-            #print((self._output_array.shape))
-            #print((self._output_array[0]))
-                    
-            #self._gpu.multiple_x_by_w_batch(array_in, self._gpu_weight, self._gpu_product,
-            #                                self._batch_size, stride_1, stride_2,
-            #                                self._num_input, self._num_node)
-            #self._gpu.sum(self._gpu_product, self._gpu_output, self._num_input, self._num_node, activation, self._batch_size)
             if self._scale==0:
                 pass
             elif self._scale==1:
@@ -467,13 +462,15 @@ class OutputLayer(Layer):
         
     def update_weight(self):
         if self._gpu:
-            if self._gpu.type==0:
-                self._gpu.copy(self._gpu_weight, self._weight_matrix)
-            elif self._gpu.type==1:
-                self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
-            #
-        else:
             pass
+        else:
+            print("OutputLayer::update_weight() = error, no gpu")
+            return
+        #
+        if self._gpu.type==0:
+            self._gpu.copy(self._gpu_weight, self._weight_matrix)
+        elif self._gpu.type==1:
+            self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
         #
         
     def propagate(self, array_in, debug=0):
@@ -1355,6 +1352,7 @@ class Roster:
                 
     def set_data(self, data, data_size, label, batch_size):
         print("Roster::set_data = obsolute")
+        print("    self._gpu.type = %d" %(self._gpu.type))
         if self._gpu:
             pass
         else:
@@ -1393,14 +1391,16 @@ class Roster:
                 return
             #
         elif self._gpu.type==1: # nvidia
+            print("Roster::set_data(), nvidia")
+            print(self._scale_input)
             if self._scale_input==0: # none
                 self._gpu_labels = self._gpu.allocateArray(label)
-                self._gpu_input = self._gpu.allocateArray(data)
+                #self._gpu_input = self._gpu.allocateArray(data)
                 self.input._gpu_output = self._gpu.allocateArray(data)
             elif self._scale_input==1: # scale 0.0 - 1.0
                 self._gpu_labels = self._gpu.allocateArray(label)
                 temp = data / 255.0
-                self._gpu_input = self._gpu.allocateArray(temp)
+                #self._gpu_input = self._gpu.allocateArray(temp)
                 self.input._gpu_output = self._gpu.allocateArray(temp)
             else:
                 return
@@ -1445,7 +1445,10 @@ class Roster:
             self._gpu.copy(self._gpu_input, data_array) # copy(dist, src)
             self._gpu.copy(self.input._gpu_output, self._gpu_input)
         elif self._gpu.type==1: # nvidia
-            self.input._gpu_input = self._gpu.allocateArray(data_array)
+            #print("Roster::direct_set_data(), nvidia")
+            #print(data_array.shape)
+            #self._gpu_input = self._gpu.allocateArray(data_array)
+            self.input._gpu_output = self._gpu.allocateArray(data_array)
         #
     
     def direct_set_label(self, label_array):
@@ -1803,7 +1806,6 @@ class Roster:
         c = self.count_layers()
         pre = self.get_layer_at(0)
         for i in range(1, c):
-            #print(i)
             layer = self.get_layer_at(i)
             layer.propagate(pre._gpu_output, debug)
             #

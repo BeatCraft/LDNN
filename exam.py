@@ -5,16 +5,8 @@
 import os
 import sys
 import time
-#, math
-#from stat import *
-#import random
-#import copy
-#import multiprocessing as mp
 import math
 import numpy as np
-#import cupy as cp
-#import struct
-#import pickle
 
 #
 # LDNN : lesser's Deep Neural Network

@@ -372,19 +372,22 @@ __kernel void normalize_layer(__global float* data, int size)
     }
 }
 
-__kernel void scale_layer(__global float* data, int size)
+__kernel void scale_layer(__global float* data, int size, float scale)
 {
     int bi = get_global_id(0);
     int start = bi*size;
     float max = 0.0;
+    //float k = 0.0;
     
     for (int i=0;i<size;i++){
-        if (data[start+i]>max){
-            max = data[start+i];
+        float k = fabs(data[start+i]);
+        if (k>max){
+            max = k;
         }
     }
     
     if (max>0.0){
+        max = max / scale;
         for (int i=0;i<size;i++){
             data[start+i] = (data[start+i]/max);
         }
@@ -460,7 +463,7 @@ __kernel void cross_entropy(__global const float* infs,
     //printf(\"%d | %f\\n\", bi, output[bi]);
 }
 
-__kernel void p_softmax(__global float* in, int num)
+__kernel void p_softmax(__global float* in, int num, float scale)
 {
     int bi = get_global_id(0);
     float temp = 0.0;
@@ -468,16 +471,21 @@ __kernel void p_softmax(__global float* in, int num)
     int start = bi*num;
 
     for (int i=0;i<num;i++){
-        temp = in[start+i];
+        temp = in[start+i] / scale;
         temp = exp(temp);
         if (isinf(temp)){
+            printf(\"%d, %d :infinity: %f (%f)\\n\", bi, i, temp, in[start+i]);
             temp = 3.402823e+38;
+            //temp = 1;
         }else if (isnan(temp)){
             temp = 0;
         }
         in[start+i] = temp;
         total += temp;
     }
+
+    //printf(\"----- %d : %f\\n\", bi, total);
+    
 
     //for (int i=0;i<num;i++){
     //    in[bi*num+i] = exp(in[bi*num+i]);
@@ -489,12 +497,13 @@ __kernel void p_softmax(__global float* in, int num)
     
     
     //sum += 0.0000001;
-    //printf(\"%d : %f\\n\", bi, sum);
+    //
 
     for (int i=0;i<num;i++){
         //printf(\"%f : %f\\n\", in[bi*num+i], sum);
         in[start+i] = in[start+i]/total;
     }
+    //printf(\"----- %d : %f\\n\", bi, in[start]);
 }
 
 __kernel void k_sum(__global const float* in,
@@ -592,10 +601,16 @@ __kernel void calc_mac_relu(
     int w_start = wsize * xi;
     int y_start = (xsize * bi) + xi;
     float temp = 0.0;
+    //float chk = 0.0;
 
     for (int i=0;i<wsize;i++){
         temp += (x[x_start+i] * w[w_start+i]);
     }
+
+    //chk = exp(temp);
+    //if (isinf(chk)){
+    //    printf(\"%d, %d :infinity: %f\\n\", bi, xi, chk);
+    //}
 
     // activation
     if (temp>=0){
@@ -703,8 +718,8 @@ class OpenCL(gpu.Gpu):
                               data_out, np.int32(size), np.int32(num_node), np.int32(mode))
         event.wait()
     
-    def scale_layer(self, batch_size, data, size):
-        event = self.prg.scale_layer(self._queue, (batch_size,), None, data, np.int32(size))
+    def scale_layer(self, batch_size, data, size, scale=1.0):
+        event = self.prg.scale_layer(self._queue, (batch_size,), None, data, np.int32(size), np.float32(scale))
         event.wait()
         
     def scale_filetr(self, batch_size, filetr_size, data, batch_stride, filetr_stride):
@@ -715,8 +730,8 @@ class OpenCL(gpu.Gpu):
         event = self.prg.normalize_layer(self._queue, (batch_size,), None, data, np.int32(size))
         event.wait()
     
-    def softmax(self, data, size, num_batch): # <<
-        event = self.prg.p_softmax(self._queue, (num_batch,), None, data, np.int32(size))
+    def softmax(self, data, size, num_batch, scale=1.0): # <<
+        event = self.prg.p_softmax(self._queue, (num_batch,), None, data, np.int32(size), np.float32(scale))
         event.wait()
     
     def mse(self, infs, labels, output, num_node, num_batch):

@@ -346,19 +346,24 @@ void calc_relu(float* buf, int size_input, int mode){
 
 cals_layer_scale = cp.RawKernel(r'''
 extern "C" __global__
-void cals_layer_scale(float* x, int size) {
+void cals_layer_scale(float* x, int size, float scale) {
     int x_start = size * blockIdx.x;
-    float temp = 0.0;
-
+    float max = 0.0;
+    //printf("size=%d, scale=%f\n", size, scale);
     for (int i=0;i<size;i++){
-        if (x[x_start+i]>temp){
-            temp = x[x_start+i];
+        //float k = fabs(x[x_start+i]);
+        float k = abs(x[x_start+i]);
+        //printf("x=%f, k=%f\n", x[x_start+i], k);
+        if (k>max){
+            max = k;
         }
     }
 
-    if (temp>0.0){
+    if (max>0.0){
+        //printf("max=%f, scale=%f\n", max, scale);
+        max = max / scale;
         for (int i=0;i<size;i++){
-            x[x_start+i] = x[x_start+i] / temp;
+            x[x_start+i] = x[x_start+i] / max;
         }
     }
 }
@@ -413,37 +418,39 @@ void cals_layer_normalize(float* x, int size) {
 
 calc_softmax = cp.RawKernel(r'''
 extern "C" __global__
-void calc_softmax(const float* x, double* y, int size) {
+void calc_softmax(const float* x, float* y, int size, int scale) {
     int x_start = size * blockIdx.x;
     int y_start = x_start;
-    double temp = 0.0;
-    double total = 0.0;
+    float temp = 0.0;
+    float total = 0.0;
     
     for (int i=0;i<size;i++){
-        temp = x[x_start+i];
-        temp = exp(temp);
+        //temp = x[x_start+i];// scale;
+        temp = exp(x[x_start+i]);
+        //printf("exp(%f)=%f\n", x[x_start+i], temp);
         if (isinf(temp)){
-            //printf("[softmax] inf\n");
+            printf("[softmax] inf : %d :%f\n", i, x[x_start+i]);
             temp = 3.402823e+38;
         }else if (isnan(temp)){
-            //printf("[softmax] nan\n");
+            printf("[softmax] nan\n");
             temp = 0;
         }
         y[y_start+i] = temp;
         total += temp;
+        //printf("total=%f, %d\n", total, size);
     }
 
     for (int i=0;i<size;i++){
-        //double k = y[y_start+i];
+        //printf("y[%d]=%f, %f\n", i, y[y_start+i], y[y_start+i] / total);
         y[y_start+i] = y[y_start+i] / total;
-        //printf("[%d, %d] %f\n", blockIdx.x, i, y[y_start+i]);
+        //printf(">>>> %f\n", y[y_start+i]);
     }
 }
 ''', 'calc_softmax')
 
 calc_entropy = cp.RawKernel(r'''
 extern "C" __global__
-void calc_entropy(const double* x, const float *a, double* y, int size) {
+void calc_entropy(const float* x, const float *a, float* y, int size) {
     int x_start = size * blockIdx.x;
     int a_start = x_start;
     int y_start = blockIdx.x;
@@ -526,8 +533,9 @@ class Dgx(gpu.Gpu):
     def crossEntropy(self, buf_x, buf_l, buf_y, size_batch, size_node):
         calc_entropy((size_batch,), (1,), (buf_x, buf_l, buf_y, size_node))
 
-    def layerScale(self, buf, size_batch, size_node):
-        cals_layer_scale((size_batch,), (1,), (buf, size_node))
+    def layerScale(self, buf, size_batch, size_node, scale):
+        #print("Dgx::layerScale(), scale=%f" % (scale))
+        cals_layer_scale((size_batch,), (1,), (buf, size_node, np.float32(scale)))
     
     def layerNormalize(self, buf, size_batch, size_node):
         cals_layer_normalize((size_batch,), (1,), (buf, size_node))
@@ -549,8 +557,8 @@ class Dgx(gpu.Gpu):
     def macRelu3(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input, act): # 0 : no activation
         calc_mac_relu3((size_batch,), (size_node,), (buf_x, buf_w, buf_y, size_node, size_input, act))
         
-    def softmax(self, buf_x, buf_y, size_batch, size_node):
-        calc_softmax((size_batch,), (1,), (buf_x, buf_y, size_node))
+    def softmax(self, buf_x, buf_y, size_batch, size_node, scale=1):
+        calc_softmax((size_batch,), (1,), (buf_x, buf_y, size_node, scale))
     #
     # cnn
     #

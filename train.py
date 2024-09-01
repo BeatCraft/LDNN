@@ -515,12 +515,14 @@ class Train:
         #
         return ce
     
-    def main_simple_loop(self, loop, idx, ce, loop_max, attack_num, debug=0):
+    def main_simple_loop(self, idx, loop, ce, loop_max, attack_num, save=0, debug=0):
         r = self._r
         w_num = len(self.w_list)
         num = 0
+        num_pre = 0
         hit = 0
-                        
+        hit_pre = 0
+        
         while num<loop_max:
             attack_list = []
             while len(attack_list)<attack_num:
@@ -537,7 +539,12 @@ class Train:
                 #wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
                 layer = r.get_layer_at(w.li)
                 if layer._type==core.LAYER_TYPE_HIDDEN or layer._type==core.LAYER_TYPE_OUTPUT:
-                    wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
+                    if r.wi_mode==3:
+                        wi_alt = core.wi_8020()
+                        #wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
+                    else:
+                        wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
+                    #
                 else:
                     wi_alt = random.randint(0, len(core.CNN_WEIGHT_SET)-1)
                 #
@@ -548,12 +555,16 @@ class Train:
             
             ce_alt = r.evaluate(0)
             if ce_alt<=ce: # keep
-                print(loop, idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce, ">", ce_alt)
+                #print(idx, loop, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce, ">", ce_alt)
+                #print("[%d/%d]" % (num, loop_max), attack_num, "\t", ce, ">", ce_alt)
+                print("[%d/%d] %d : " % (num, loop_max, attack_num), ce, ">", ce_alt)
                 ce = ce_alt
                 ret = 1
                 hit = hit + 1
             else: # undo
-                print(loop, idx, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce)
+                #print(idx, loop, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce)
+                #print("[%d/%d]" % (num, loop_max), attack_num, "\t", ce)
+                print("[%d/%d] %d : " % (num, loop_max, attack_num), ce)
                 for ws in attack_list:
                     widx = ws[0]
                     wi = ws[1]
@@ -563,6 +574,13 @@ class Train:
                     layer.set_weight_index(w.ni, w.ii, wi)
                 #
                 r.update_weight()
+            #
+            if num>0 and num % 100 == 0:
+                print("hit rate:", hit - hit_pre, "/ 100 = ", float((hit - hit_pre)/(100)))
+                print("hit rate:", hit, "/", loop_max, "=", float(hit/loop_max))
+                num_pre = num
+                hit_pre = hit
+                r.save()
             #
             num += 1
         #

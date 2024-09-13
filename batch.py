@@ -62,8 +62,9 @@ class Batch:
             self.mini_batch_idx_list.append(i)
         #
         random.shuffle(self.mini_batch_idx_list)
-        #random.shuffle(self.mini_batch_idx_list)
-        #random.shuffle(self.mini_batch_idx_list)
+        
+    def shuffle_mini_batch(self):
+        random.shuffle(self.mini_batch_idx_list)
     
     def get_batch(self, size, offset=0):
         data_array = np.zeros((size, self.data_size), dtype=np.float32)

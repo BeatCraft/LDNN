@@ -678,7 +678,6 @@ class Train:
                 w = self.w_list[widx]
                 wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
                 w.wi = wi_alt
-                layer = r.get_layer_at(w.li)
                 layer.set_weight_index(w.ni, w.ii, wi_alt)
             #
             r.update_weight()
@@ -688,12 +687,12 @@ class Train:
             #
             ce_alt = r.evaluate(0)
             if ce_alt<=ce: # keep
-                print("[%d, %d/%d] %d : " % (idx, num, iteration, attack_num), ce, ">", ce_alt)
+                print("[%d, %d/%d] %d : " % (idx, iteration, loop_max, attack_num), ce, ">", ce_alt)
                 ce = ce_alt
                 ret = 1
                 hit = hit + 1
             else: # undo
-                print("[%d, %d/%d] %d : " % (idx, num, iteration, attack_num), ce)
+                print("[%d, %d/%d] %d : " % (idx, iteration, loop_max, attack_num), ce)
                 for ws in attack_list:
                     widx = ws[0]
                     wi = ws[1]
@@ -717,6 +716,6 @@ class Train:
             #
             num += 1
         #
-        print("hit rate:", hit, "/", iteration, "=", float(hit/iteration))
+        print("hit rate:", hit, "/", loop_max, "=", float(hit/loop_max))
         r.save()
         return ce

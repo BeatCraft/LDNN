@@ -27,9 +27,11 @@ import util
 #
 # constant values
 #
-WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0, 0.0625, 0.125, 0.25, 0.5, 1.0] # 9
+WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0, 0.0625, 0.125, 0.25, 0.5, 1.0] # 11
+WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0] # 9
+WEIGHT_SET_2 = [-1.0, -0.5, -0.25, -0.125, 0.125, 0.25, 0.5, 1.0] # 8
 #
-WEIGHT_SET = WEIGHT_SET_0
+WEIGHT_SET = WEIGHT_SET_1
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = int(WEIGHT_INDEX_SIZE/2)
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -69,6 +71,33 @@ def wi_8020():
         wi = wmax + i + 1
     else:
         wi = i
+    #
+    return wi
+
+# [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0]
+# 1, 2, 3, 4
+def wi_std():
+    if random.random() < 0.05:
+        wi = WEIGHT_INDEX_ZERO
+        return wi
+    #
+    p = random.random()
+    if p < 0.05:
+        wi = 0
+    elif p >= 0.05 and p < 0.15:
+        wi = 1
+    elif p >= 0.15 and p < 0.30:
+        wi = 2
+    elif p >= 0.30 and p < 0.50:
+        wi = 3
+    elif p >= 0.50 and p < 0.70:
+        wi = 5
+    elif p >= 0.70 and p < 0.85:
+        wi = 6
+    elif p >= 0.85 and p < 0.95:
+        wi = 7
+    else:
+        wi = 8
     #
     return wi
 
@@ -216,10 +245,12 @@ class Layer(object):
             self.set_weight_index(ni, ii, wi)
         elif mode==3: # 8:2
             wi = wi_8020()
-            #print(wi, type(wi))
+            self.set_weight_index(ni, ii, wi)
+        elif mode==4:
+            wi = wi_std()
             self.set_weight_index(ni, ii, wi)
         #
-        
+                    
     def init_weight_with_mode(self, mode=0, value=0):
         #print(self._num_node, self._num_input)
         for ni in range(self._num_node):

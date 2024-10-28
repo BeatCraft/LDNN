@@ -28,7 +28,7 @@ import util
 # constant values
 #
 WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0, 0.0625, 0.125, 0.25, 0.5, 1.0] # 11
-WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0] # 9
+WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0] # 9
 WEIGHT_SET_2 = [-1.0, -0.5, -0.25, -0.125, 0.125, 0.25, 0.5, 1.0] # 8
 #
 WEIGHT_SET = WEIGHT_SET_1
@@ -101,6 +101,31 @@ def wi_std():
     #
     return wi
 
+# [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0]
+
+def wi_std2():
+    p = random.random()
+    if p <= 0.05:
+        wi = 0
+    elif p > 0.05 and p<=0.15:# 0.1
+        wi = 1
+    elif p > 0.15 and p<=0.3:# 0.15
+        wi = 2
+    elif p > 0.3 and p<=0.49:# 0.25
+        wi = 3
+    elif p > 0.49 and p<=0.51:
+        wi = 4 # 0.0
+    elif p > 0.51 and p<=0.7:
+        wi = 5
+    elif p > 0.7 and p<=0.85:
+        wi = 6
+    elif p > 0.85 and p<=0.95:
+        wi = 7
+    elif p > 0.95 and p<=1.0:
+        wi = 8 # 1.0
+    #
+    return wi
+
 class Weight:
     def __init__(self, li, ni, ii, wi, type=-1):
         self.li = li
@@ -110,6 +135,7 @@ class Weight:
         self.wi_alt = wi
         self.mark = 0
         self.type = type
+        #print("Weight::init()")
         
 class Node:
     def __init__(self):
@@ -248,6 +274,9 @@ class Layer(object):
             self.set_weight_index(ni, ii, wi)
         elif mode==4:
             wi = wi_std()
+            self.set_weight_index(ni, ii, wi)
+        elif mode==5:
+            wi = wi_std2()
             self.set_weight_index(ni, ii, wi)
         #
                     

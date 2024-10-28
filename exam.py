@@ -138,3 +138,5 @@ def inference3(r, num_class, data, data_size, debug=0):
     inf = r.get_inference()
     #print(inf)
     return inf
+    
+    

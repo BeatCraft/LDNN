@@ -6,6 +6,13 @@ import sys
 
 ID = 0
 
+#Platform Name: Apple
+#Platform Vendor: Apple
+#    Device Name: Apple M3
+#    Device Type: ALL | GPU
+#    Device Vendor: Apple
+#    Device Version: OpenCL 1.2
+
 # 0 : MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports)
 #     macOS Monterey Version 12.3.1
 #     opencl
@@ -29,7 +36,7 @@ else:
 def getGpu(idx=0):
     if ID==0: # MBP
         platform_id = 0
-        device_id = 1
+        device_id = 0
         # 0 : Intel(R) Core(TM) i7-7660U CPU @ 2.50GH
         # 1 : Intel(R) Iris(TM) Plus Graphics 64
         # 2 : AMD Radeon Pro 580 Compute Engine

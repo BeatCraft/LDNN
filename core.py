@@ -315,6 +315,9 @@ class Layer(object):
     def export_weight_index(self):
         return self._weight_index_matrix.tolist()
     
+    def export_weight_value(self):
+        return self._weight_matrix.tolist()
+    
     def import_weight_index(self, wi_list):
         self._weight_index_matrix = np.array(wi_list, dtype=np.int32).copy()
         for ni in range(self._num_node):
@@ -323,6 +326,8 @@ class Layer(object):
                 self.set_weight_index(ni, ii, wi)
             #
         #
+
+    #def
 
     def set_id(self, id):
         if id>=0:
@@ -380,6 +385,9 @@ class InputLayer(Layer):
         return 0
         
     def export_weight_index(self):
+        return None
+    
+    def export_weight_value(self):
         return None
         
     def count_weight(self):
@@ -1862,34 +1870,37 @@ class Roster:
         #
         return 0.0
 
-    def export_weight(self, path):
-        print(("Roster : export_weight(%s)" % path))
-        self.export_weight_index(path)
-        
-    def export_weight_index(self, path):
+    def export_weight(self, path, mode=0):
+        # mode 0:index, 1:value
+        print(("Roster : export_weight(%s, %d)" % (path, mode))
         with open(path, "w") as f:
             writer = csv.writer(f, lineterminator='\n')
             c = self.count_layers()
             for i in range(1, c):
                 layer = self.get_layer_at(i)
-                data = layer.export_weight_index()
+                if mode==0:
+                    data = layer.export_weight_index()
+
+                elif mode==1:
+                    data = layer.export_weight_index()
+                #
                 if data:
                     writer.writerows(data)
                 #
             #
         #
-    
-    def export_weight_index_by_layer(self, idx):
-        layer = self.get_layer_at(idx)
-        data = layer.export_weight_index()
-        path = "./wi/%d.csv" % (idx)
-        with open(path, "w") as f:
-            writer = csv.writer(f, lineterminator='\n')
-            if data:
-                writer.writerows(data)
-            #
-        #
-    
+        
+   # def export_weight_index_by_layer(self, idx):
+   #     layer = self.get_layer_at(idx)
+   #     data = layer.export_weight_index()
+   #     path = "./wi/%d.csv" % (idx)
+   #     with open(path, "w") as f:
+   #         writer = csv.writer(f, lineterminator='\n')
+   #         if data:
+   #             writer.writerows(data)
+   #         #
+   #    #
+
     def import_weight_index_by_layer(self, idx):
         path = "./wi/%d.csv" % (idx)
         with open(path, "r") as f:

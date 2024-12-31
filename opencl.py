@@ -1,19 +1,121 @@
 #! /usr/bin/python
 # -*- coding: utf-8 -*-
 #
-
 import os
-os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 import sys
-#import time
-#from time import time
 import numpy as np
 import pyopencl as cl
+os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
 import gpu
-#os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
 KERNEL_CODE = """
+__kernel void flatten_2d_to_1d(
+    __global float* buf_in,
+    __global float* buf_out,
+    const int y,
+    const int x,
+    const int divider)
+{
+    int xi = get_global_id(0);   
+        
+    for (int yi=0; yi<y; yi++){
+        buf_out[xi] += buf_in[yi * x + xi];
+    }
+    buf_out[xi] = buf_out[xi] / float(divider);
+}
+
+__kernel void flatten_3d_to_2d(
+    __global float* buf_in,
+    __global float* buf_out,
+    const int z,
+    const int y,
+    const int x,
+    const int divider)
+{
+    int yi = get_global_id(0);   
+    int xi = get_global_id(1);
+        
+    for (int zi=0; zi<z; zi++){
+        buf_out[yi * x + xi] += buf_in[zi * y * x + yi * x + xi];
+    }
+    buf_out[yi * x + xi] = buf_out[yi * x + xi] / float(divider);
+    //printf(\"[%d, %d] %f\\n\", yi, xi, buf_out[yi * x + xi]);
+}
+
+__kernel void bp_hidden_gradient(
+    __global float* buf_out,
+    __global float* buf_gradient_next,
+    __global float* buf_weight,
+    __global float* pad_grad,
+    const int num_node)
+{
+    int bi = get_global_id(0);
+    int ii = get_global_id(0);
+    int ni = get_global_id(1);
+    
+    float delta_next = buf_gradient_next[ni];
+    float w = buf_weight[ii * num_node + ni];
+    float z = buf_out[bi * num_node + ni];
+    float delta = z * (1 - z) * delta_next * w;
+    //printf(\"[%d, %d, %d] %.15f\\n\", bi, ii, ni, delta);
+    //pad_grad[bi * num_input * num_node, ii * num_node + ni] = delta;
+}
+
+__kernel void bp_hidden(
+    __global float* buf_output,
+    __global float* buf_output_pre,
+    __global float* buf_weight,
+    __global float* buf_gradient,
+    __global float* pad_weight,
+    const int num_batch, 
+    const int num_input,
+    const int num_node)
+{
+    int bi = get_global_id(0);
+    int ii = get_global_id(1);
+    int ni = get_global_id(2);
+
+    float grad = buf_gradient[ni];
+    float delta = 0.01 * grad * buf_output_pre[bi * num_node + ni];
+    pad_weight[bi * num_node + ni] = buf_weight[bi * num_node + ni] + delta;
+    //printf(\"[%d, %d, %d] %.15f\\n\", bi, ii, ni, delta);
+}
+
+__kernel void bp_output_softmax_gradient(
+    __global float* buf_label,
+    __global float* buf_softmax,
+    __global float* pad_grad,
+    const int num_node)
+{
+    int bi = get_global_id(0);
+    int ni = get_global_id(1);
+    float label = buf_label[bi * num_node + ni];
+    float z = buf_softmax[bi * num_node + ni];
+    float delta = (label - z) * z * (1-z);
+    pad_grad[bi * num_node + ni] = delta;
+    //printf(\"[%d, %d] %.15f\\n\", bi, ni, delta);
+}
+
+__kernel void bp_output_fc(
+    __global float* buf_output,
+    __global float* buf_output_pre,
+    __global float* buf_weight,
+    __global float* buf_gradient,
+    __global float* pad_weight,
+    const int num_batch, 
+    const int num_input,
+    const int num_node)
+{
+    int bi = get_global_id(0);
+    int ii = get_global_id(1);
+    int ni = get_global_id(2);
+    
+    float delta = buf_gradient[ni];
+    float v = 0.01 * delta * buf_output_pre[bi * num_input + ii];
+    float w = buf_weight[ni * num_input + ii];
+    pad_weight[bi * num_node * num_input + ni * num_input + ii] = w + v;
+}
 
 __kernel void get_std(
     __global float* buf,
@@ -676,6 +778,43 @@ class OpenCL(gpu.Gpu):
     #
     #
 
+    #
+    # back propagation
+    #
+    def flatten_2d_to_1d(self, buf_in, buf_out, y, x, divider):
+        event = self.prg.flatten_2d_to_1d(self._queue, (x,), None,
+            buf_in, buf_out, np.int32(y), np.int32(x), np.int32(y))
+        event.wait()
+        
+    def flatten_3d_to_2d(self, buf_in, buf_out, z, y, x, divider):
+        event = self.prg.flatten_3d_to_2d(self._queue, (y, x,), None,
+            buf_in, buf_out, np.int32(z), np.int32(y), np.int32(x), np.int32(z))
+        event.wait()
+
+    def bp_hidden_gradient(self, buf_out, buf_gradient_next, buf_weight, pad_grad, num_batch, num_input, num_node):
+        event = self.prg.bp_hidden_gradient(self._queue, (num_input, num_node), None, buf_out, buf_gradient_next, buf_weight, pad_grad, np.int32(num_node))
+        event.wait()
+    
+    def bp_hidden(self, buf_output, buf_output_pre, buf_weight, buf_gradient, pad_weight, num_batch, num_input, num_node):
+        event = self.prg.bp_hidden(self._queue, (num_batch, num_input, num_node), None,
+            buf_output, buf_output_pre, buf_weight, buf_gradient, pad_weight,
+            np.int32(num_batch), np.int32(num_input), np.int32(num_input))
+        event.wait()
+    
+    def bp_output_softmax_gradient(self, buf_label, buf_softmax, pad_grad, num_batch, num_input, num_node):
+        event = self.prg.bp_output_softmax_gradient(self._queue, (num_batch, num_node), None,
+            buf_label, buf_softmax, pad_grad, np.int32(num_node))
+        event.wait()
+        
+    def bp_output_fc(self, buf_output, buf_output_pre, buf_weight, pad_weight, pad_grad, num_batch, num_input, num_node):
+        event = self.prg.bp_output_fc(self._queue, (num_batch, num_input, num_node), None,
+            buf_output, buf_output_pre, buf_weight, pad_weight, pad_grad,
+            np.int32(num_batch), np.int32(num_input), np.int32(num_node))
+        event.wait()
+    #
+    #
+    #
+    
     def scale_exp(self, d_x, d_y, stride, row, batch_size, debug):
         event = self.prg.scale_exp(self._queue, (row, batch_size), None,
                                d_x, d_y, np.int32(stride), np.int32(debug))

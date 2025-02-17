@@ -43,12 +43,28 @@ class Batch:
         print(type(data), size)
         return data, size
     
-    def prepare_batch(self, scale=True):
+    def prepare_batch(self, scale=True, quantize=False):
         self.label_array = np.zeros((self.batch_size, self.class_num), dtype=np.float32)
         for i in range(self.batch_size):
             # scale to 0.0 - 1.0
             if scale==True:
                 self.data_array[i] = self.data_array[i] / 255.0
+                if quantize:
+                    size = self.data_array[i].shape[0]
+                    for j in range(size):
+                        q = self.data_array[i][j]
+                        if q>=0.0 and q<=0.125:
+                            q = 0.0
+                        elif q>0.125 and q<=0.375:
+                            q = 0.25
+                        elif q>0.375 and q<=0.75:
+                            q = 0.5
+                        elif q>0.75 and q<=1.0:
+                            q = 1.0
+                        #
+                        self.data_array[i][j] = q
+                    # for j
+                #
             #
             k = int(self.label_list[i])
             self.label_array[i][k] = 1.0

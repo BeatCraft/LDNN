@@ -550,7 +550,20 @@ __kernel void scale_layer(__global float* data, int size, float scale)
     if (max>0.0){
         max = max / scale;
         for (int i=0;i<size;i++){
-            data[start+i] = (data[start+i]/max);
+            //
+            //data[start+i] = (data[start+i]/max);
+            //
+            float k = data[start+i]/max;
+            if (k>=0.0 && k<0.125){
+                k = 0.0;
+            }else if (k>0.125 && k<=0.375){
+                k = 0.25;
+            }else if (k>0.375 && k<=0.75){
+                k = 0.5;
+            }else if (k>0.75 && k<=1.0){
+                k = 1.0;
+            }
+            data[start+i] = k;
         }
     }
 }
@@ -641,33 +654,16 @@ __kernel void p_softmax(
         if (isinf(temp)){
             printf(\"%d, %d :infinity: %f (%f)\\n\", bi, i, temp, in[start+i]);
             temp = 3.402823e+38;
-            //temp = 1;
         }else if (isnan(temp)){
             temp = 0;
         }
-        //in[start+i] = temp;
         out[start+i] = temp;
         total += temp;
     }
 
-    //printf(\"----- %d : %f\\n\", bi, total);
-    //for (int i=0;i<num;i++){
-    //    in[bi*num+i] = exp(in[bi*num+i]);
-    //}
-    //
-    //for (int i=0;i<num;i++){
-    //    sum += in[bi*num+i];
-    //}
-    
-    
-    //sum += 0.0000001;
-    //
-
     for (int i=0;i<num;i++){
-        //printf(\"%f : %f\\n\", in[bi*num+i], sum);
         out[start+i] = out[start+i]/total;
     }
-    //printf(\"----- %d : %f\\n\", bi, in[start]);
 }
 
 __kernel void k_sum(__global const float* in,
@@ -768,9 +764,11 @@ __kernel void calc_mac_relu(
     //float chk = 0.0;
 
     for (int i=0;i<wsize;i++){
+        //printf(\"(%d, %d) = %f, %f\\n\", bi, xi, x[x_start+i], w[w_start+i]);
         temp += (x[x_start+i] * w[w_start+i]);
     }
-
+    
+        
     //chk = exp(temp);
     //if (isinf(chk)){
     //    printf(\"%d, %d :infinity: %f\\n\", bi, xi, chk);
@@ -779,7 +777,11 @@ __kernel void calc_mac_relu(
     // activation
     if (temp>=0){
         y[y_start] = temp;
+        //
+        // 0.0, 0.125, 0.25, 0.5, 1.0
+        //
     }else{
+        //printf(\"(%d, %d) < 0.0\\n\", bi, xi);
         if (act==0){ // no
             y[y_start] = temp;
         }else if (act==1){ // relu

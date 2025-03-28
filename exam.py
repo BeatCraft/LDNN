@@ -29,52 +29,63 @@ def print_result(ca, eval_size, num_class, dist, rets, oks):
     #
     print("---------------------------------")
     
-def classification(r, data_size, num_class, batch_size, batch_image, batch_label, n, debug=0, single=0):
+#def classification(r, data_size, num_class, batch_size, batch_image, batch_label, n, debug=0, single=0):
+
+def classification(r, b, n, debug=0, single=0):
+    data_size = b.data_size
+    num_class = b.class_num
+    batch_size = b.batch_size
+    
+    print("== classification test ==")
+    print("total size", batch_size)
+    print("mini batch size", n)
+    if single==1:
+        print("single test")
+    #
+    
+    mini_batch_num = int(batch_size / n) #mini_batch_size)
+    print("mini_batch_num", mini_batch_num)
     
     dist = np.zeros(num_class, dtype=np.int32)
     rets = np.zeros(num_class, dtype=np.int32)
     oks = np.zeros(num_class, dtype=np.int32)
-    print((">>test(%d) = %d" % (n, batch_size)))
-    print(num_class)
-    it, left = divmod(batch_size, n)
     
     # for single test
     if single==1:
         it = 1
         n = 1
+        left = 0
+        #b.batch_size = 1
+    else:
+        it, left = divmod(batch_size, n)
     #
-    
     if left>0:
         print(("error : n(=%d) is not appropriate" % (n)))
     #
-    #start_time = time.time()
+    
     elapsed_time = 0.0
-    #
-    r.prepare(n, data_size, num_class)
-    data_array = np.zeros((n, data_size), dtype=np.float32)
-    class_array = np.zeros(n, dtype=np.int32)
+    #r.prepare(n, data_size, num_class)
     for i in range(it):
-        for j in range(n):
-            data_array[j] = batch_image[i*n+j]
-            class_array[j] = batch_label[i*n+j]
+        data_array, label_array = b.get_mini_batch(i*n)
         #
+        #print("data_array", data_array.shape, i*n)
+        
         r.reset()
-        r.set_batch(data_size, num_class, data_array, class_array, n, 0)
+        r.direct_set_data(data_array)
+        r.direct_set_label(label_array)
+        
         start_time = time.time()
-        #print("test 0")
         r.propagate(debug)
         elapsed_time += (time.time() - start_time)
-        #
-        #print("test 1")
         #infs = r.get_inference()
         answers = r.get_answer()
         #print(answers)
+        
         for j in range(n):
             ans = answers[j]
-            label = class_array[j]
+            label = np.argmax(label_array[j])
             rets[ans] = rets[ans] + 1
             dist[label] = dist[label] + 1
-            #print("%d, %d" % (ans, label))
             if ans == label:
                 oks[ans] = oks[ans] + 1
             #

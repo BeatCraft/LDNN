@@ -43,7 +43,7 @@ CNN_WEIGHT_SET_3 = [0.0, 1.0]
 CNN_WEIGHT_SET_4 = [-0.25, -0.125, 0.0, 0.125, 0.25, 0.5]
 CNN_WEIGHT_SET_5 = [-0.5, 0.0, 0.5]
 
-CNN_WEIGHT_SET = WEIGHT_SET_0#CNN_WEIGHT_SET_4
+CNN_WEIGHT_SET = WEIGHT_SET_0 # CNN_WEIGHT_SET_4
 CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
 CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
 CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
@@ -164,7 +164,7 @@ class Layer(object):
     # num_input : number of inputs / outputs from a previous layer
     # node : neurons
     # num_node  : numbers of neurons in a layer
-    def __init__(self, i, type, num_input, num_node, pre, gpu=None):
+    def __init__(self, i, type, num_input, num_node, pre, gpu=None, mode_q=0):
         self._pre = None
         self._next = None
         self._pre = pre
@@ -182,6 +182,7 @@ class Layer(object):
         self._id = -1
         self._num_input = num_input
         self._num_node = num_node
+        self.mode_q = mode_q
         
     def count_weight(self):
         return self._num_node*self._num_input
@@ -221,7 +222,12 @@ class Layer(object):
         self._weight_index_matrix[ni][ii] = wi
         try:
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
-                self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
+                if self.mode_q==0:
+                    self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
+                elif self.mode_q==1:
+                    #self._weight_matrix[ni][ii] = wi
+                    self._weight_index_matrix[ni][ii] = wi
+                #
             elif self._type==LAYER_TYPE_CONV or self._type==LAYER_TYPE_FCNN:
                 self._weight_matrix[ni][ii] = CNN_WEIGHT_SET[wi]
             elif self._type==LAYER_TYPE_FCNN2:
@@ -360,7 +366,12 @@ class InputLayer(Layer):
         
     def prepare(self, batch_size):
         self._batch_size = batch_size
-        self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+        
+        if self.mode_q==0:
+            self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+        elif self.mode_q==1:
+            self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.uint8)
+        #
         if self._gpu:
             if self._gpu.type==0:
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
@@ -407,71 +418,58 @@ class HiddenLayer(Layer):
         print("HiddenLayer::__init__(%d, %d)" % (num_input, num_node))
         super(HiddenLayer, self).__init__(i, LAYER_TYPE_HIDDEN, num_input, num_node, pre, gpu)
         
-        self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
-        
-        #self.gradient = np.zeros((self._num_node, self._num_input), dtype=np.float32)
-        self.gradient = np.zeros(self._num_node, dtype=np.float32)
-        
-        #self.grad = np.zeros(self._num_node, dtype=np.float32)
-        #self.gpu_grad = self._gpu.dev_malloc(self.grad)
-        #self.grad_matrix = np.zeros((self._num_input, self._num_node), dtype=np.float32)
-        #self.gpu_grad = self._gpu.dev_malloc(self.grad_matrix)
-        
-        if self._gpu:
-            if self._gpu.type==0:
-                self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
-                self.gpu_gradient = self._gpu.dev_malloc(self.gradient)
-            elif self._gpu.type==1:
-                self._gpu_weight = self._gpu.allocateArray(self.grad)
-            #
-        else:
-            print("error")
-        #
         self._scale = 3 # scale only
         self.rate = 0.001
-        
+        if self._gpu:
+            pass
+        else:
+            print("error : no gpu")
+            return
+        #
+                
     def set_scale(self, mode):
         self._scale = mode
         
     def get_scale(self, mode):
-        return self._scale
         # 0 : none
         # 1 : layer normalize
         # 2 : batch normalize
         # 3 : max scale
-    
-    #def reset(self):
-    #    if self._gpu:
-    #        pass
-    #    else:
-    #        print("HiddenLayer::reset() = error, no gpu")
-    #        return
-    #    #
-    #    self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-    #    if self._gpu.type==0:
-    #        self._gpu_output = self._gpu.dev_malloc(self._output_array)
-    #    elif self._gpu.type==1:
-    #        self._gpu_output = self._gpu.allocateArray(self._output_array)
-    #    #
-    
+        return self._scale
+
     def prepare(self, batch_size):
-        print("HiddenLayer::prepare(%d)" % (batch_size))
+        print("HiddenLayer::prepare(%d), %d" % (batch_size, self.mode_q))
         self._batch_size = batch_size
-        self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-        if self._gpu:
-            pass
-        else:
-            print("HiddenLayer::prepare() = error, no gpu")
-            return
-        #
+        
         if self._gpu.type==0:
-            self._gpu_output = self._gpu.dev_malloc(self._output_array)
-            
-            self.weight_pad = np.zeros((self._batch_size, self._num_node, self._num_input), dtype=np.float32)
-            self.gpu_weight_pad = self._gpu.dev_malloc(self.weight_pad)
-            
+            if self.mode_q==0:
+                self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+                self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+                self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+                    
+                self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+                self._gpu_output = self._gpu.dev_malloc(self._output_array)
+                    
+                # temporaly, here for SGD tests
+                self.gradient = np.zeros(self._num_node, dtype=np.float32)
+                self.gpu_gradient = self._gpu.dev_malloc(self.gradient)
+                self.weight_pad = np.zeros((self._batch_size, self._num_node, self._num_input), dtype=np.float32)
+                self.gpu_weight_pad = self._gpu.dev_malloc(self.weight_pad)
+            elif self.mode_q==1:
+                self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+                #print(self._weight_index_matrix)
+                #print("C_CONTIGUOUS", self._weight_index_matrix.flags['C_CONTIGUOUS'] )
+                self._gpu_weight = self._gpu.dev_malloc(self._weight_index_matrix)
+                print(self._gpu_weight)
+                
+                self.mac_array = np.zeros( (self._batch_size, self._num_node), dtype=np.float32)
+                self._gpu_mac = self._gpu.dev_malloc(self.mac_array)
+                                                        
+                self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.uint8)
+                self._gpu_output = self._gpu.dev_malloc(self._output_array)
+            #
         elif self._gpu.type==1:
+            self._gpu_weight = self._gpu.allocateArray(self.grad)
             self._gpu_output = self._gpu.allocateArray(self._output_array)
         #
 
@@ -483,7 +481,13 @@ class HiddenLayer(Layer):
             return
         #
         if self._gpu.type==0:
-            self._gpu.copy(self._gpu_weight, self._weight_matrix)
+            if self.mode_q==0:
+                self._gpu.copy(self._gpu_weight, self._weight_matrix)
+            elif self.mode_q==1:
+                #print(self._gpu_weight)
+                #print(type(self._weight_index_matrix[0][0]))
+                self._gpu.copy(self._gpu_weight, self._weight_index_matrix)
+            #
         elif self._gpu.type==1:
             self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
         #
@@ -511,57 +515,56 @@ class HiddenLayer(Layer):
         a_mode = 1
         
         if self._gpu.type==0: # OpenCL
-            #print(self._index, "@@@@@@@@ weight_matrix - 0")
-            #self._gpu.copy(self._weight_matrix, self._gpu_weight)
-            #print((self._weight_matrix[0]))
-            #print(self._index, "@@@@@@@@ output - 0")
-            #self._gpu.copy(self._output_array, self._gpu_output)
-            #print((self._output_array[0]))
-            
-            #print(self._index, "@@@@@@@@ pre.output")
-            #self._gpu.copy(self._pre._output_array, self._pre._gpu_output)
-            #print((self._pre._output_array[0]))
-            
-            self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
-                              self._batch_size, self._num_node, self._num_input, a_mode)
-            #print(self._index, "@@@@@@@@ weight_matrix - 1")
-            #self._gpu.copy(self._weight_matrix, self._gpu_weight)
-            #print((self._weight_matrix[0]))
-            
-            #print(self._index, "@@@@@@@@ output 1")
-            #self._gpu.copy(self._output_array, self._gpu_output)
-            #print((self._output_array[0]))
-            
-            if self._scale==0:
-                pass
-            elif self._scale==1:
-                self._gpu.normalize_layer(self._gpu_output, self._batch_size, self._num_node)
-            elif self._scale==2:
-                self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._num_input, self._num_node)
-            elif self._scale==3: # quantization test of Relu()
-                self._gpu.scale_layer(self._batch_size, self._gpu_output, self._num_node, 1.0)
-            elif self._scale==4:
-                self._gpu.normalize_layer(self._gpu_output, self._batch_size, self._num_node)
-                self._gpu.scale_layer(self._batch_size, self._gpu_output, self._num_node)
-            #
-            
-            #self._gpu.copy(self._weight_matrix, self._gpu_weight)
-            #self._gpu.copy(self._output_array, self._gpu_output)
-                            
-            if debug:
-                print("scale", self._scale)
-                print(self._index, "hidden, input")
-                tarray = np.zeros((self._batch_size, self._num_input), dtype=np.float32)
-                self._gpu.copy(tarray, array_in)
-                print((tarray[0]))
+            if self.mode_q==0:
+                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
+                if self._scale==0:
+                    pass
+                elif self._scale==1:
+                    self._gpu.normalize_layer(self._gpu_output, self._batch_size, self._num_node)
+                elif self._scale==2:
+                    self._gpu.normalize_batch(self._gpu_output, self._batch_size, self._num_input, self._num_node)
+                elif self._scale==3: # quantization test of Relu()
+                    self._gpu.scale_layer(self._batch_size, self._gpu_output, self._num_node, 1.0)
+                elif self._scale==4:
+                    self._gpu.normalize_layer(self._gpu_output, self._batch_size, self._num_node)
+                    self._gpu.scale_layer(self._batch_size, self._gpu_output, self._num_node)
+                #
                 
-                print(self._index, "hidden, output")
-                #self._gpu.copy(self._output_array, self._gpu_output)
-                print((self._output_array[0]))
+                if debug:
+                    print("scale", self._scale)
+                    print(self._index, "hidden, input")
+                    tarray = np.zeros((self._batch_size, self._num_input), dtype=np.float32)
+                    self._gpu.copy(tarray, array_in)
+                    print((tarray[0]))
+                    print(self._index, "hidden, output")
+                    print((self._output_array[0]))
+                    print("hidden, weight", self._weight_matrix.shape)
+                    print((self._weight_matrix[0]))
+                #
+            elif self.mode_q==1:
+                #self._gpu.macReluQ(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
+                # mac + sum
+                self._gpu.macReluQ(array_in, self._gpu_weight, self._gpu_mac, self._batch_size, self._num_node, self._num_input, a_mode)
+                self._gpu.q_hidden_output(self._gpu_mac, self._gpu_output, self._num_node, self._batch_size)
+                # quantize output
                 
-                print("hidden, weight", self._weight_matrix.shape)
-                #self._gpu.copy(self._weight_matrix, self._gpu_weight)
-                print((self._weight_matrix[0]))
+                if debug:
+                    #print(self._index, "hidden, weight")
+                    #print(self._weight_index_matrix)
+                
+                    #tarray = np.zeros((self._batch_size, self._num_input), dtype=np.uint8)
+                    #self._gpu.copy(tarray, array_in)
+                    #print(self._index, "hidden, input")
+                    #print((tarray[0]))
+                                    
+                    self._gpu.copy(self._output_array, self._gpu_output)
+                    print(self._index, "hidden, output")
+                    print(self._output_array[0])
+                    
+                    #self._gpu.copy(self.mac_array, self._gpu_mac)
+                    #print(self._index, "hidden, output")
+                    #print(self.mac_array[0])
+                #
             #
         elif self._gpu.type==1: # DGX
             self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
@@ -582,12 +585,6 @@ class HiddenLayer(Layer):
         #
     
     def backpropagate2(self, label, debug=0):
-        #print("HiddenLayer::backpropagate2()", self._index)
-        #print("self._output_array", self._output_array.shape)
-        #print(self._output_array[0])
-        #print("self._weight_matrix", self._weight_matrix.shape)
-        #print(self._weight_matrix[0])
-        
         # pad
         grad3_array = np.zeros((self._batch_size, self._next._num_node, self._num_node), dtype=np.float32)
         pad_grad3 = self._gpu.dev_malloc(grad3_array)
@@ -600,38 +597,14 @@ class HiddenLayer(Layer):
 
         # gradient
         self._gpu.bp_hidden_gradient(self._gpu_output, self._next.gpu_gradient, self._gpu_weight, pad_grad3, self._batch_size, self._num_node, self._next._num_node)
-        #self._gpu.copy(grad3_array, pad_grad3)
-        #print("print(grad3_array)", grad3_array.shape)
-        #print(grad3_array[0][0])
-        
         self._gpu.flatten_3d_to_2d(pad_grad3, pad_grad2, self._batch_size, self._next._num_node, self._num_node, self._batch_size)
-        #self._gpu.copy(grad2_array, pad_grad2)
-        #print("print(grad2_array)", grad2_array.shape)
-        #print(grad2_array[0])
-        #for i in range(10):
-        #    print(grad2_array[i][0])
-        #
-        #print(self._next._num_node)
-        
         self._gpu.flatten_2d_to_1d(pad_grad2, self.gpu_gradient, self._next._num_node, self._num_node, 1)
         self._gpu.copy(self.gradient, self.gpu_gradient)
-        #print("print(self.gradient)", self.gradient.shape)
-        #print(self.gradient)
-        
 
-        #print("self._output_array", self._output_array.shape)
-        #self._pre._gpu_output
-        #print(self._pre._index)
-        #print("self._pre._output_array", self._pre._output_array.shape)
-        
         # weight
-        #self._weight_index_matrix = np.zeros( (self._num_node, self._num_input),
-        #
         self._gpu.bp_hidden(self._gpu_output, self._pre._gpu_output, self._gpu_weight, self.gpu_gradient, pad_weight3, self._batch_size, self._num_node, self._num_input)
         self._gpu.flatten_3d_to_2d(pad_weight3, self._gpu_weight, self._batch_size, self._num_node, self._num_input, self._batch_size)
         self._gpu.copy(self._weight_matrix, self._gpu_weight)
-        #print("weight_matrix", self._weight_matrix.shape)
-        #print(self._weight_matrix[0])
     
     def bp_gradient(self, gpu_mode, debug=0):
         if debug:
@@ -669,8 +642,6 @@ class HiddenLayer(Layer):
             self._gpu.flatten_3d_to_2d(pad_grad3, pad_grad2, self._batch_size, self._next._num_node, self._num_node, self._batch_size)
             
             self._gpu.flatten_2d_to_1d(pad_grad2, self.gpu_gradient, self._next._num_node, self._num_node, 1)
-            
-            #self._gpu.copy(self.gradient, self.gpu_gradient)
             if debug:
                 print("*** output", self._output_array.shape)
                 print(self._output_array[0])
@@ -711,33 +682,17 @@ class HiddenLayer(Layer):
             self._gpu.bp_hidden(self._gpu_output, self._pre._gpu_output, self._gpu_weight, self.gpu_gradient, self.gpu_weight_pad, self._batch_size, self._num_node, self._num_input)
             
             self._gpu.flatten_3d_to_2d(self.gpu_weight_pad, self._gpu_weight, self._batch_size, self._num_node, self._num_input, self._batch_size)
-            
-            #self._gpu.copy(self._weight_matrix, self._gpu_weight)
-            #self._gpu.copy(self._output_array, self._gpu_output)
-                            
             if debug:
-                #self._gpu.copy(self._weight_matrix, self._gpu_weight)
                 print(self._index, "weight_matrix", self._weight_matrix.shape)
                 print(self._weight_matrix[0])
-                
-                #self._gpu.copy(self._output_array, self._gpu_output)
                 print("********* output", self._output_array.shape)
                 print(self._output_array[0])
             #
         #
     
     def backpropagate(self, label, debug=0):
-        #print("HiddenLayer::backpropagate()", self._index)
-        #print("HiddenLayer::backpropagate()")
-        #self._gpu.copy(self._output_array, self._gpu_output)
-        #print(self._output_array[0])
-        #self._gpu.copy(self._pre._output_array, self._pre._gpu_output)
-        #print("self._weight_matrix", self._weight_matrix.shape)
-        #print(self._weight_matrix[0])
-                            
         pad_grad = np.zeros((self._num_node), dtype=np.float32)
         for bi in range(self._batch_size):
-            #print(self._output_array[m])
             for ni in range(self._num_node):
                 y = self._output_array[bi][ni]
                 d_sum = 0.0
@@ -746,34 +701,16 @@ class HiddenLayer(Layer):
                     delta_next = self._next.gradient[nni]
                     delta = y * (1 - y) * delta_next * w
                     d_sum = d_sum + delta
-                    #pad_grad[ni] = delta
-                    #if  nni==0 and ni==0:
-                    #if ni==0:
-                    #    print("y:", y)
-                    #    print("w:", w)
-                    #    print("delta_next:", delta_next)
-                    #    print(nni, "delta:", delta)
-                    #
                 #
                 self.gradient[ni] = d_sum
-                #print(bi, ni, y, self.gradient[ni])
             #
         #
         
         self.gradient = self.gradient / self._batch_size
-        #print("gradient", self.gradient.shape, self._batch_size)
-        #print(self.gradient)
-        
-        #print("w[1][0]=", self._weight_matrix[1][0])
-        #
-        #self._weight_index_matrix = np.zeros( (self._num_node, self._num_input),
-        #
         for m in range(self._batch_size):
             for k in range(self._num_node):
-                #delta = self.gradient[k]
                 for j in range(self._num_input):
                     v = self.rate * self.gradient[k] * self._pre._output_array[m][k]
-                    #v = 0.01 * self.gradient[k] * self._output_array[m][k]
                     w = self._weight_matrix[k][j]
                     self._weight_matrix[k][j] = w + v
                     if w + v < -1.0:
@@ -786,83 +723,77 @@ class HiddenLayer(Layer):
         #
         self._weight_matrix = self._weight_matrix / self._batch_size
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
-        #
-        #print("weight_matrix", self._weight_matrix.shape)
-        #print(self._weight_matrix[0])
         
 class OutputLayer(Layer):
-    def __init__(self, i, num_input, num_node, pre, gpu=None):#, mode=0):
+    def __init__(self, i, num_input, num_node, pre, gpu=None):
         print("OutputLayer::__init__()")
-        super(OutputLayer, self).__init__(i, LAYER_TYPE_OUTPUT, num_input, num_node, pre, gpu)#, mode)
-        #
-        self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
-        self._weight_matrix = np.zeros((self._num_node, self._num_input), dtype=np.float32)
-        
-        self.gradient = np.zeros(self._num_node, dtype=np.float32)
-        self.gpu_gradient = self._gpu.dev_malloc(self.gradient)
-        
-        #self.gradient = np.zeros(self._num_node, dtype=np.float32)
-        #pad_weight = np.zeros((self._num_node, self._num_input), dtype=np.float32)
-        
-        #self.grad_matrix = np.zeros((self._num_node, self._num_input), dtype=np.float32)
-        #self.gpu_grad = self._gpu.dev_malloc(self.grad_matrix)
+        super(OutputLayer, self).__init__(i, LAYER_TYPE_OUTPUT, num_input, num_node, pre, gpu)
                 
         if self._gpu:
-            if self._gpu.type==0:
-                self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
-            elif self._gpu.type==1:
-                self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
-            #
+            pass
+        else:
+            print("error : no gpu")
         #
         self.softmax_scale = 1.0
         self.rate = 0.01
         
     def set_softmax_scale(self, scale):
         self.softmax_scale = scale
-
-    #def reset(self):
-    #    if self._gpu:
-    #        pass
-    #    else:
-    #        print("HiddenLayer::OutputLayer() = error, no gpu")
-    #        return
-    #    #
-    #    self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-    #    if self._gpu.type==0:
-    #        self._gpu_output = self._gpu.dev_malloc(self._output_array)
-    #    elif self._gpu.type==1:
-    #        self._gpu_output = self._gpu.allocateArray(self._output_array)
-    #        self._gpu_softmax = self._gpu.allocateArray(self._softmax_array)
-    #    #
         
     def prepare(self, batch_size):
-        print("OutputLayer::prepare(%d)" % (batch_size))
+        print("OutputLayer::prepare(%d), %d" % (batch_size, self.mode_q))
         self._batch_size = batch_size
-        self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-        self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-        if self._gpu:
-            if self._gpu.type==0:
+        
+        if self._gpu.type==0:
+            if self.mode_q==0:
+                self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+                
+                self._weight_matrix = np.zeros((self._num_node, self._num_input), dtype=np.float32)
+                self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+                
+                self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
-                self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
-            elif self._gpu.type==1:
-                print("output : nvidia")
+                                
                 self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
-                self._gpu_output = self._gpu.allocateArray(self._output_array)
-                self._gpu_softmax = self._gpu.allocateArray(self._softmax_array)
+                self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
+                
+                # temporaly, here
+                self.gradient = np.zeros(self._num_node, dtype=np.float32)
+                self.gpu_gradient = self._gpu.dev_malloc(self.gradient)
+            elif self.mode_q==1:
+                self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
+                #self._weight_matrix = np.zeros((self._num_node, self._num_input), dtype=np.float32)
+                self._gpu_weight = self._gpu.dev_malloc(self._weight_index_matrix)
+                
+                self.mac_array = np.zeros( (self._batch_size, self._num_node), dtype=np.float32)
+                self._gpu_mac = self._gpu.dev_malloc(self.mac_array)
+                
+                self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+                self._gpu_output = self._gpu.dev_malloc(self._output_array)
+                
+                self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+                self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
             #
-        else:
-            pass
+        elif self._gpu.type==1:
+            print("output : nvidia")
+            self._weight_matrix = np.zeros((self._num_node, self._num_input), dtype=np.float32)
+            self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
+            
+            self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
+            self._gpu_output = self._gpu.allocateArray(self._output_array)
+            
+            #self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+            self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
+            self._gpu_softmax = self._gpu.allocateArray(self._softmax_array)
         #
         
     def update_weight(self):
-        if self._gpu:
-            pass
-        else:
-            print("OutputLayer::update_weight() = error, no gpu")
-            return
-        #
         if self._gpu.type==0:
-            self._gpu.copy(self._gpu_weight, self._weight_matrix)
+            if self.mode_q==0:
+                self._gpu.copy(self._gpu_weight, self._weight_matrix)
+            elif self.mode_q==1:
+                self._gpu.copy(self._gpu_weight, self._weight_index_matrix)
+            #
         elif self._gpu.type==1:
             self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
         #
@@ -881,29 +812,37 @@ class OutputLayer(Layer):
             print("OutputLayer::propagate() = error, no gpu")
         #
         if self._gpu.type==0: # OpenCL
-            self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
+            if self.mode_q==0:
+                self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
                               self._batch_size, self._num_node, self._num_input, 0)
-            self._gpu.copy(self._output_array, self._gpu_output)
-            
-            #if debug:
-            #print("output:mac")
-            #self._gpu.copy(self._output_array, self._gpu_output)
-            #print((self._output_array[0]))
-            #
-            
-            #self._gpu.scale_layer(self._batch_size, self._gpu_output, self._num_node, 4.0)
-            #if debug:
-            #   print("output:scaled")
-            #   self._gpu.copy(self._output_array, self._gpu_output)
-            #   print((self._output_array[0]))
-            #
-            
-            self._gpu.softmax(self._gpu_output, self._gpu_softmax, self._num_node, self._batch_size, self.softmax_scale)
-            # this copy is needed for numpy bp
-            self._gpu.copy(self._softmax_array, self._gpu_softmax)
-            if debug:
-                print("softmax", self._softmax_array[0].sum())
-                print(self._softmax_array[0])
+                self._gpu.copy(self._output_array, self._gpu_output)
+                self._gpu.softmax(self._gpu_output, self._gpu_softmax, self._num_node, self._batch_size, self.softmax_scale)
+                # this copy is needed for numpy bp
+                self._gpu.copy(self._softmax_array, self._gpu_softmax)
+                if debug:
+                    print("softmax", self._softmax_array[0].sum())
+                    print(self._softmax_array[0])
+                #
+            elif self.mode_q==1:
+                a_mode = 0
+                #self._gpu.macReluQ(array_in, self._gpu_weight, self._gpu_mac, self._batch_size, self._num_node, self._num_input, a_mode)
+                #self._gpu.softmax(self._gpu_mac, self._gpu_softmax, self._num_node, self._batch_size, self.softmax_scale)
+                self._gpu.macReluQ(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
+                self._gpu.softmax(self._gpu_output, self._gpu_softmax, self._num_node, self._batch_size, self.softmax_scale)
+                
+                if debug:
+                    #self._gpu.copy(self.mac_array, self._gpu_mac)
+                    #print(self._index, "output, mac")
+                    #print(self.mac_array[0])
+                    
+                    self._gpu.copy(self._output_array, self._gpu_output)
+                    print(self._index, "output, mac")
+                    print(self.mac_array[0])
+                
+                    self._gpu.copy(self._softmax_array, self._gpu_softmax)
+                    print("output, softmax", self._softmax_array[0].sum())
+                    print(self._softmax_array[0])
+                #
             #
         elif self._gpu.type==1: # DGX
             self._gpu.macRelu3(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, 0)
@@ -929,18 +868,9 @@ class OutputLayer(Layer):
     
     def backpropagate2(self, label, debug=0):
         #print("OutputLayer::backpropagate()")
-        
-        #self._gpu.copy(self._weight_matrix, self._gpu_weight)
-        #print("weight_matrix", self._weight_matrix.shape)
-        #print(self._weight_matrix[0])
         buf_label = self._gpu.dev_malloc(label)
-        #buf_softmax = self._gpu.dev_malloc(self._softmax_array)
-        #buf_output = self._gpu.dev_malloc(self._output_array)
         buf_output_pre = self._gpu.dev_malloc(self._pre._output_array)
-        
         self._gpu.copy(buf_label, label)
-        #self._gpu.copy(buf_softmax, self._softmax_array)
-        #self._gpu.copy(buf_output, self._output_array)
         self._gpu.copy(buf_output_pre, self._pre._output_array)
 
         # pad
@@ -954,21 +884,9 @@ class OutputLayer(Layer):
         #
         self._gpu.flatten_2d_to_1d(pad2_grad, self.gpu_gradient, self._batch_size, self._num_node, self._batch_size)
         
-        #self._gpu.copy(self.gradient, self.gpu_gradient)
-        #print("self.gradient", self.gradient.shape)
-        #print(self.gradient)
-        
         # weight
         self._gpu.bp_output_fc(self._gpu_output, buf_output_pre, self._gpu_weight, self.gpu_gradient, pad_weight, self._batch_size, self._num_input, self._num_node)
-        
-        #self._gpu.copy(weight_array, pad_weight)
-        #print("weight_array", weight_array.shape)
-        #print(weight_array)
-                
         self._gpu.flatten_3d_to_2d(pad_weight, self._gpu_weight, self._batch_size, self._num_input, self._num_node, self._batch_size)
-        #self._gpu.copy(self._weight_matrix, self._gpu_weight)
-        #print("weight_matrix", self._weight_matrix.shape)
-        #print(self._weight_matrix[0])
     
     def bp_gradient(self, label, gpu_mode, debug=0):
         if debug:
@@ -976,7 +894,6 @@ class OutputLayer(Layer):
         #
         
         if gpu_mode==0:
-            #self.gradient = np.zeros(self._num_node, dtype=np.float32)
             for m in range(self._batch_size):
                 for k in range(self._num_node):
                     z = self._softmax_array[m][k]
@@ -1046,13 +963,6 @@ class OutputLayer(Layer):
         #
         
     def backpropagate(self, label, debug=0):
-        #print("OutputLayer::backpropagate()")
-        #print(self._softmax_array)
-        #self._gpu.copy(self._output_array, self._gpu_output)
-        #print("weight_matrix")
-        #print(self._weight_matrix[0])
-        
-        #self.gradient = np.zeros(self._num_node, dtype=np.float32)
         pad_weight = np.zeros((self._num_node, self._num_input), dtype=np.float32)
         
         for m in range(self._batch_size):
@@ -1063,39 +973,18 @@ class OutputLayer(Layer):
             #
         #
         self.gradient = self.gradient / self._batch_size
-        #print("self.gradient", self.gradient.shape)
-        #print(self.gradient)
         
         for m in range(self._batch_size):
             for k in range(self._num_node):
                 delta = self.gradient[k]
-                #v_sum = 0.0
                 for j in range(self._num_input):
-                    v = self.rate * delta * self._pre._output_array[m][j]# / self._batch_size
-                    #w = self._weight_matrix[k][j]
+                    v = self.rate * delta * self._pre._output_array[m][j]
                     pad_weight[k][j] = pad_weight[k][j] + v
-                    
-                    #if j==0 and k==0:
-                    #    print("delta :", delta)
-                    #    print("v :", v)
-                    #    print("w :", self._weight_matrix[k][j])
-                    #    print("w + v :", self._weight_matrix[k][j] + v)
-                    #
-                    #self._weight_matrix[k][j] = w + v
-                    #if w + v < -1.0:
-                    #    print("under")
-                    #    self._weight_matrix[k][j] = -1.0
-                    #elif w + v > 1.0:
-                    #    print("over")
-                    #    self._weight_matrix[k][j] = 1.0
-                    #
                 #
             #
         #
         self._weight_matrix = self._weight_matrix - pad_weight / self._batch_size
         self._gpu.copy(self._gpu_weight, self._weight_matrix)
-        #print("weight_matrix", self._weight_matrix.shape)
-        #print(self._weight_matrix[0])
 
 class RegressionOutputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
@@ -1868,6 +1757,15 @@ class Roster:
         self._path = ""
         self._scale_input = 0
         self.wi_mode = 0
+        self.mode_q = 0 # 0 : wi only, 1:all
+    
+    def set_mode_q(self, q):
+        self.mode_q = q
+        c = self.count_layers()
+        for i in range(c):
+            layer = self.get_layer_at(i)
+            layer.mode_q = self.mode_q
+        #
         
     def set_path(self, path):
         self._path = path
@@ -1907,7 +1805,8 @@ class Roster:
     def prepare(self, batch_size, data_size, num_class):
         print("Roster::prepare(), gpu type=%d" % (self._gpu.type))
         if self._gpu:
-            print("Roster::prepare(), gpu type=%d" % (self._gpu.type))
+            #print("Roster::prepare(), gpu type=%d" % (self._gpu.type))
+            pass
         else:
             print("Roster::prepare(), error, no gpu")
         #
@@ -1915,7 +1814,11 @@ class Roster:
         self._batch_size = batch_size
         self._data_size = data_size
         #
-        self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.float32)
+        if self.mode_q==0:
+            self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.float32)
+        elif self.mode_q==1:
+            self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.uint8)
+        #
         self._labels = np.zeros((batch_size, num_class), dtype=np.float32)
         self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
         if self._gpu.type==0: # OpenCL
@@ -1938,8 +1841,7 @@ class Roster:
     
     # batch for classification
     def set_batch(self, data_size, num_class, train_data_batch, train_label_batch, size, offset):
-        #print("Roster::set_batch(), obsolute")
-        #print("Roster::set_batch(%d, %d, %d, %d)" % (data_size, num_class, size, offset))
+        print("Roster::set_batch(%d, %d, %d, %d), obsolute" % (data_size, num_class, size, offset))
         
         data_array = np.zeros((size, data_size), dtype=np.float32)
         labels = np.zeros((size, num_class), dtype=np.float32)
@@ -1951,7 +1853,7 @@ class Roster:
         self.set_data(data_array, data_size, labels, size)
                 
     def set_data(self, data, data_size, label, batch_size):
-        #print("Roster::set_data(), obsolute, self._gpu.type=%d" % (self._gpu.type))
+        print("Roster::set_data(), obsolute, self._gpu.type=%d, self._scale_input=%d" % (self._gpu.type, self._scale_input))
         if self._gpu:
             pass
         else:

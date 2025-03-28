@@ -10,6 +10,18 @@ os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 import gpu
 
 KERNEL_CODE = """
+__constant float multiple[9][5] = {
+    {0.000,  0.125,  0.250,  0.500,  1.000},
+    {0.000,  0.000,  0.125,  0.250,  0.500},
+    {0.000,  0.000,  0.000,  0.125,  0.250},
+    {0.000,  0.000,  0.000,  0.000,  0.125},
+    {0.000,  0.000,  0.000,  0.000,  0.000},
+    {0.000,  0.000,  0.000,  0.000, -0.125},
+    {0.000,  0.000,  0.000, -0.125, -0.250},
+    {0.000,  0.000, -0.125, -0.250, -0.500},
+    {0.000, -0.125, -0.250, -0.500, -1.000}
+};
+
 __kernel void gradient_3d_to_2d(
     __global float* buf_in,
     __global float* buf_out,
@@ -651,6 +663,7 @@ __kernel void p_softmax(
     for (int i=0;i<num;i++){
         temp = in[start+i] / scale;
         temp = exp(temp);
+        //printf(\"%d, %d : %f (%f)\\n\", bi, i, temp, in[start+i]);
         if (isinf(temp)){
             printf(\"%d, %d :infinity: %f (%f)\\n\", bi, i, temp, in[start+i]);
             temp = 3.402823e+38;
@@ -767,8 +780,7 @@ __kernel void calc_mac_relu(
         //printf(\"(%d, %d) = %f, %f\\n\", bi, xi, x[x_start+i], w[w_start+i]);
         temp += (x[x_start+i] * w[w_start+i]);
     }
-    
-        
+            
     //chk = exp(temp);
     //if (isinf(chk)){
     //    printf(\"%d, %d :infinity: %f\\n\", bi, xi, chk);
@@ -792,6 +804,83 @@ __kernel void calc_mac_relu(
             y[y_start] = temp/20;
         }else{
             y[y_start] = temp;
+        }
+    }
+}
+
+__kernel void calc_mac_relu_q(
+    __global uchar* x,
+    __global uchar* w,
+    __global float* y,
+    int xsize, // node
+    int wsize, // input
+    int act)
+{
+    int bi = get_global_id(0); // batch
+    int xi = get_global_id(1); // node
+    
+    int x_start = wsize * bi;
+    int w_start = wsize * xi;
+    int y_start = (xsize * bi) + xi;
+    float temp = 0.0;
+
+    for (int i=0;i<wsize;i++){
+        int t0 = w[w_start+i];
+        int t1 = x[x_start+i];
+        //float mp = multiple[t0][t1];
+        //printf(\"mp : (%d, %d) %f, \\n\", t0, t1, mp);
+        //temp += mp;
+        temp += multiple[t0][t1];
+    }
+    
+    // relu
+    if (act==0){
+        y[y_start] = temp;
+    }else{
+        if (temp<=0.0){
+            y[y_start] = 0.0;
+        } else {
+            y[y_start] = temp;
+        }
+    }
+}
+
+__kernel void q_hidden_output(
+    __global float* x,
+    __global uchar* y,
+    int size) // size of y
+{
+    int bi = get_global_id(0);
+    float min = 0.0;
+    float max = 0.0;
+    float temp = 0.0;
+    float base = 0.0;
+    int start = bi * size;
+            
+    // find min and max
+    min = FLT_MAX;
+    max = 0.0;
+    for (int i=0;i<size;i++){
+        if (x[start+i]<min){
+            if (x[start+i]>0.0){
+                min = x[start+i];
+            }
+        }else if (x[start+i]>max){
+            max = x[start+i];
+        }
+    }
+    
+    // scale
+    base = max - min;
+    for (int i=0;i<size;i++){
+        int out = 4;
+        temp = x[start+i];
+        if (temp>0.0){
+            temp = (temp-min)/base;
+            out = (int)(temp * 5);
+            y[start+i] = 4 + out;
+        }else{
+            y[start+i] = 4;
         }
     }
 }
@@ -826,6 +915,7 @@ class OpenCL(gpu.Gpu):
         return self._bufs
     
     def dev_malloc(self, host_array):
+        #print("OpenCL::dev_malloc(%d)" % (host_array.nbytes))
         mf = cl.mem_flags
         buf = cl.Buffer(self._ctx,
                         mf.READ_WRITE|mf.COPY_HOST_PTR,
@@ -907,6 +997,17 @@ class OpenCL(gpu.Gpu):
                                         buf_x, buf_w, buf_y,
                                         np.int32(size_node), np.int32(size_input),
                                         np.int32(act))
+        event.wait()
+        
+    def macReluQ(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input, act):
+        event = self.prg.calc_mac_relu_q(self._queue,(size_batch, size_node), None,
+                                         buf_x, buf_w, buf_y,
+                                         np.int32(size_node), np.int32(size_input),
+                                         np.int32(act))
+        event.wait()
+        
+    def q_hidden_output(self, buf_x, buf_y, ysize, num_batch):
+        event = self.prg.q_hidden_output(self._queue, (num_batch,), None, buf_x, buf_y, np.int32(ysize))
         event.wait()
 
     def multiple_x_by_w_batch(self, d_x, d_w, d_y, bsize, stride_1, stride_2, row, col):

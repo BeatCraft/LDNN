@@ -40,7 +40,7 @@ __kernel void gradient_3d_to_2d(
         //    printf(\"gradient_3d_to_2d[%d, %d] %f\\n\", ii, ni, buf_in[bi * y * x + ii * x + ni]);
         //}
     }
-    buf_out[ni * x + ii] = w_sum / float(divider);
+    buf_out[ni * x + ii] = w_sum / ((float)divider);//float(divider);
 }
 
 __kernel void flatten_2d_to_1d(
@@ -58,7 +58,7 @@ __kernel void flatten_2d_to_1d(
         //    printf(\"\\t %d : %.15f, %.15f, %d\\n\", ii, buf_in[ii * x + ni], buf_out[ni], divider);
         //}
     }
-    buf_out[ni] = buf_out[ni] / float(divider);
+    buf_out[ni] = buf_out[ni] / ((float)divider);//float(divider);
     //printf(\"\\t flatten_2d_to_1d : %d : %.15f\\n\", ni, buf_out[ni]);
 }
 
@@ -82,7 +82,7 @@ __kernel void flatten_3d_to_2d(
         //    printf(\"b flatten_3d_to_2d[%d, %d] %f\\n\", ii, ni, buf_in[bi * y * x + ii * x + ni]);
         //}
     }
-    buf_out[ii * x + ni] = w_sum / float(divider);
+    buf_out[ii * x + ni] = w_sum / ((float)divider); //float(divider);
     
     //if (ni==0 && ii==0){
     //    printf(\"c flatten_3d_to_2d[%d, %d] %f\\n\", ii, ni, buf_out[ii * x + ni]);

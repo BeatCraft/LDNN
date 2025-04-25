@@ -558,14 +558,14 @@ class Train:
             if ce_alt<=ce: # keep
                 #print(idx, loop, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce, ">", ce_alt)
                 #print("[%d/%d]" % (num, loop_max), attack_num, "\t", ce, ">", ce_alt)
-                print("[%d, %d/%d] %d : " % (loop, num, loop_max, attack_num), ce, ">", ce_alt)
+                print("[%d][%d, %d/%d] %d : " % (idx, loop, num, loop_max, attack_num), ce, ">", ce_alt)
                 ce = ce_alt
                 ret = 1
                 hit = hit + 1
             else: # undo
                 #print(idx, loop, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce)
                 #print("[%d/%d]" % (num, loop_max), attack_num, "\t", ce)
-                print("[%d, %d/%d] %d : " % (loop, num, loop_max, attack_num), ce)
+                print("[%d][%d, %d/%d] %d : " % (idx, loop, num, loop_max, attack_num), ce)
                 for ws in attack_list:
                     widx = ws[0]
                     wi = ws[1]

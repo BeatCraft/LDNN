@@ -66,9 +66,10 @@ def classification(r, b, n, debug=0, single=0):
     elapsed_time = 0.0
     #r.prepare(n, data_size, num_class)
     for i in range(it):
-        data_array, label_array = b.get_mini_batch(i*n)
-        #
+        data_array, label_array = b.get_batch(i*n)#  b.get_mini_batch(i*n)
         #print("data_array", data_array.shape, i*n)
+        print("label_array", type(label_array), label_array.shape)
+        print(label_array)
         
         r.reset()
         r.direct_set_data(data_array)
@@ -83,6 +84,7 @@ def classification(r, b, n, debug=0, single=0):
         
         for j in range(n):
             ans = answers[j]
+            #print(label_array)
             label = np.argmax(label_array[j])
             rets[ans] = rets[ans] + 1
             dist[label] = dist[label] + 1

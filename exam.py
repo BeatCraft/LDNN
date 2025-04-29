@@ -28,8 +28,6 @@ def print_result(ca, eval_size, num_class, dist, rets, oks):
         print(("%d\t| %d\t| %d\t| %d"  % (i, dist[i], rets[i], oks[i])))
     #
     print("---------------------------------")
-    
-#def classification(r, data_size, num_class, batch_size, batch_image, batch_label, n, debug=0, single=0):
 
 def classification(r, b, n, debug=0, single=0):
     data_size = b.data_size
@@ -66,10 +64,11 @@ def classification(r, b, n, debug=0, single=0):
     elapsed_time = 0.0
     #r.prepare(n, data_size, num_class)
     for i in range(it):
-        data_array, label_array = b.get_batch(i*n)#  b.get_mini_batch(i*n)
+        data_array, label_array = b.get_batch(n, i*n)
+        #  b.get_mini_batch(i*n)
         #print("data_array", data_array.shape, i*n)
-        print("label_array", type(label_array), label_array.shape)
-        print(label_array)
+        #print("label_array", type(label_array), label_array.shape)
+        #print(label_array)
         
         r.reset()
         r.direct_set_data(data_array)

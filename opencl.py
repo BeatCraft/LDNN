@@ -562,9 +562,9 @@ __kernel void scale_layer(__global float* data, int size, float scale)
     if (max>0.0){
         max = max / scale;
         for (int i=0;i<size;i++){
-            //
-            //data[start+i] = (data[start+i]/max);
-            //
+            // simple scaling
+            data[start+i] = (data[start+i]/max);
+            /*
             float k = data[start+i]/max;
             if (k>=0.0 && k<0.125){
                 k = 0.0;
@@ -576,26 +576,7 @@ __kernel void scale_layer(__global float* data, int size, float scale)
                 k = 1.0;
             }
             data[start+i] = k;
-        }
-    }
-}
-
-__kernel void scale_filetr(__global float* data, int bsize, int fsize)
-{
-    int bi = get_global_id(0);
-    int fi = get_global_id(1);
-    int start = bsize * bi + fsize * fi;
-    float max = 0.0;
-    
-    for (int i=0;i<fsize;i++){
-        if (data[start+i]>max){
-            max = data[start+i];
-        }
-    }
-    
-    if (max>0.0){
-        for (int i=0;i<fsize;i++){
-            data[start+i] = (data[start+i]/max);
+            */
         }
     }
 }
@@ -774,26 +755,21 @@ __kernel void calc_mac_relu(
     int w_start = wsize * xi;
     int y_start = (xsize * bi) + xi;
     float temp = 0.0;
-    //float chk = 0.0;
 
     for (int i=0;i<wsize;i++){
-        //printf(\"(%d, %d) = %f, %f\\n\", bi, xi, x[x_start+i], w[w_start+i]);
         temp += (x[x_start+i] * w[w_start+i]);
     }
-            
-    //chk = exp(temp);
-    //if (isinf(chk)){
-    //    printf(\"%d, %d :infinity: %f\\n\", bi, xi, chk);
-    //}
-
-    // activation
-    if (temp>=0){
+    
+    if (act==0){ // no
         y[y_start] = temp;
-        //
-        // 0.0, 0.125, 0.25, 0.5, 1.0
-        //
-    }else{
-        //printf(\"(%d, %d) < 0.0\\n\", bi, xi);
+    } else {
+        if (temp>=0){
+            y[y_start] = temp;
+        }else{
+            y[y_start] = 0;
+        }
+    }
+/*
         if (act==0){ // no
             y[y_start] = temp;
         }else if (act==1){ // relu
@@ -805,7 +781,7 @@ __kernel void calc_mac_relu(
         }else{
             y[y_start] = temp;
         }
-    }
+*/
 }
 
 __kernel void calc_mac_relu_q(
@@ -1032,9 +1008,9 @@ class OpenCL(gpu.Gpu):
         event = self.prg.scale_layer(self._queue, (batch_size,), None, data, np.int32(size), np.float32(scale))
         event.wait()
         
-    def scale_filetr(self, batch_size, filetr_size, data, batch_stride, filetr_stride):
-        event = self.prg.scale_filetr(self._queue, (batch_size, filetr_size), None, data, np.int32(batch_stride), np.int32(filetr_stride))
-        event.wait()
+    #def scale_filetr(self, batch_size, filetr_size, data, batch_stride, filetr_stride):
+    #    event = self.prg.scale_filetr(self._queue, (batch_size, filetr_size), None, data, np.int32(batch_stride), np.int32(filetr_stride))
+    #    event.wait()
         
     def normalize_layer(self, data, size, batch_size):
         event = self.prg.normalize_layer(self._queue, (batch_size,), None, data, np.int32(size))

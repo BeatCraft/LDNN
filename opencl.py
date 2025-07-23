@@ -886,6 +886,11 @@ class OpenCL(gpu.Gpu):
 
     def set_kernel_code(self):
         self.prg = cl.Program(self._ctx, KERNEL_CODE).build()
+        
+        self.k_calc_mac_relu = cl.Kernel(self.prg, "calc_mac_relu")
+        self.k_scale_layer = cl.Kernel(self.prg, "scale_layer")
+        self.k_p_softmax = cl.Kernel(self.prg, "p_softmax")
+        self.k_cross_entropy = cl.Kernel(self.prg, "cross_entropy")
     
     def get_buffer_list(self):
         return self._bufs
@@ -968,8 +973,12 @@ class OpenCL(gpu.Gpu):
                                          np.int32(stride_1), np.int32(stride_2))
         event.wait()
         
-    def macRelu(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input, act): # <<
-        event = self.prg.calc_mac_relu(self._queue,(size_batch, size_node), None,
+    def macRelu(self, buf_x, buf_w, buf_y, size_batch, size_node, size_input, act):
+        #event = self.prg.calc_mac_relu(self._queue,(size_batch, size_node), None,
+        #                                buf_x, buf_w, buf_y,
+        #                                np.int32(size_node), np.int32(size_input),
+        #                                np.int32(act))
+        event = self.k_calc_mac_relu(self._queue,(size_batch, size_node), None,
                                         buf_x, buf_w, buf_y,
                                         np.int32(size_node), np.int32(size_input),
                                         np.int32(act))
@@ -1005,7 +1014,8 @@ class OpenCL(gpu.Gpu):
         event.wait()
     
     def scale_layer(self, batch_size, data, size, scale=1.0):
-        event = self.prg.scale_layer(self._queue, (batch_size,), None, data, np.int32(size), np.float32(scale))
+        #event = self.prg.scale_layer(self._queue, (batch_size,), None, data, np.int32(size), np.float32(scale))
+        event = self.k_scale_layer(self._queue, (batch_size,), None, data, np.int32(size), np.float32(scale))
         event.wait()
         
     #def scale_filetr(self, batch_size, filetr_size, data, batch_stride, filetr_stride):
@@ -1020,7 +1030,8 @@ class OpenCL(gpu.Gpu):
     #    event = self.prg.p_softmax(self._queue, (num_batch,), None, data, np.int32(size), np.float32(scale))
     #    event.wait()
     def softmax(self, data, out, size, num_batch, scale=1.0): # <<
-        event = self.prg.p_softmax(self._queue, (num_batch,), None, data, out, np.int32(size), np.float32(scale))
+        #event = self.prg.p_softmax(self._queue, (num_batch,), None, data, out, np.int32(size), np.float32(scale))
+        event = self.k_p_softmax(self._queue, (num_batch,), None, data, out, np.int32(size), np.float32(scale))
         event.wait()
     
     def mse(self, infs, labels, output, num_node, num_batch):
@@ -1028,7 +1039,9 @@ class OpenCL(gpu.Gpu):
         event.wait()
         
     def cross_entropy(self, infs, labels, output, num_node, num_batch):
-        event = self.prg.cross_entropy(self._queue, (num_batch,), None,
+        #event = self.prg.cross_entropy(self._queue, (num_batch,), None,
+        #                               infs, labels, output, np.int32(num_node))
+        event = self.k_cross_entropy(self._queue, (num_batch,), None,
                                        infs, labels, output, np.int32(num_node))
         event.wait()
     

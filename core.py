@@ -8,6 +8,8 @@ import copy
 import pickle
 import numpy as np
 
+#import pyopencl as cl
+
 if sys.platform.startswith('darwin'):
     pass
 else:
@@ -55,6 +57,15 @@ CNN_WEIGHT_INDEX_ZERO2 = int(CNN_WEIGHT_INDEX_SIZE2/2)
 CNN_WEIGHT_INDEX_MAX2 = CNN_WEIGHT_INDEX_SIZE2 - 1
 CNN_WEIGHT_INDEX_MIN2 = 0
 
+def wi_8020_3bit():
+    wmax = int( (WEIGHT_INDEX_SIZE - 1) / 2 )
+    i = random.randint(0, wmax-1)
+    if random.random() < 0.8:
+        wi = wmax + i
+    else:
+        wi = i
+    #
+    return wi
 
 def wi_8020():
     if random.random() < 0.05:
@@ -218,15 +229,16 @@ class Layer(object):
         return self._weight_index_matrix[ni][ii]
     
     def set_weight_index(self, ni, ii, wi):
-        pre = self._weight_index_matrix[ni][ii]
-        self._weight_index_matrix[ni][ii] = wi
+        #pre = self._weight_index_matrix[ni][ii]
+        #self._weight_index_matrix[ni][ii] = wi
         try:
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
                 if self.mode_q==0:
+                    self._weight_index_matrix[ni][ii] = np.uint8(wi)
                     self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
                 elif self.mode_q==1:
-                    #self._weight_matrix[ni][ii] = wi
-                    self._weight_index_matrix[ni][ii] = wi
+                    self._weight_index_matrix[ni][ii] = np.uint8(wi)
+                    #print(type(self._weight_index_matrix[ni][ii]))
                 #
             elif self._type==LAYER_TYPE_CONV or self._type==LAYER_TYPE_FCNN:
                 self._weight_matrix[ni][ii] = CNN_WEIGHT_SET[wi]
@@ -292,6 +304,9 @@ class Layer(object):
                 v = 0.0000001
             #
             self._weight_matrix[ni][ii] = v
+        elif mode==7: #3bit, no zero
+            wi = wi_8020_3bit()
+            self.set_weight_index(ni, ii, wi)
         #
                     
     def init_weight_with_mode(self, mode=0, value=0):
@@ -302,15 +317,15 @@ class Layer(object):
             #
         #
 
-    def init_weight(self, ni, ii, wi=-1):
-        if wi<0:
-            if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
-                wi = random.randrange(WEIGHT_INDEX_SIZE)
-            elif self._type==LAYER_TYPE_CONV:
-                wi = random.randrange(CNN_WEIGHT_INDEX_SIZE)
-            #
-        #
-        self.set_weight_index(ni, ii, wi)
+    #def init_weight(self, ni, ii, wi=-1):
+    #    if wi<0:
+    #        if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
+    #            wi = random.randrange(WEIGHT_INDEX_SIZE)
+    #        elif self._type==LAYER_TYPE_CONV:
+    #            wi = random.randrange(CNN_WEIGHT_INDEX_SIZE)
+    #        #
+    #    #
+    #    self.set_weight_index(ni, ii, wi)
         
     def init_weight_with_random_index(self):
         for ni in range(self._num_node):
@@ -333,7 +348,8 @@ class Layer(object):
         return self._weight_matrix.tolist()
     
     def import_weight_index(self, wi_list):
-        self._weight_index_matrix = np.array(wi_list, dtype=np.int32).copy()
+        #self._weight_index_matrix = np.array(wi_list, dtype=np.int32).copy()
+        self._weight_index_matrix = np.array(wi_list, dtype=np.uint8).copy()
         for ni in range(self._num_node):
             for ii in range(self._num_input):
                 wi = self._weight_index_matrix[ni][ii]
@@ -444,7 +460,6 @@ class HiddenLayer(Layer):
         if self._gpu.type==0:
             if self.mode_q==0:
                 self._momentum = np.zeros( (self._num_node, self._num_input), dtype=np.int8)
-                #self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
@@ -452,14 +467,10 @@ class HiddenLayer(Layer):
                 self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
             elif self.mode_q==1:
-                #self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_index_matrix)
-                print(self._gpu_weight)
-                
                 self.mac_array = np.zeros( (self._batch_size, self._num_node), dtype=np.float32)
                 self._gpu_mac = self._gpu.dev_malloc(self.mac_array)
-                                                        
                 self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.uint8)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
             #
@@ -537,12 +548,9 @@ class HiddenLayer(Layer):
                     print((self._weight_matrix[0]))
                 #
             elif self.mode_q==1:
-                #self._gpu.macReluQ(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
-                # mac + sum
                 self._gpu.macReluQ(array_in, self._gpu_weight, self._gpu_mac, self._batch_size, self._num_node, self._num_input, a_mode)
                 self._gpu.q_hidden_output(self._gpu_mac, self._gpu_output, self._num_node, self._batch_size)
                 # quantize output
-                
                 if debug:
                     #print(self._index, "hidden, weight")
                     #print(self._weight_index_matrix)
@@ -602,7 +610,6 @@ class OutputLayer(Layer):
         if self._gpu.type==0:
             if self.mode_q==0:
                 self._momentum = np.zeros( (self._num_node, self._num_input), dtype=np.int8)
-                #self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._weight_matrix = np.zeros((self._num_node, self._num_input), dtype=np.float32)
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
@@ -612,18 +619,9 @@ class OutputLayer(Layer):
                                 
                 self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
                 self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
-                
-                # temporaly, here
-                self.gradient = np.zeros(self._num_node, dtype=np.float32)
-                self.gpu_gradient = self._gpu.dev_malloc(self.gradient)
             elif self.mode_q==1:
-                #self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.int32)
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
-                #self._weight_matrix = np.zeros((self._num_node, self._num_input), dtype=np.float32)
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_index_matrix)
-                
-                self.mac_array = np.zeros( (self._batch_size, self._num_node), dtype=np.float32)
-                self._gpu_mac = self._gpu.dev_malloc(self.mac_array)
                 
                 self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
@@ -638,8 +636,6 @@ class OutputLayer(Layer):
             
             self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
             self._gpu_output = self._gpu.allocateArray(self._output_array)
-            
-            #self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
             self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
             self._gpu_softmax = self._gpu.allocateArray(self._softmax_array)
         #
@@ -680,16 +676,15 @@ class OutputLayer(Layer):
                 #
             elif self.mode_q==1:
                 a_mode = 0
-                #self._gpu.macReluQ(array_in, self._gpu_weight, self._gpu_mac, self._batch_size, self._num_node, self._num_input, a_mode)
-                #self._gpu.softmax(self._gpu_mac, self._gpu_softmax, self._num_node, self._batch_size, self.softmax_scale)
                 self._gpu.macReluQ(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
-                self._gpu.softmax(self._gpu_output, self._gpu_softmax, self._num_node, self._batch_size, self.softmax_scale)
-                
                 if debug:
                     self._gpu.copy(self._output_array, self._gpu_output)
                     print(self._index, "output, mac")
-                    print(self.mac_array[0])
+                    print(self._output_array[0])
+                #
+                self._gpu.softmax(self._gpu_output, self._gpu_softmax, self._num_node, self._batch_size, self.softmax_scale)
                 
+                if debug:
                     self._gpu.copy(self._softmax_array, self._gpu_softmax)
                     print("output, softmax", self._softmax_array[0].sum())
                     print(self._softmax_array[0])
@@ -1503,7 +1498,7 @@ class Roster:
         self._path = path
         
     def save(self, mode=0):
-        print("Roster::save(%s, %d)" % (self._path, mode))
+        #print("Roster::save(%s, %d)" % (self._path, mode))
         self.export_weight(self._path, mode)
         
     def save_as(self, path, mode=0):
@@ -1573,6 +1568,7 @@ class Roster:
     
     def direct_set_data(self, data_array):
         if self._gpu.type==0: # opencl
+            # copy(dist, src)
             self._gpu.copy(self._gpu_input, data_array) # copy(dist, src)
             self._gpu.copy(self.input._gpu_output, self._gpu_input)
         elif self._gpu.type==1: # nvidia
@@ -1624,16 +1620,16 @@ class Roster:
             #
         #
         
-    def init_weight_by_layer(self, idx, mode, value=0):
-        print("Roster::init_weight_by_layer(), obsolute")
-        layer = self.get_layer_at(idx)
-        if layer.count_weight()>0:
-            if mode==0: # random
-                layer.init_weight_with_random_index()
-            elif mode==1: # a value
-                layer.init_weight_with_value(value)
-            #
-        #
+    #def init_weight_by_layer(self, idx, mode, value=0):
+    #    print("Roster::init_weight_by_layer(), obsolute")
+    #    layer = self.get_layer_at(idx)
+    #    if layer.count_weight()>0:
+    #        if mode==0: # random
+    #            layer.init_weight_with_random_index()
+    #        elif mode==1: # a value
+    #            layer.init_weight_with_value(value)
+    #        #
+    #    #
         
     def reset(self):
     # flush a batch depending cache when switching batches
@@ -1858,7 +1854,7 @@ class Roster:
 
     def export_weight(self, path, mode=0):
         # mode 0:index, 1:value
-        print("Roster : export_weight(%s, %d)" % (path, mode))
+        #print("Roster : export_weight(%s, %d)" % (path, mode))
         with open(path, "w") as f:
             writer = csv.writer(f, lineterminator='\n')
             c = self.count_layers()

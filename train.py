@@ -206,13 +206,6 @@ class Train:
         
         while num<loop_max:
             attack_list = self.make_attack_list(w_num, attack_num)
-            #attack_list = []
-            #while len(attack_list)<attack_num:
-            #    widx = random.randint(0, w_num-1)
-            #    w = self.w_list[widx]
-            #    wi = w.wi
-            #    attack_list.append((widx, wi))
-            ##
         
             # attack
             for ws in attack_list:
@@ -223,7 +216,8 @@ class Train:
                 if layer._type==core.LAYER_TYPE_HIDDEN or layer._type==core.LAYER_TYPE_OUTPUT:
                     if r.wi_mode==3:
                         wi_alt = core.wi_8020()
-                        #wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
+                    elif r.wi_mode==7:
+                        wi_alt = core.wi_8020_3bit()
                     else:
                         wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
                     #
@@ -239,38 +233,30 @@ class Train:
             if ce_alt<=ce: # keep
                 #print(idx, loop, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce, ">", ce_alt)
                 #print("[%d/%d]" % (num, loop_max), attack_num, "\t", ce, ">", ce_alt)
-                print("[%d][%d, %d/%d] %d : " % (idx, loop, num, loop_max, attack_num), ce, ">", ce_alt)
+                #print("[%d][%d, %d/%d] %d : " % (idx, loop, num, loop_max, attack_num), ce, ">", ce_alt)
                 ce = ce_alt
                 ret = 1
                 hit = hit + 1
             else: # undo
                 #print(idx, loop, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce)
                 #print("[%d/%d]" % (num, loop_max), attack_num, "\t", ce)
-                print("[%d][%d, %d/%d] %d : " % (idx, loop, num, loop_max, attack_num), ce)
+                
+                #print("[%d][%d, %d/%d] %d : " % (idx, loop, num, loop_max, attack_num), ce)
                 self.undo_attack(attack_list, self.w_list)
-                                
-                #for ws in attack_list:
-                #    widx = ws[0]
-                #    wi = ws[1]
-                #    w = self.w_list[widx]
-                #    w.wi = wi
-                #    layer = r.get_layer_at(w.li)
-                #    layer.set_weight_index(w.ni, w.ii, wi)
-                ##
-                #r.update_weight()
             #
             if num>0 and num % 100 == 0:
-                print("hit rate:", hit - hit_pre, "/ 100 = ", float((hit - hit_pre)/(100)))
-                print("hit rate:", hit, "/", loop_max, "=", float(hit/loop_max))
+                #print("hit rate:", hit - hit_pre, "/ 100 = ", float((hit - hit_pre)/(100)))
+                #print("hit rate:", hit, "/", loop_max, "=", float(hit/loop_max))
                 num_pre = num
                 hit_pre = hit
                 r.save()
             #
             num += 1
         #
-        print("hit rate:", hit, "/", loop_max, "=", float(hit/loop_max))
+        hit_rate = hit / loop_max
+        print(attack_num, "hit rate:", hit, "/", loop_max, "=", hit_rate, "ce=", ce)
         r.save()
-        return ce
+        return ce, hit_rate
 
     def momentum_loop(self, idx, loop, loop_max, attack_num, save=0, debug=0):
         r = self._r
@@ -374,4 +360,99 @@ class Train:
         #
         self.reset_mommentum()
         
+        return 1
+
+    def momentum_challenge(self, idx, loop, loop_max, attack_num, save=0, debug=0):
+        r = self._r
+        w_num = len(self.w_list)
+        num = 0
+        hit = 0
+        ce = r.evaluate(0)
+        
+        #
+        # attack
+        #
+        while num<loop_max:
+            attack_list = self.make_attack_list(w_num, attack_num)
+            self.attack_set_momentum(attack_list)
+            ce_alt = r.evaluate(0)
+            if ce_alt<=ce: # keep
+                print(idx, "%d, [%d/%d]" % (loop, num, loop_max), attack_num, "\t", ce, ">", ce_alt)
+                ce = ce_alt
+                ret = 1
+                hit = hit + 1
+                return attack_list
+            else: # undo
+                print(idx, "%d, [%d/%d]" % (loop, num, loop_max), attack_num, "\t", ce)
+                self.undo_attack_reset_momentum(attack_list)
+            #
+            num = num + 1
+        #
+        
+        empty_list = []
+        return empty_list
+
+    def auto_momentum_challenge(self, idx, loop, loop_max, attack_list, attack_num, save=0, debug=0):
+        #print("train::auto_momentum_loop()")
+        r = self._r
+        num = 0
+        hit = 0
+        w_num = len(attack_list)
+        #self.w_list_momentum = self.make_w_list_momentum()
+        #print(self.w_list_momentum)
+        #w_num = len(self.w_list_momentum)
+        #if w_num>0:
+        #    pass
+        #else:
+        #    return 0
+        #
+        ce = r.evaluate(0)
+        loop_max = 1
+        while num<loop_max:
+            #
+            # attack
+            #
+            #attack_list = self.make_attack_list_momentum(w_num, attack_num)
+            for ws in attack_list:
+                widx = ws[0]
+                #w = self.w_list_momentum[widx]
+                w = self.w_list[widx]
+                wi = w.wi
+                momentum = w.momentum
+                wi_alt = w.wi + momentum
+                if momentum>0:
+                    if wi_alt<=core.WEIGHT_INDEX_MAX:
+                        w.wi = wi_alt
+                        layer = r.get_layer_at(w.li)
+                        layer.set_weight_index(w.ni, w.ii, w.wi)
+                    #
+                else:
+                    if wi_alt>=0:
+                        w.wi = wi_alt
+                        layer = r.get_layer_at(w.li)
+                        layer.set_weight_index(w.ni, w.ii, w.wi)
+                    #
+                #
+            #
+            r.update_weight()
+            ce_alt = r.evaluate(0)
+
+            if ce_alt<=ce: # keep
+                print("*", idx, "%d, [%d/%d]" % (loop, num, loop_max), attack_num, "\t", ce, ">", ce_alt)
+                ce = ce_alt
+                ret = 1
+                hit = hit + 1
+                return 1
+            else: # undo
+                print("*", idx, "%d, [%d/%d]"%(loop, num, loop_max), attack_num, "\t", ce)
+                #self.undo_attack(attack_list, self.w_list_momentum)
+                self.undo_attack_reset_momentum(attack_list)
+            #
+            num = num + 1
+        #
+        
+        #self.reset_mommentum()
+        #for w in self.w_list:
+        #    w.momentum = 0
+        #
         return 1

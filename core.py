@@ -8,6 +8,9 @@ import copy
 import pickle
 import numpy as np
 
+import random
+from scipy.stats import norm
+
 #import pyopencl as cl
 
 if sys.platform.startswith('darwin'):
@@ -33,7 +36,7 @@ WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0, 0.0625, 0.125, 0.25, 0.5,
 WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0] # 9
 WEIGHT_SET_2 = [-1.0, -0.5, -0.25, -0.125, 0.125, 0.25, 0.5, 1.0] # 8
 #
-WEIGHT_SET = WEIGHT_SET_1
+WEIGHT_SET = WEIGHT_SET_0
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = int(WEIGHT_INDEX_SIZE/2)
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
@@ -56,6 +59,34 @@ CNN_WEIGHT_INDEX_SIZE2 = len(CNN_WEIGHT_SET2)
 CNN_WEIGHT_INDEX_ZERO2 = int(CNN_WEIGHT_INDEX_SIZE2/2)
 CNN_WEIGHT_INDEX_MAX2 = CNN_WEIGHT_INDEX_SIZE2 - 1
 CNN_WEIGHT_INDEX_MIN2 = 0
+
+RNDWT = [norm.pdf(x, 0, 1) for x in WEIGHT_SET]
+RNDWT[5] *= 0.1
+
+def wi_std_11():
+    idx = random.choices(range(WEIGHT_INDEX_SIZE), weights=RNDWT, k=1)[0]
+    return idx
+
+def wi_std_3bit():
+    p = random.random()
+    if p >= 0.0 and p<0.0625:
+        wi = 0
+    elif p > 0.0625 and p<=0.125:
+        wi = 1
+    elif p > 0.125 and p<=0.25:
+        wi = 2
+    elif p > 0.25 and p<=0.5:
+        wi = 3
+    elif p > 0.50 and p<=0.75:
+        wi = 4
+    elif p > 0.75 and p<=0.825:
+        wi = 5
+    elif p > 0.825 and p<=0.9375:
+        wi = 6
+    elif p > 0.9375 and p<=1.00:
+        wi = 7
+    #
+    return wi
 
 def wi_8020_3bit():
     wmax = int( (WEIGHT_INDEX_SIZE - 1) / 2 )
@@ -252,7 +283,8 @@ class Layer(object):
             
             print("set_weight_index()")
             print(" [%d] type=%d" % (self._index, self._type))
-            print(" (%d, %d) wi=%d, pre=%d" % (ni, ii, wi, pre))
+            #print(" (%d, %d) wi=%d, pre=%d" % (ni, ii, wi, pre))
+            print(" (%d, %d) wi=%d" % (ni, ii, wi))
             print(" num_node:", self._num_node)
             print(" num_input:", self._num_input)
             #print(self._weight_matrix.shape)
@@ -304,8 +336,12 @@ class Layer(object):
                 v = 0.0000001
             #
             self._weight_matrix[ni][ii] = v
-        elif mode==7: #3bit, no zero
-            wi = wi_8020_3bit()
+        elif mode==7:
+            #print("mode==7")
+            #wi = wi_std_3bit()
+            #wi = wi_std2()
+            #wi = random.randrange(WEIGHT_INDEX_SIZE)
+            wi = wi_std_11()
             self.set_weight_index(ni, ii, wi)
         #
                     

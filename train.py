@@ -456,3 +456,73 @@ class Train:
         #    w.momentum = 0
         #
         return 1
+
+    def main_challenge_loop(self, ce, rate, loop_max, attack_num, one=False, save=0, debug=0):
+        r = self._r
+        w_num = len(self.w_list)
+        num = 0
+        num_pre = 0
+        hit = 0
+        hit_pre = 0
+        sum_ce = 0.0
+        #cnt = 0
+        while num<loop_max and sum_ce<rate:
+            #cnt += 1
+            attack_list = self.make_attack_list(w_num, attack_num)
+        
+            # attack
+            for ws in attack_list:
+                widx = ws[0]
+                w = self.w_list[widx]
+                layer = r.get_layer_at(w.li)
+                if layer._type==core.LAYER_TYPE_HIDDEN or layer._type==core.LAYER_TYPE_OUTPUT:
+                    if r.wi_mode==3:
+                        wi_alt = core.wi_8020()
+                    elif r.wi_mode==7:
+                        #wi_alt = core.wi_8020_3bit()
+                        #wi_alt = core.wi_std2()
+                        #wi_alt = random.randrange(core.WEIGHT_INDEX_SIZE)
+                        wi_alt = core.wi_std_11()
+                    else:
+                        wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
+                    #
+                else:
+                    wi_alt = random.randint(0, len(core.CNN_WEIGHT_SET)-1)
+                #
+                w.wi = wi_alt
+                layer.set_weight_index(w.ni, w.ii, wi_alt)
+            #
+            r.update_weight()
+            
+            ce_alt = r.evaluate(0)
+            if ce_alt<=ce: # keep
+                #print(idx, loop, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce, ">", ce_alt)
+                #print("[%d/%d]" % (num, loop_max), attack_num, "\t", ce, ">", ce_alt)
+                #print("[%d][%d, %d/%d] %d : " % (idx, loop, num, loop_max, attack_num), ce, ">", ce_alt)
+                sum_ce += (ce - ce_alt)
+                ce = ce_alt
+                ret = 1
+                hit = hit + 1
+            else: # undo
+                #print(idx, loop, "[%d/%d]"%(num, loop_max), attack_num, "\t", ce)
+                #print("[%d/%d]" % (num, loop_max), attack_num, "\t", ce)
+                
+                #print("[%d][%d, %d/%d] %d : " % (idx, loop, num, loop_max, attack_num), ce)
+                self.undo_attack(attack_list, self.w_list)
+            #
+            if num>0 and num % 100 == 0:
+                #print("hit rate:", hit - hit_pre, "/ 100 = ", float((hit - hit_pre)/(100)))
+                #print("hit rate:", hit, "/", loop_max, "=", float(hit/loop_max))
+                num_pre = num
+                hit_pre = hit
+                r.save()
+            #
+            num += 1
+            if one==True and hit>0:
+                break
+            #
+        #
+        hit_rate = hit / num #loop_max
+        print(attack_num, "hit rate:", hit, "/", num, "ce=", ce)
+        r.save()
+        return ce, hit_rate

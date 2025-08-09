@@ -64,12 +64,7 @@ def classification(r, b, n, debug=0, single=0):
     elapsed_time = 0.0
     #r.prepare(n, data_size, num_class)
     for i in range(it):
-        data_array, label_array = b.get_batch(n, i*n)
-        #  b.get_mini_batch(i*n)
-        #print("data_array", data_array.shape, i*n)
-        #print("label_array", type(label_array), label_array.shape)
-        #print(label_array)
-        
+        (data_array, label_list, label_array) = b.get_batch(n, i*n)
         r.reset()
         r.direct_set_data(data_array)
         r.direct_set_label(label_array)

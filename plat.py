@@ -4,7 +4,7 @@
 import os
 import sys
 
-ID = 0
+ID = 3
 
 #Platform Name: Apple
 #Platform Vendor: Apple
@@ -22,15 +22,17 @@ ID = 0
 # 2 : Nvidia DGX
 #     ubuntu
 #     cupy
+# 3 : macOS Metal
 
-if sys.platform.startswith('darwin'):
+#if sys.platform.startswith('darwin'):
+#    import opencl
+#else:
+if ID==0 or ID==1:
     import opencl
-else:
-    if ID==1:
-        import opencl
-    elif ID==2:
-        import dgx
-    #
+elif ID==2:
+    import dgx
+elif ID==3:
+    import lmetal
 #
 
 def getGpu(idx=0):
@@ -49,6 +51,13 @@ def getGpu(idx=0):
         my_gpu.set_kernel_code()
     elif ID==2: # nvidia
         my_gpu = dgx.Dgx(idx)
+    elif ID==3: # macOS Metal
+        my_gpu = lmetal.LMetal()
+        #m.init_test_func()
+        my_gpu.init_calc_mac_relu()
+        my_gpu.init_scale_layer()
+        my_gpu.init_softmax()
+        my_gpu.init_cross_entropy()
     else:
         print("error : undefined platform")
         my_gpu = None

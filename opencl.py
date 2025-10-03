@@ -10,7 +10,9 @@ os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 import gpu
 
 KERNEL_CODE = """
-__constant float multiple[9][5] = {
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+
+__constant half multiple[9][5] = {
     {0.000,  0.125,  0.250,  0.500,  1.000},
     {0.000,  0.000,  0.125,  0.250,  0.500},
     {0.000,  0.000,  0.000,  0.125,  0.250},
@@ -23,8 +25,8 @@ __constant float multiple[9][5] = {
 };
 
 __kernel void gradient_3d_to_2d(
-    __global float* buf_in,
-    __global float* buf_out,
+    __global half* buf_in,
+    __global half* buf_out,
     const int z,
     const int y,
     const int x,
@@ -32,7 +34,7 @@ __kernel void gradient_3d_to_2d(
 {   
     int ii = get_global_id(0);   
     int ni = get_global_id(1);
-    float w_sum = 0.0;
+    half w_sum = 0.0;
     
     for (int bi=0; bi<z; bi++){
         w_sum += buf_in[bi * y * x + ni * x + ii];
@@ -40,12 +42,12 @@ __kernel void gradient_3d_to_2d(
         //    printf(\"gradient_3d_to_2d[%d, %d] %f\\n\", ii, ni, buf_in[bi * y * x + ii * x + ni]);
         //}
     }
-    buf_out[ni * x + ii] = w_sum / ((float)divider);//float(divider);
+    buf_out[ni * x + ii] = w_sum / ((half)divider);//half(divider);
 }
 
 __kernel void flatten_2d_to_1d(
-    __global float* buf_in,
-    __global float* buf_out,
+    __global half* buf_in,
+    __global half* buf_out,
     const int y,
     const int x,
     const int divider)
@@ -58,13 +60,13 @@ __kernel void flatten_2d_to_1d(
         //    printf(\"\\t %d : %.15f, %.15f, %d\\n\", ii, buf_in[ii * x + ni], buf_out[ni], divider);
         //}
     }
-    buf_out[ni] = buf_out[ni] / ((float)divider);//float(divider);
+    buf_out[ni] = buf_out[ni] / ((half)divider);//half(divider);
     //printf(\"\\t flatten_2d_to_1d : %d : %.15f\\n\", ni, buf_out[ni]);
 }
 
 __kernel void flatten_3d_to_2d(
-    __global float* buf_in,
-    __global float* buf_out,
+    __global half* buf_in,
+    __global half* buf_out,
     const int z,
     const int y,
     const int x,
@@ -72,7 +74,7 @@ __kernel void flatten_3d_to_2d(
 {   
     int ii = get_global_id(0);   
     int ni = get_global_id(1);
-    float w_sum = 0.0;
+    half w_sum = 0.0;
     
     for (int bi=0; bi<z; bi++){
         w_sum += buf_in[bi * y * x + ii * x + ni];
@@ -82,7 +84,7 @@ __kernel void flatten_3d_to_2d(
         //    printf(\"b flatten_3d_to_2d[%d, %d] %f\\n\", ii, ni, buf_in[bi * y * x + ii * x + ni]);
         //}
     }
-    buf_out[ii * x + ni] = w_sum / ((float)divider); //float(divider);
+    buf_out[ii * x + ni] = w_sum / ((half)divider); //half(divider);
     
     //if (ni==0 && ii==0){
     //    printf(\"c flatten_3d_to_2d[%d, %d] %f\\n\", ii, ni, buf_out[ii * x + ni]);
@@ -90,15 +92,15 @@ __kernel void flatten_3d_to_2d(
     //for (int zi=0; zi<z; zi++){
     //    buf_out[yi * x + xi] += buf_in[zi * y * x + yi * x + xi];
     //}
-    //buf_out[yi * x + xi] = buf_out[yi * x + xi] / float(divider);
+    //buf_out[yi * x + xi] = buf_out[yi * x + xi] / half(divider);
     //printf(\"[%d, %d] %f\\n\", yi, xi, buf_out[yi * x + xi]);
 }
 
 __kernel void bp_hidden_gradient(
-    __global float* buf_out,
-    __global float* buf_gradient_next,
-    __global float* buf_weight,
-    __global float* pad_grad,
+    __global half* buf_out,
+    __global half* buf_gradient_next,
+    __global half* buf_weight,
+    __global half* pad_grad,
     const int num_node,
     const int n_num_node)
 {
@@ -106,10 +108,10 @@ __kernel void bp_hidden_gradient(
     int ni = get_global_id(1);
     int nni = get_global_id(2);
     
-    float y = buf_out[bi * num_node + ni];
-    float w = buf_weight[nni * num_node + ni];
-    float delta_next = buf_gradient_next[nni];
-    float delta = y * (1 - y) * delta_next * w;
+    half y = buf_out[bi * num_node + ni];
+    half w = buf_weight[nni * num_node + ni];
+    half delta_next = buf_gradient_next[nni];
+    half delta = y * (1 - y) * delta_next * w;
     
     pad_grad[bi * n_num_node * num_node + nni * num_node + ni] = delta;
     //if (ni==0){
@@ -127,11 +129,11 @@ __kernel void bp_hidden_gradient(
 }
 
 __kernel void bp_hidden(
-    __global float* buf_output,
-    __global float* buf_output_pre,
-    __global float* buf_weight,
-    __global float* buf_gradient,
-    __global float* pad_weight,
+    __global half* buf_output,
+    __global half* buf_output_pre,
+    __global half* buf_weight,
+    __global half* buf_gradient,
+    __global half* pad_weight,
     const int num_batch, 
     const int num_input,
     const int num_node)
@@ -140,33 +142,33 @@ __kernel void bp_hidden(
     int ii = get_global_id(1);
     int ni = get_global_id(2);
 
-    float grad = buf_gradient[ni];
-    float delta = 0.01 * grad * buf_output_pre[bi * num_node + ni];
+    half grad = buf_gradient[ni];
+    half delta = 0.01 * grad * buf_output_pre[bi * num_node + ni];
     pad_weight[bi * num_node + ni] = buf_weight[bi * num_node + ni] + delta;
     //printf(\"[%d, %d, %d] %.15f\\n\", bi, ii, ni, delta);
 }
 
 __kernel void bp_output_softmax_gradient(
-    __global float* buf_label,
-    __global float* buf_softmax,
-    __global float* pad_grad,
+    __global half* buf_label,
+    __global half* buf_softmax,
+    __global half* pad_grad,
     const int num_node)
 {
     int bi = get_global_id(0);
     int ni = get_global_id(1);
-    float label = buf_label[bi * num_node + ni];
-    float z = buf_softmax[bi * num_node + ni];
-    float delta = (label - z) * z * (1-z);
+    half label = buf_label[bi * num_node + ni];
+    half z = buf_softmax[bi * num_node + ni];
+    half delta = (label - z) * z * (1-z);
     pad_grad[bi * num_node + ni] = delta;
     //printf(\"[%d, %d] %.15f\\n\", bi, ni, delta);
 }
 
 __kernel void bp_output_fc(
-    __global float* buf_output,
-    __global float* buf_output_pre,
-    __global float* buf_weight,
-    __global float* buf_gradient,
-    __global float* pad_weight,
+    __global half* buf_output,
+    __global half* buf_output_pre,
+    __global half* buf_weight,
+    __global half* buf_gradient,
+    __global half* pad_weight,
     const int num_batch, 
     const int num_input,
     const int num_node)
@@ -175,9 +177,9 @@ __kernel void bp_output_fc(
     int ii = get_global_id(1);
     int ni = get_global_id(2);
     
-    float delta = buf_gradient[ni];
-    float v = 0.01 * delta * buf_output_pre[bi * num_input + ii];
-    float w = buf_weight[ni * num_input + ii];
+    half delta = buf_gradient[ni];
+    half v = 0.01 * delta * buf_output_pre[bi * num_input + ii];
+    half w = buf_weight[ni * num_input + ii];
     
     pad_weight[bi * num_node * num_input + ni * num_input + ii] = w + v;
     //if (ni==0 && ii==0){
@@ -189,32 +191,32 @@ __kernel void bp_output_fc(
 }
 
 __kernel void get_std(
-    __global float* buf,
+    __global half* buf,
     const int batch_stride,
-    const float mean,
-    const float div)
+    const half mean,
+    const half div)
 {
     int bi = get_global_id(0);
     int start = bi * batch_stride;
     
     for (int i=0; i<batch_stride; i++){
-        float k = buf[start + i] - mean;
+        half k = buf[start + i] - mean;
         buf[start + i] = k / div;
     }
 }
 
 __kernel void get_dsum(
-    __global float* buf,
-    __global float* out,
+    __global half* buf,
+    __global half* out,
     const int batch_stride,
-    const float mean)
+    const half mean)
 {
     int bi = get_global_id(0);
     int start = bi * batch_stride;
-    float dsum = 0.0;
+    half dsum = 0.0;
         
     for (int i=0; i<batch_stride; i++){
-        float k = buf[start + i] - mean;
+        half k = buf[start + i] - mean;
         dsum += (k*k);
     }
     
@@ -222,13 +224,13 @@ __kernel void get_dsum(
 }
 
 __kernel void get_sum(
-    __global float* buf,
-    __global float* out,
+    __global half* buf,
+    __global half* out,
     const int batch_stride)
 {
     int bi = get_global_id(0);
     int start = bi * batch_stride;
-    float sum = 0.0;
+    half sum = 0.0;
     
     for (int i=0; i<batch_stride; i++){
         sum += buf[start + i];
@@ -238,12 +240,12 @@ __kernel void get_sum(
 }
 
 __kernel void get_max(
-    __global float* buf,
-    __global float* out,
+    __global half* buf,
+    __global half* out,
     const int batch_stride)
 {
     int bi = get_global_id(0);
-    float max = 0.0;
+    half max = 0.0;
     int start = bi * batch_stride;
     
     for (int i=0; i<batch_stride; i++){
@@ -256,7 +258,7 @@ __kernel void get_max(
 }
         
 __kernel void normalize_batch(
-    __global float* data, 
+    __global half* data, 
     const int b_num, 
     const int ch_size, 
     const int ch_num)
@@ -264,12 +266,12 @@ __kernel void normalize_batch(
     int ci = get_global_id(0);
     int stride = ch_size * ch_num;
 
-    float sum = 0.0;
-    float mean = 0.0;
-    float dsum = 0.0;
-    float delta = 0.0000001;
-    float div2 = 0.0;
-    float div = 0.0;
+    half sum = 0.0;
+    half mean = 0.0;
+    half dsum = 0.0;
+    half delta = 0.0000001;
+    half div2 = 0.0;
+    half div = 0.0;
     int cnt = 0;
 
     for (int bi=0; bi<b_num; bi++){
@@ -279,30 +281,30 @@ __kernel void normalize_batch(
             cnt++;
         }
     }
-    mean = sum / (float)cnt;
+    mean = sum / (half)cnt;
 
     for (int bi=0; bi<b_num; bi++){
         int start = bi * stride + ci * ch_size;
         for (int i=0; i<ch_size; i++){
-            float k = data[start + i] - mean;
+            half k = data[start + i] - mean;
             dsum += (k*k);
         }
     }        
-    div2 = dsum / (float)cnt;
+    div2 = dsum / (half)cnt;
     div = sqrt(div2) + delta;
     
     for (int bi=0; bi<b_num; bi++){
         int start = bi * stride + ci * ch_size;
         for (int i=0; i<ch_size; i++){
-            float k = data[start + i] - mean;
+            half k = data[start + i] - mean;
             data[start + i] = k / div;
         }
     }
 }
 
 __kernel void conv_4_pad_batch(
-    __global float* input,
-    __global float* output,
+    __global half* input,
+    __global half* output,
     const int w,
     const int h,
     const int ch)
@@ -330,9 +332,9 @@ __kernel void conv_4_pad_batch(
 };
 
 __kernel void conv_4_roll_batch(
-    __global float* input,
-    __global float* weight,
-    __global float* output,
+    __global half* input,
+    __global half* weight,
+    __global half* output,
     const int w,
     const int h,
     const int ch,
@@ -351,7 +353,7 @@ __kernel void conv_4_roll_batch(
     
     for (int fi=0; fi<filter; fi++){
         //printf(\"CL : fi=%d\\n\", fi);
-        float sum = 0.0;
+        half sum = 0.0;
         int f_start = 3*3*fi*ch;
                     
         for (int i=0; i<ch; i++){
@@ -389,9 +391,9 @@ __kernel void conv_4_roll_batch(
 };
 
 __kernel void conv_5_roll_batch(
-    __global float* input,
-    __global float* weight,
-    __global float* output,
+    __global half* input,
+    __global half* weight,
+    __global half* output,
     const int in_w,
     const int in_h,
     const int out_w,
@@ -416,7 +418,7 @@ __kernel void conv_5_roll_batch(
     // ch is input, filter is output
     
     for (int fi=0; fi<filter; fi++){
-        float sum = 0.0;
+        half sum = 0.0;
         int f_start = ksize * ksize * fi * ch;
         for (int i=0; i<ch; i++){
             int start = in_start + in_ch_stride * i;
@@ -424,8 +426,8 @@ __kernel void conv_5_roll_batch(
             
             for (int fy=0; fy<ksize; fy++){
                 for (int fx=0; fx<ksize; fx++){
-                    float w = weight[w_start + ksize*fy + fx];
-                    float t = input[start + in_w*fy + fx] * w;
+                    half w = weight[w_start + ksize*fy + fx];
+                    half t = input[start + in_w*fy + fx] * w;
                     sum += t;
                     //printf(\"w=%f\\n\", w);
                 }
@@ -438,8 +440,8 @@ __kernel void conv_5_roll_batch(
 };
 
 __kernel void max_batch(
-    __global float* input,
-    __global float* output,
+    __global half* input,
+    __global half* output,
     const int ch,
     const int w, // output w
     const int h)
@@ -460,8 +462,8 @@ __kernel void max_batch(
     int output_stride = och_stride * ch;
     int output_offset = output_stride * bi;
 
-    float max = 0.0;
-    float a[4];
+    half max = 0.0;
+    half a[4];
 
     for (int c=0;c<ch;c++){
         int k = input_offset + (ich_stride*c) + (w*2)*y + x*2;
@@ -479,8 +481,8 @@ __kernel void max_batch(
 }
 
 __kernel void scale_exp(
-    __global float* x,
-    __global float* y,
+    __global half* x,
+    __global half* y,
     const int stride,
     const int debug)
 {
@@ -495,10 +497,10 @@ __kernel void scale_exp(
 };
 
 __kernel void scale(
-    __global float* x,
-    __global float* y,
+    __global half* x,
+    __global half* y,
     const int stride,
-    const float max,
+    const half max,
     const int debug)
 {
     int i = get_global_id(0); // data index
@@ -517,43 +519,43 @@ __kernel void scale(
     }
 };
 
-__kernel void normalize_layer(__global float* data, int size)
+__kernel void normalize_layer(__global half* data, int size)
 {
     int bi = get_global_id(0);
-    float sum = 0.0;
-    float mean = 0.0;
-    float delta = 0.000001;
-    float div2 = 0.0;
-    float div = 0.0;
+    half sum = 0.0;
+    half mean = 0.0;
+    half delta = 0.000001;
+    half div2 = 0.0;
+    half div = 0.0;
 
     for (int i=0; i<size; i++){
         sum += data[bi*size+i];
     }
-    mean = sum / (float)size;
+    mean = sum / (half)size;
     
     sum = 0.0;
     for (int i=0; i<size; i++){
-        float k = data[bi*size+i] - mean;
+        half k = data[bi*size+i] - mean;
         sum += k * k;
     }
-    div2 = sum / (float)size;
+    div2 = sum / (half)size;
     div =  sqrt(div2 + delta);
     
     for (int i=0; i<size; i++){
-        float k = data[bi*size+i] - mean;
+        half k = data[bi*size+i] - mean;
         data[bi*size+i] = k / div;
     }
 }
 
-__kernel void scale_layer(__global float* data, int size, float scale)
+__kernel void scale_layer(__global half* data, int size, half scale)
 {
     int bi = get_global_id(0);
     int start = bi*size;
-    float max = 0.0;
-    //float k = 0.0;
+    half max = 0.0;
+    //half k = 0.0;
     
     for (int i=0;i<size;i++){
-        float k = fabs(data[start+i]);
+        half k = fabs(data[start+i]);
         if (k>max){
             max = k;
         }
@@ -565,7 +567,7 @@ __kernel void scale_layer(__global float* data, int size, float scale)
             // simple scaling
             data[start+i] = (data[start+i]/max);
             /*
-            float k = data[start+i]/max;
+            half k = data[start+i]/max;
             if (k>=0.0 && k<0.125){
                 k = 0.0;
             }else if (k>0.125 && k<=0.375){
@@ -581,14 +583,14 @@ __kernel void scale_layer(__global float* data, int size, float scale)
     }
 }
 
-__kernel void mse(__global const float* infs, __global const float* labels, __global float* output, int num)
+__kernel void mse(__global const half* infs, __global const half* labels, __global half* output, int num)
 {
     int bi = get_global_id(0); // batch index
     
-    float k;
-    float t;
-    float d;
-    float sum;
+    half k;
+    half t;
+    half d;
+    half sum;
 
     sum = 0.0;
 
@@ -600,21 +602,21 @@ __kernel void mse(__global const float* infs, __global const float* labels, __gl
     }
     
     //output[bi] = sum/2.0;
-    output[bi] = sum/(float)num;
+    output[bi] = sum/(half)num;
 }
 
-__kernel void cross_entropy(__global const float* infs,
-                            __global const float* labels,
-                            __global float* output,
+__kernel void cross_entropy(__global const half* infs,
+                            __global const half* labels,
+                            __global half* output,
                             int num)
 {
     int bi = get_global_id(0); // batch index
     //int ni = get_global_id(1); // node index
     
-    float delta;
-    float k;
-    float t;
-    float sum;
+    half delta;
+    half k;
+    half t;
+    half sum;
     
     delta = 0.0000001;
     sum = 0.0;
@@ -631,14 +633,14 @@ __kernel void cross_entropy(__global const float* infs,
 }
 
 __kernel void p_softmax(
-    __global float* in,
-    __global float* out,
+    __global half* in,
+    __global half* out,
     int num,
-    float scale)
+    half scale)
 {
     int bi = get_global_id(0);
-    float temp = 0.0;
-    float total = 0.0;
+    half temp = 0.0;
+    half total = 0.0;
     int start = bi*num;
 
     for (int i=0;i<num;i++){
@@ -660,8 +662,8 @@ __kernel void p_softmax(
     }
 }
 
-__kernel void k_sum(__global const float* in,
-                    __global float* out,
+__kernel void k_sum(__global const half* in,
+                    __global half* out,
                     int num_input,
                     int num_node,
                     int activation)
@@ -669,7 +671,7 @@ __kernel void k_sum(__global const float* in,
     int ni = get_global_id(0);
     int bi = get_global_id(1);
     int ii = 0;
-    float sum = 0.0;
+    half sum = 0.0;
     
     for (ii=0;ii<num_input;ii++){
         sum += in[num_node*num_input*bi + num_input*ni + ii];
@@ -684,11 +686,11 @@ __kernel void k_sum(__global const float* in,
     }
 }
 
-__kernel void relu(__global float* out, int num, int stride, int mode)
+__kernel void relu(__global half* out, int num, int stride, int mode)
 {
     int bi = get_global_id(0);
     int ni = get_global_id(1);
-    //float k = 0.0;
+    //half k = 0.0;
     
     for (int i=0;i<num;i++){
         int idx = stride*bi + ni + i;
@@ -705,9 +707,9 @@ __kernel void relu(__global float* out, int num, int stride, int mode)
 }
 
 __kernel void multiple_x_by_w_batch(
-    __global const float* x,
-    __global const float* w,
-    __global float* y,
+    __global const half* x,
+    __global const half* w,
+    __global half* y,
     const int stride_1,
     const int stride_2)
 {
@@ -719,9 +721,9 @@ __kernel void multiple_x_by_w_batch(
 };
 
 __kernel void multiple_x_by_w(
-    __global float* x,
-    __global float* w,
-    __global float* y,
+    __global half* x,
+    __global half* w,
+    __global half* y,
     const int bi,
     const int stride_1,
     const int stride_2)
@@ -732,18 +734,18 @@ __kernel void multiple_x_by_w(
     y[stride_1*bi + stride_2*j+i] = x[stride_2*bi+i] * w[stride_2*j+i];
 };
 
-__kernel void k_test(const float in)
+__kernel void k_test(const half in)
 {
     int i = get_global_id(0);
-    float out = 0.0;
+    half out = 0.0;
     out = exp(in);
     printf(\"%d : exp(%If) = %If\\n\", i, in, out);
 };
 
 __kernel void calc_mac_relu(
-    __global float* x,
-    __global float* w,
-    __global float* y,
+    __global half* x,
+    __global half* w,
+    __global half* y,
     int xsize, // node
     int wsize, // input
     int act)
@@ -754,7 +756,7 @@ __kernel void calc_mac_relu(
     int x_start = wsize * bi;
     int w_start = wsize * xi;
     int y_start = (xsize * bi) + xi;
-    float temp = 0.0;
+    half temp = 0.0;
 
     for (int i=0;i<wsize;i++){
         temp += (x[x_start+i] * w[w_start+i]);
@@ -787,7 +789,7 @@ __kernel void calc_mac_relu(
 __kernel void calc_mac_relu_q(
     __global uchar* x,
     __global uchar* w,
-    __global float* y,
+    __global half* y,
     int xsize, // node
     int wsize, // input
     int act)
@@ -798,12 +800,12 @@ __kernel void calc_mac_relu_q(
     int x_start = wsize * bi;
     int w_start = wsize * xi;
     int y_start = (xsize * bi) + xi;
-    float temp = 0.0;
+    half temp = 0.0;
 
     for (int i=0;i<wsize;i++){
         int t0 = w[w_start+i];
         int t1 = x[x_start+i];
-        //float mp = multiple[t0][t1];
+        //half mp = multiple[t0][t1];
         //printf(\"mp : (%d, %d) %f, \\n\", t0, t1, mp);
         //temp += mp;
         temp += multiple[t0][t1];
@@ -822,15 +824,15 @@ __kernel void calc_mac_relu_q(
 }
 
 __kernel void q_hidden_output(
-    __global float* x,
+    __global half* x,
     __global uchar* y,
     int size) // size of y
 {
     int bi = get_global_id(0);
-    float min = 0.0;
-    float max = 0.0;
-    float temp = 0.0;
-    float base = 0.0;
+    half min = 0.0;
+    half max = 0.0;
+    half temp = 0.0;
+    half base = 0.0;
     int start = bi * size;
             
     // find min and max
@@ -907,6 +909,11 @@ class OpenCL(gpu.Gpu):
         
     def copy(self, dist, src):
         #print("OpenCL::copy()")
+        
+        #assert type(self._gpu_input).__name__ == "Buffer"
+        #assert self._queue.context is self._gpu_input.context
+        #src = np.asarray(data_array)
+        
         event = cl.enqueue_copy(self._queue, dist, src)
         event.wait()
     #
@@ -964,7 +971,7 @@ class OpenCL(gpu.Gpu):
     def scale(self, d_x, d_y, stride, max, row, batch_size, debug):
         event = self.prg.scale(self._queue, (row, batch_size), None,
                                d_x, d_y, np.int32(stride),
-                               np.float32(max), np.int32(debug))
+                               np.float16(max), np.int32(debug))
         event.wait()
 
     def multiple_x_by_w(self, d_x, d_w, d_y, bi, stride_1, stride_2, row, col):
@@ -1014,8 +1021,8 @@ class OpenCL(gpu.Gpu):
         event.wait()
     
     def scale_layer(self, batch_size, data, size, scale=1.0):
-        #event = self.prg.scale_layer(self._queue, (batch_size,), None, data, np.int32(size), np.float32(scale))
-        event = self.k_scale_layer(self._queue, (batch_size,), None, data, np.int32(size), np.float32(scale))
+        #event = self.prg.scale_layer(self._queue, (batch_size,), None, data, np.int32(size), np.float16(scale))
+        event = self.k_scale_layer(self._queue, (batch_size,), None, data, np.int32(size), np.float16(scale))
         event.wait()
         
     #def scale_filetr(self, batch_size, filetr_size, data, batch_stride, filetr_stride):
@@ -1027,11 +1034,11 @@ class OpenCL(gpu.Gpu):
         event.wait()
     
     #def softmax(self, data, size, num_batch, scale=1.0): # <<
-    #    event = self.prg.p_softmax(self._queue, (num_batch,), None, data, np.int32(size), np.float32(scale))
+    #    event = self.prg.p_softmax(self._queue, (num_batch,), None, data, np.int32(size), np.float16(scale))
     #    event.wait()
     def softmax(self, data, out, size, num_batch, scale=1.0): # <<
-        #event = self.prg.p_softmax(self._queue, (num_batch,), None, data, out, np.int32(size), np.float32(scale))
-        event = self.k_p_softmax(self._queue, (num_batch,), None, data, out, np.int32(size), np.float32(scale))
+        #event = self.prg.p_softmax(self._queue, (num_batch,), None, data, out, np.int32(size), np.float16(scale))
+        event = self.k_p_softmax(self._queue, (num_batch,), None, data, out, np.int32(size), np.float16(scale))
         event.wait()
     
     def mse(self, infs, labels, output, num_node, num_batch):
@@ -1081,12 +1088,12 @@ class OpenCL(gpu.Gpu):
  
     def get_std(self, batch_size, buf, batch_stride, mean, std):
         event = self.prg.get_std(self._queue, (batch_size,), None,
-                                 buf, np.int32(batch_stride), np.float32(mean), np.float32(std))
+                                 buf, np.int32(batch_stride), np.float16(mean), np.float16(std))
         event.wait()
         
     def get_dsum(self, batch_size, buf, out, batch_stride, mean):
         event = self.prg.get_dsum(self._queue, (batch_size,), None,
-                                     buf, out, np.int32(batch_stride), np.float32(mean))
+                                     buf, out, np.int32(batch_stride), np.float16(mean))
         event.wait()
         
     def get_sum(self, batch_size, buf, out, batch_stride):
@@ -1100,18 +1107,20 @@ class OpenCL(gpu.Gpu):
         event.wait()
         
     def k_test(self, value):
-        event = self.prg.k_test(self._queue, (1,), None, np.float32(value))
+        event = self.prg.k_test(self._queue, (1,), None, np.float16(value))
         event.wait()
 #
 #
 #
 def main():
-    data_x = np.array([0.1, 0.2, 0.3, 0.4, 0.5]).astype(np.float32)
+    data_x = np.array([0.1, 0.2, 0.3, 0.4, 0.5]).astype(np.float16)
+    data_x0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0]).astype(np.float16)
+    data_x1 = np.array([0.0, 0.0, 0.0, 0.0, 0.0]).astype(np.float16)
     data_w = np.array([[0.5, 0.5, 0.5, 0.5, 0.2, 0.5, 0.5, 0.5, 0.5, 0.2, 0.5, 0.5, 0.5, 0.5, 0.2],
                        [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-                       [0.1, 0.2, 0.3, 0.4, 0.5, 0.1, 0.2, 0.3, 0.4, 0.5, 0.1, 0.2, 0.3, 0.4, 0.5]]).astype(np.float32)
+                       [0.1, 0.2, 0.3, 0.4, 0.5, 0.1, 0.2, 0.3, 0.4, 0.5, 0.1, 0.2, 0.3, 0.4, 0.5]]).astype(np.float16)
     data_y = np.array([[0.0, 0.0, 0.0, 0.0],
-                       [0.0, 0.0, 0.0, 0.0]]).astype(np.float32)
+                       [0.0, 0.0, 0.0, 0.0]]).astype(np.float16)
     data_a = np.array([8, 16, 32, 64]).astype(np.int32)
     data_b = np.array([0.0, 0.0, 0.0, 0.0]).astype(np.float64)
 
@@ -1120,14 +1129,24 @@ def main():
     print(data_y)
     
     platform_id = 0
-    device_id = 1
-    g = Gpu(platform_id, device_id)
+    device_id = 0
+    g = OpenCL(platform_id, device_id)
     g.set_kernel_code()
+    
+    #print(data_x1)
+    b0 = g.dev_malloc(data_x0)
+    #print(b0)
+    #print(data_x1)
+    g.copy(b0, data_x)
+    g.copy(data_x1, b0)
+    # copy(dist, src)
+    print(data_x1)
+    
     #
-    p = 0.0
-    for i in range(100):
-        g.k_test(p)
-        p = p + 1.0
+    #p = 0.0
+    #for i in range(100):
+    #    g.k_test(p)
+    #    p = p + 1.0
     #
     return 0
 #

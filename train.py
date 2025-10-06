@@ -457,7 +457,7 @@ class Train:
         #
         return 1
 
-    def main_challenge_loop(self, ce, rate, loop_max, attack_num, one=False, save=0, debug=0):
+    def main_challenge_loop(self, ce, loop_max, attack_num, one=False, save=0, debug=0):
         r = self._r
         w_num = len(self.w_list)
         num = 0
@@ -466,7 +466,7 @@ class Train:
         hit_pre = 0
         sum_ce = 0.0
         #cnt = 0
-        while num<loop_max and sum_ce<rate:
+        while num<loop_max: # and sum_ce<rate:
             #cnt += 1
             attack_list = self.make_attack_list(w_num, attack_num)
         
@@ -524,5 +524,5 @@ class Train:
         #
         hit_rate = hit / num #loop_max
         print(attack_num, "hit rate:", hit, "/", num, "ce=", ce)
-        r.save()
+        #r.save()
         return ce, hit_rate

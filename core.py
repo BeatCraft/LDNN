@@ -1647,6 +1647,9 @@ class Roster:
             self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.uint8)
         #
         self._labels = np.zeros((batch_size, num_class), dtype=np.float16)
+        #
+        # this should be float32 or float64?
+        #
         self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float16)
         if self._gpu.type==0: # OpenCL
             print("Roster::prepare(), OpenCL")

@@ -760,7 +760,7 @@ class OutputLayer(Layer):
             self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
             self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
             self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
-            
+        
             self._gpu_weight = self._gpu.alloc_buf_from_array(self._weight_matrix)
             self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
             self._gpu_softmax = self._gpu.alloc_buf_from_array(self._softmax_array)
@@ -842,28 +842,54 @@ class OutputLayer(Layer):
             if debug:
                 print("OutputLayer::propagate() macOS Metal")
             #
-            
             self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, 0)
+            #self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
+            
             if self.backprop:
                 self._output_array = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float16)
                 self._output_array = self._output_array.view(np.float16).reshape(self._batch_size, self._num_node)
                 
                 self._softmax_array = np.frombuffer(self._gpu_softmax.contents().as_buffer(self._gpu_softmax.length()), dtype=np.float16)
                 self._softmax_array = self._softmax_array.view(np.float16).reshape(self._batch_size, self._num_node)
+                
+                self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
+                
+                debug=1
+                if debug:
+                    N = self._softmax_array.shape[0]
+                    M = self._softmax_array.shape[1]
+                    for n in range(N):
+                        for m in range(M):
+                            if np.isnan(self._softmax_array[n][m]):
+                                print(n, m, self._output_array[n][m], self._softmax_array[n][m])
+                            #
+                        #
+                    #
+                #
+                debug = 0
+            else:
+                self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
             #
+                        
             if debug:
                 out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float16)
+                out = out.view(np.float16).reshape(self._batch_size, self._num_node)
                 print(out.shape)
-                print(out[:10])
+                #print(out[503])
+                #print("softmax", self._softmax_array[502])
+                #print("softmax", self._softmax_array[504])
             #
             
-            self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
-            if debug:
-                print(self._batch_size, self._num_node)
-                out = np.frombuffer(self._gpu_softmax.contents().as_buffer(self._gpu_softmax.length()), dtype=np.float16)
-                print(out.shape)
-                print(out[:10])
+            #self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
+            #print("output", self._output_array[503])
+            #sum = np.sum(self._output_array[503])
+            #for i in range(10):
+            #    temp = self._output_array[503][i]
+            #    e = np.exp(temp)
+            #    print(e/sum)
             #
+            #print(sum)
+            #print("softmax", self._softmax_array[503][2])
         #
     
     def bp(self, label_array, debug=0):
@@ -873,12 +899,31 @@ class OutputLayer(Layer):
         
         if self._gpu.type==2:
             # differencial
-            self.delta = self._softmax_array - label_array # need no batch avg
+            self.delta = (self._softmax_array - label_array) # need no batch avg
+            ddd = self._softmax_array - label_array
             #print("self.delta.shape:", self.delta.shape) # (100, 10)
             #print("self._pre._output_array.shape:", self._pre._output_array.shape) # (100, 256)
+            
+            #I = self.delta.shape[0] # 100
+            #J = self.delta.shape[1] # 10
+            #for i in range(I):
+            #    for j in range(J):
+            #        if np.isnan(self.delta[i][j]):
+            #            #print("NaN", i, j, self.delta[i][j], self._softmax_array[i][j], label_array[i][j])
+            #            print("NaN", i, self._softmax_array[i])
+            #        #
+            #    #
+            #
+            
 
             # slope for weights
             self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
+            #N = self.dW.shape[0]
+            #M = self.dW.shape[1]
+            #for n in range(N): # 100
+            #    for m in range(M): # 256
+            #        self._pre._output_array[][]
+            
             #print("self.dW.shape:", self.dW.shape) # (256, 10)
             
             # change weights and derivertive of relu
@@ -887,10 +932,12 @@ class OutputLayer(Layer):
             #print("self._weight_matrix.shape:", self._weight_matrix.shape) # (10, 256)
             N = self.dW.shape[0]
             M = self.dW.shape[1]
-            
             #cnt = 0
             for n in range(N):
                 for m in range(M):
+                    #if np.isnan(self.dW[n][m]):
+                    #    print("NaN", n, m, self.delta[m][n], self._pre._output_array[m][n], self.delta[m][n]*self._pre._output_array[m][n]/self._batch_size)
+                    #
                     w = self._weight_matrix[n][m]
                     self._weight_matrix[n][m] = w - self.dW[n][m] * self.learning_rate
                     if self.dW[n][m]<0:

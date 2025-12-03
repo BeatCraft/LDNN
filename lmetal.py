@@ -66,8 +66,8 @@ kernel void scale_layer(
     uint idx [[thread_position_in_grid]])
 {
     uint bi = idx;
-    uint start = bi*P.size;
-        half max = 0.0;
+    uint start = bi * P.size;
+    half max = 0.0;
     
     for (uint i=0;i<P.size;i++){
         half k = fabs(data[start+i]);
@@ -102,6 +102,9 @@ kernel void softmax(
 
     for (uint i=0;i<P.num;i++){
         temp = (float)(in[start+i] / P.scale);
+        if (temp>11.0){ // fix overflow
+            temp = 11.0;
+        }
         temp = exp(temp);
         if (isinf(temp)){
             temp = 3.402823e+38;
@@ -123,6 +126,27 @@ struct Params_ce {
 };
 
 kernel void cross_entropy(
+    device const half* infs [[buffer(0)]],
+    device const half* labels [[buffer(1)]],
+    device half* output [[buffer(2)]],
+    constant Params_ce& P [[buffer(3)]],
+    uint idx [[thread_position_in_grid]])
+{
+    const float eps = 1e-7f;
+    float sum = 0.0f;
+    const uint base = idx * P.num;
+    
+    for (uint i = 0; i < P.num; ++i) {
+        float t = (float)labels[base + i];
+        float p = (float)infs[base + i];
+        p = fmax(p, eps);
+        sum += t * log(p);
+    }
+    
+    output[idx] = (half)(-sum);
+}
+
+kernel void cross_entropy16(
     device const half* infs [[buffer(0)]],
     device const half* labels [[buffer(1)]],
     device half* output [[buffer(2)]],

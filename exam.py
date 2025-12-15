@@ -29,6 +29,9 @@ def print_result(ca, eval_size, num_class, dist, rets, oks):
     #
     print("---------------------------------")
 
+def regression(r, debug=0):
+    pass
+                
 def classification(r, b, n, debug=0, single=0):
     data_size = b.data_size
     num_class = b.class_num

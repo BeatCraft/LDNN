@@ -273,10 +273,11 @@ class Layer(object):
         #self._weight_index_matrix[ni][ii] = wi
         try:
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
-                if self.qmode==0:
+            
+                if self.qmode==0 or self.qmode==1:
                     self._weight_index_matrix[ni][ii] = np.uint8(wi)
                     self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
-                elif self.qmode==1:
+                elif self.qmode==2:
                     self._weight_index_matrix[ni][ii] = np.uint8(wi)
                 #
             elif self._type==LAYER_TYPE_CONV or self._type==LAYER_TYPE_FCNN:
@@ -427,8 +428,10 @@ class InputLayer(Layer):
         self._batch_size = batch_size
         
         if self.qmode==0:
-            self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
+            self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
         elif self.qmode==1:
+            self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
+        elif self.qmode==2:
             self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.uint8)
         #
         if self._gpu:
@@ -516,14 +519,20 @@ class HiddenLayer(Layer):
         
         if self._gpu.type==0:
             if self.qmode==0:
-                self._momentum = np.zeros( (self._num_node, self._num_input), dtype=np.int8)
+                self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
+                self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+                self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+                self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+                self._gpu_output = self._gpu.dev_malloc(self._output_array)
+            if self.qmode==1:
+                #self._momentum = np.zeros( (self._num_node, self._num_input), dtype=np.int8)
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
                     
                 self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
                 self._gpu_output = self._gpu.dev_malloc(self._output_array)
-            elif self.qmode==1:
+            elif self.qmode==2:
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_index_matrix)
                 self.mac_array = np.zeros( (self._batch_size, self._num_node), dtype=np.float16)
@@ -536,12 +545,22 @@ class HiddenLayer(Layer):
             self._gpu_output = self._gpu.allocateArray(self._output_array)
         elif self._gpu.type==2: # macOS Metal
             #print(" macOS Metal")
-            self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
-            self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
-            self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
+            if self.qmode==0:
+                self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
+                self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+                self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+                self._gpu_weight = self._gpu.alloc_buf_from_array(self._weight_matrix)
+                self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
+            elif self.qmode==1:
+                self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
+                self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
+                self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
             
-            self._gpu_weight = self._gpu.alloc_buf_from_array(self._weight_matrix)
-            self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
+                self._gpu_weight = self._gpu.alloc_buf_from_array(self._weight_matrix)
+                self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
+            elif self.qmode==2:
+                pass
+            #
         #
 
     def update_weight(self):
@@ -560,7 +579,6 @@ class HiddenLayer(Layer):
         elif self._gpu.type==1:
             self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
         elif self._gpu.type==2:
-            #print("HiddenLayer::update_weight() macOS Metal")
             self._gpu.write_np_to_mbuf(self._weight_matrix, self._gpu_weight)
         #
 
@@ -588,6 +606,8 @@ class HiddenLayer(Layer):
         
         if self._gpu.type==0: # OpenCL
             if self.qmode==0:
+                pass
+            elif self.qmode==1:
                 self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
                 if self._scale==0:
                     pass
@@ -615,7 +635,7 @@ class HiddenLayer(Layer):
                     print("hidden, weight", self._weight_matrix.shape)
                     print((self._weight_matrix[0]))
                 #
-            elif self.qmode==1:
+            elif self.qmode==2:
                 self._gpu.macReluQ(array_in, self._gpu_weight, self._gpu_mac, self._batch_size, self._num_node, self._num_input, a_mode)
                 self._gpu.q_hidden_output(self._gpu_mac, self._gpu_output, self._num_node, self._batch_size)
                 # quantize output
@@ -627,7 +647,7 @@ class HiddenLayer(Layer):
                     #self._gpu.copy(tarray, array_in)
                     #print(self._index, "hidden, input")
                     #print((tarray[0]))
-                                    
+        
                     self._gpu.copy(self._output_array, self._gpu_output)
                     print(self._index, "hidden, output")
                     print(self._output_array[0])
@@ -655,21 +675,37 @@ class HiddenLayer(Layer):
             #
         elif self._gpu.type==2: # macOS Metal
             if debug:
-                print("HiddenLayer::propagate() macOS Metal")
+                print("HiddenLayer::propagate() macOS Metal", self.qmode, debug)
             #
             
-            self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, a_mode)
-            self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
+            if self.qmode==0:
+                self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, a_mode)
+                self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
+                if self.backprop:
+                    pass
+                #
+                if debug:
+                    out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
+                    out = out.view(np.float32).reshape(self._batch_size, self._num_node)
+                    print(out.shape)
+                    print(out[:10])
+                #
+            elif self.qmode==1:
+                self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, a_mode)
+                self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
             
-            if self.backprop:
-                self._output_array = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float16)
-                self._output_array = self._output_array.view(np.float16).reshape(self._batch_size, self._num_node)
-            #
+                if self.backprop:
+                    self._output_array = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float16)
+                    self._output_array = self._output_array.view(np.float16).reshape(self._batch_size, self._num_node)
+                #
             
-            if debug:
-                out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float16)
-                print(out.shape)
-                print(out[:10])
+                if debug:
+                    out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float16)
+                    print(out.shape)
+                    print(out[:10])
+                #
+            elif self.qmode==2:
+                pass
             #
         #
         
@@ -725,6 +761,17 @@ class OutputLayer(Layer):
         
         if self._gpu.type==0:
             if self.qmode==0:
+                #self._momentum = np.zeros( (self._num_node, self._num_input), dtype=np.int8)
+                self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
+                self._weight_matrix = np.zeros((self._num_node, self._num_input), dtype=np.float32)
+                self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
+                
+                self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+                self._gpu_output = self._gpu.dev_malloc(self._output_array)
+                                
+                self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+                self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
+            elif self.qmode==1:
                 self._momentum = np.zeros( (self._num_node, self._num_input), dtype=np.int8)
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._weight_matrix = np.zeros((self._num_node, self._num_input), dtype=np.float16)
@@ -735,7 +782,7 @@ class OutputLayer(Layer):
                                 
                 self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
                 self._gpu_softmax = self._gpu.dev_malloc(self._softmax_array)
-            elif self.qmode==1:
+            elif self.qmode==2:
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_index_matrix)
                 
@@ -756,21 +803,34 @@ class OutputLayer(Layer):
             self._gpu_softmax = self._gpu.allocateArray(self._softmax_array)
         elif self._gpu.type==2:
             #print("OutputLayer::prepare() macOS Metal")
-            self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
-            self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
-            self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
-            self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
+            if self.qmode==0:
+                self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
+                self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float32)
+                self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
+                self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
         
-            self._gpu_weight = self._gpu.alloc_buf_from_array(self._weight_matrix)
-            self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
-            self._gpu_softmax = self._gpu.alloc_buf_from_array(self._softmax_array)
+                self._gpu_weight = self._gpu.alloc_buf_from_array(self._weight_matrix)
+                self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
+                self._gpu_softmax = self._gpu.alloc_buf_from_array(self._softmax_array)
+            elif self.qmode==1:
+                self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
+                self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
+                self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
+                self._softmax_array = np.zeros((self._batch_size, self._num_node), dtype=np.float16)
+        
+                self._gpu_weight = self._gpu.alloc_buf_from_array(self._weight_matrix)
+                self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
+                self._gpu_softmax = self._gpu.alloc_buf_from_array(self._softmax_array)
+            elif self.qmode==0:
+                pass
+            #
         #
         
     def update_weight(self):
         if self._gpu.type==0:
-            if self.qmode==0:
+            if self.qmode==0 or self.qmode==1:
                 self._gpu.copy(self._gpu_weight, self._weight_matrix)
-            elif self.qmode==1:
+            elif self.qmode==2:
                 self._gpu.copy(self._gpu_weight, self._weight_index_matrix)
             #
         elif self._gpu.type==1:
@@ -791,6 +851,8 @@ class OutputLayer(Layer):
         
         if self._gpu.type==0: # OpenCL
             if self.qmode==0:
+                pass
+            elif self.qmode==1:
                 self._gpu.macRelu(array_in, self._gpu_weight, self._gpu_output,
                               self._batch_size, self._num_node, self._num_input, 0)
                 #if debug:
@@ -802,7 +864,7 @@ class OutputLayer(Layer):
                     print("softmax", self._softmax_array[0].sum())
                     print(self._softmax_array[0])
                 #
-            elif self.qmode==1:
+            elif self.qmode==2:
                 a_mode = 0
                 self._gpu.macReluQ(array_in, self._gpu_weight, self._gpu_output, self._batch_size, self._num_node, self._num_input, a_mode)
                 if debug:
@@ -842,54 +904,50 @@ class OutputLayer(Layer):
             if debug:
                 print("OutputLayer::propagate() macOS Metal")
             #
-            self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, 0)
-            #self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
             
-            if self.backprop:
-                self._output_array = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float16)
-                self._output_array = self._output_array.view(np.float16).reshape(self._batch_size, self._num_node)
-                
-                self._softmax_array = np.frombuffer(self._gpu_softmax.contents().as_buffer(self._gpu_softmax.length()), dtype=np.float16)
-                self._softmax_array = self._softmax_array.view(np.float16).reshape(self._batch_size, self._num_node)
-                
-                self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
-                
-                debug=1
+            if self.qmode==0:
+                self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, 0)
+                #self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
                 if debug:
-                    N = self._softmax_array.shape[0]
-                    M = self._softmax_array.shape[1]
-                    for n in range(N):
-                        for m in range(M):
-                            if np.isnan(self._softmax_array[n][m]):
-                                print(n, m, self._output_array[n][m], self._softmax_array[n][m])
+                    out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
+                    out = out.view(np.float32).reshape(self._batch_size, self._num_node)
+                    print(out.shape)
+                    print(out[0])
+                #
+            elif self.qmode==1:
+                self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, 0)
+                
+                if self.backprop:
+                    self._output_array = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float16)
+                    self._output_array = self._output_array.view(np.float16).reshape(self._batch_size, self._num_node)
+                    self._softmax_array = np.frombuffer(self._gpu_softmax.contents().as_buffer(self._gpu_softmax.length()), dtype=np.float16)
+                    self._softmax_array = self._softmax_array.view(np.float16).reshape(self._batch_size, self._num_node)
+                    self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
+                    #debug=1
+                    if debug:
+                        N = self._softmax_array.shape[0]
+                        M = self._softmax_array.shape[1]
+                        for n in range(N):
+                            for m in range(M):
+                                if np.isnan(self._softmax_array[n][m]):
+                                    print(n, m, self._output_array[n][m], self._softmax_array[n][m])
+                                #
                             #
                         #
                     #
+                    #debug = 0
+                else:
+                    self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
                 #
-                debug = 0
-            else:
-                self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
-            #
                         
-            if debug:
-                out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float16)
-                out = out.view(np.float16).reshape(self._batch_size, self._num_node)
-                print(out.shape)
-                #print(out[503])
-                #print("softmax", self._softmax_array[502])
-                #print("softmax", self._softmax_array[504])
+                if debug:
+                    out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float16)
+                    out = out.view(np.float16).reshape(self._batch_size, self._num_node)
+                    print(out.shape)
+                #
+            elif self.qmode==2:
+                pass
             #
-            
-            #self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
-            #print("output", self._output_array[503])
-            #sum = np.sum(self._output_array[503])
-            #for i in range(10):
-            #    temp = self._output_array[503][i]
-            #    e = np.exp(temp)
-            #    print(e/sum)
-            #
-            #print(sum)
-            #print("softmax", self._softmax_array[503][2])
         #
     
     def bp(self, label_array, debug=0):
@@ -1727,11 +1785,11 @@ class Roster:
         self.output = None
         self._batch_size = 1
         self._data_size = 1
-        self._eval_mode = 0
+        #self._eval_mode = 0
         self._path = ""
-        self.wi_mode = 0
-        #self.mode_q = 0 # 0 : wi only, 1:all
-        self.qmode = 0 # 0 : wi only, 1:all
+        self.emode = 0
+        self.wmode = 0 # 0:index, 1:float
+        self.qmode = 0 # 0:32bit, 1:16bit, 2:8bit
         
     def set_backpropagation(self, sw, lr=0.01):
         self.backprop = sw
@@ -1744,6 +1802,10 @@ class Roster:
     
     # 0 : wi only / old style
     # 1 : all quantize
+    
+    # 0 : 32 bit
+    # 1 : 16 bit
+    # 2 : 8 bit
     def set_qmode(self, q):
         self.qmode = q
         c = self.count_layers()
@@ -1763,22 +1825,28 @@ class Roster:
         print("Roster::save(%s, %d)" % (path, mode))
         self.export_weight(path, mode)
     
-    def load(self, path=None, mode=0):
-        # mode : 0=index, 1=value
+    def load(self, path=None, mode=-1):
+        print("Roster::load(%s, %d)" % (path, mode))
+        # 0:index, 1:float
+        if mode<0:
+            mode = self.wmode
+        #
+        
         if path is None:
             path = self._path
         #
-        print("Roster::load(%s, %d)" % (path, mode))
+        
         if os.path.isfile(path):
             self.import_weight(path, mode)
         else:
             value = 0
-            self.init_weight(self.wi_mode, value)
+            self.init_weight(mode, value)
             self.export_weight(path, mode)
         #
 
     def set_evaluate_mode(self, mode):
-        self._eval_mode = mode
+        #self._eval_mode = mode
+        self.emode = mode
         # 0 : CE for classification
         # 1 : MSE for autoencoder
         # 2 : MSE for regression
@@ -1800,15 +1868,19 @@ class Roster:
         self._data_size = data_size
         #
         if self.qmode==0:
+            self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.float32)
+            self._labels = np.zeros((batch_size, num_class), dtype=np.float32)
+            self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float32)
+        if self.qmode==1:
             self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.float16)
-        elif self.qmode==1:
+            self._labels = np.zeros((batch_size, num_class), dtype=np.float16)
+            self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float16)
+        elif self.qmode==2:
             self._batch_data = np.zeros((self._batch_size, data_size), dtype=np.uint8)
+            self._labels = np.zeros((batch_size, num_class), dtype=np.float16)
+            self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float16)
         #
-        self._labels = np.zeros((batch_size, num_class), dtype=np.float16)
-        #
-        # this should be float32 or float64?
-        #
-        self._batch_cross_entropy = np.zeros(batch_size, dtype=np.float16)
+
         if self._gpu.type==0: # OpenCL
             print("Roster::prepare(), OpenCL")
             self._gpu_input = self._gpu.dev_malloc(self._batch_data)
@@ -1833,44 +1905,24 @@ class Roster:
     
     def direct_set_data(self, data_array):
         if self._gpu.type==0: # opencl
-            # copy(dist, src)
-            
-            #assert type(self._gpu_input).__name__ == "Buffer"
-            #assert self._queue.context is self._gpu_input.context
-            #src = np.asarray(data_array)
-            #assert src.flags.c_contiguous
-            #dest_nbytes = self._gpu_input.get_info(cl.mem_info.SIZE)
-            #assert src.nbytes <= dest_nbytes
-            #assert src.size > 0
-            
-            #print(type(data_array[0][0]))
-            
             self._gpu.copy(self._gpu_input, data_array) # copy(dist, src)
             self._gpu.copy(self.input._gpu_output, self._gpu_input)
         elif self._gpu.type==1: # nvidia
-            #print("Roster::direct_set_data(), nvidia")
-            #print(data_array.shape)
-            #self._gpu_input = self._gpu.allocateArray(data_array)
             self.input._gpu_output = self._gpu.allocateArray(data_array)
         elif self._gpu.type==2: # macOS Metal
-            # redone? check later 2025.09.09
+            print(type(self._batch_data[0][0]), self._batch_data.shape)
+            print(type(data_array[0][0]), data_array.shape)
+            
             self._gpu.write_np_to_mbuf(data_array, self._gpu_input)
             self._gpu.write_np_to_mbuf(data_array, self.input._gpu_output)
             #
             # copy data to np array for bp !!!!!
             #
             self.input._output_array = data_array
-            #self.input._output_array = copy.deepcopy(data_array)
-            #print(self.input._output_array[0])
-            
         #
     
     def direct_set_label(self, label_array):
-        # copy(dist, src)
-        #print(self._gpu.type)
-        #print("from :", type(label_array), label_array.shape)
-        #print("To :", type(self._gpu_labels), self._labels.shape)
-        #print(label_array[0][0])
+        #print("Roster::direct_set_label()")
         if self._gpu.type==0: # opencl
             self._gpu.copy(self._gpu_labels, label_array)
             self.label_array = label_array
@@ -1878,12 +1930,12 @@ class Roster:
             self._gpu_labels = self._gpu.allocateArray(label_array)
         elif self._gpu.type==2: # macOS Metal
             #print(label_array.shape)
-            self._gpu.write_np_to_mbuf(label_array, self._gpu_labels)
+            #print(type(self._labels[0][0]), self._labels.shape)
+            #print(type(label_array), type(label_array[0][0]), label_array.shape)
+            
+            #self._gpu.write_np_to_mbuf(label_array, self._gpu_labels)
             self.label_array = label_array
         #
-        
-    #def set_scale_input(self, scale):
-    #    self._scale_input = scale
     
     def denominate(self, all=False):
         print("Roster : denominate()")
@@ -1906,24 +1958,12 @@ class Roster:
             if type==LAYER_TYPE_MAX or type==LAYER_TYPE_INPUT:
                 pass
             else:
-                #layer.init_weight_with_random_index()
                 layer.init_weight_with_mode(mode, value)
             #
         #
         
-    #def init_weight_by_layer(self, idx, mode, value=0):
-    #    print("Roster::init_weight_by_layer(), obsolute")
-    #    layer = self.get_layer_at(idx)
-    #    if layer.count_weight()>0:
-    #        if mode==0: # random
-    #            layer.init_weight_with_random_index()
-    #        elif mode==1: # a value
-    #            layer.init_weight_with_value(value)
-    #        #
-    #    #
-        
     def reset(self):
-    # flush a batch depending cache when switching batches
+        # flush a batch depending cache when switching batches
         c = self.count_layers()
         for i in range(c):
             layer = self.get_layer_at(i)
@@ -1997,7 +2037,17 @@ class Roster:
             return None
         #
         output = self.output
-        output._gpu.copy(output._output_array, output._gpu_output)
+        
+        if self._gpu.type==0: # OpenCL
+            print("Roster::get_inference(), OpenCL")
+            output._gpu.copy(output._output_array, output._gpu_output)
+        elif self._gpu.type==1: # nvidia
+            print("Roster::get_inference(), CUPY")
+        elif self._gpu.type==2: # macOS Metal
+            #print("Roster::get_inference(), macOS Metal")
+            output._output_array = np.frombuffer(output._gpu_output.contents().as_buffer(output._gpu_output.length()), dtype=np.float32)
+            output._output_array = output._output_array.view(np.float32).reshape(self._batch_size, 2)
+        #
         return output._output_array
 
     def get_answer_with_confidence(self):
@@ -2074,20 +2124,32 @@ class Roster:
         return ret
     
     def evaluate(self, debug=0):
-        #print("Roster::evaluate()", self._eval_mode)
+        #print("Roster::evaluate()", self.emode)
         self.propagate(debug)
         #
-        if self._eval_mode==0: # CE for classification
+        if self.emode==0: # CE for classification
             ce = self.get_cross_entropy(debug)
-        elif self._eval_mode==1: # MSE for autoencoder
+        elif self.emode==1: # MSE for autoencoder
             self._gpu.mse(self.output._gpu_output, self.input._gpu_output, self._gpu_entropy, self._data_size, self._batch_size)
             self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
             ce = np.sum(self._batch_cross_entropy)/np.float16(self._batch_size)
-        elif self._eval_mode==2: # MSE for regression
-            #print(self._batch_size, self._data_size)
-            self._gpu.mse(self.output._gpu_output, self._gpu_labels, self._gpu_entropy, self.num_class, self._batch_size)
-            self._gpu.copy(self._batch_cross_entropy, self._gpu_entropy)
-            ce = np.sum(self._batch_cross_entropy)/np.float16(self._batch_size)
+        elif self.emode==2: # MSE for regression
+            #print(self._batch_size, self._data_size, self.output._output_array.shape)
+            infs = self.get_inference()
+            I = self.output._output_array.shape[0]
+            J = self.output._output_array.shape[1]
+            total = np.float32(0.0)
+            #print("I:", I)
+            for i in range(I):
+                sub_total = np.float32(0.0)
+                for j in range(J):
+                    se = np.float32(0.0)
+                    se = self.label_array[i][j] - self.output._output_array[i][j]
+                    sub_total += se * se
+                #
+                total += sub_total
+            #
+            ce = total / np.float32(I) #self._batch_size
         #
         return ce
     

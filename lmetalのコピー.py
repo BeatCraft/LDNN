@@ -13,10 +13,10 @@ MSL = r"""
 #include <metal_stdlib>
 using namespace metal;
 
-kernel void double_float(device const float* a [[buffer(0)]],
-                        device float*       b [[buffer(1)]],
+kernel void double_half(device const half* a [[buffer(0)]],
+                        device half*       b [[buffer(1)]],
                         uint idx [[thread_position_in_grid]]) {
-    b[idx] = a[idx] * (float)2.0;
+    b[idx] = a[idx] * (half)2.0;
 }
 
 struct Params_mac {
@@ -26,9 +26,9 @@ struct Params_mac {
 };
 
 kernel void calc_mac_relu(
-    device const float* x [[buffer(0)]],
-    device const float* w [[buffer(1)]],
-    device float* y [[buffer(2)]],
+    device const half* x [[buffer(0)]],
+    device const half* w [[buffer(1)]],
+    device half* y [[buffer(2)]],
     constant Params_mac& P [[buffer(3)]],    
     uint2 gid [[thread_position_in_grid]])
 {
@@ -45,32 +45,32 @@ kernel void calc_mac_relu(
     }
     
     if (P.act==0){ // no
-        y[y_start] = (float)temp;
+        y[y_start] = (half)temp;
     } else {
         if (temp>=0){
-            y[y_start] = (float)temp;
+            y[y_start] = (half)temp;
         }else{
-            y[y_start] = (float)0.0;
+            y[y_start] = (half)0.0;
         }
     }
 }
 
 struct Params_scale {
     uint  size;
-    float  scale;
+    half  scale;
 };
 
 kernel void scale_layer(
-    device float* data [[buffer(0)]],
+    device half* data [[buffer(0)]],
     constant Params_scale& P [[buffer(1)]],
     uint idx [[thread_position_in_grid]])
 {
     uint bi = idx;
     uint start = bi * P.size;
-    float max = 0.0;
+    half max = 0.0;
     
     for (uint i=0;i<P.size;i++){
-        float k = fabs(data[start+i]);
+        half k = fabs(data[start+i]);
         if (k>max){
             max = k;
         }
@@ -86,12 +86,12 @@ kernel void scale_layer(
 
 struct Params_softmax {
     uint num;
-    float scale;
+    half scale;
 };
 
 kernel void softmax(
-    device const float* in [[buffer(0)]],
-    device float* out [[buffer(1)]],
+    device const half* in [[buffer(0)]],
+    device half* out [[buffer(1)]],
     constant Params_softmax& P [[buffer(2)]],
     uint idx [[thread_position_in_grid]])
 {
@@ -112,12 +112,12 @@ kernel void softmax(
             temp = 0;
         }
         //printf("exp=%f\n", (float)temp);
-        out[start+i] = (float)temp;
+        out[start+i] = (half)temp;
         total += temp;
     }
 
     for (uint i=0;i<P.num;i++){
-        out[start+i] = out[start+i]/(float)total;
+        out[start+i] = out[start+i]/(half)total;
     }
 }
 
@@ -126,9 +126,9 @@ struct Params_ce {
 };
 
 kernel void cross_entropy(
-    device const float* infs [[buffer(0)]],
-    device const float* labels [[buffer(1)]],
-    device float* output [[buffer(2)]],
+    device const half* infs [[buffer(0)]],
+    device const half* labels [[buffer(1)]],
+    device half* output [[buffer(2)]],
     constant Params_ce& P [[buffer(3)]],
     uint idx [[thread_position_in_grid]])
 {
@@ -143,22 +143,22 @@ kernel void cross_entropy(
         sum += t * log(p);
     }
     
-    output[idx] = (float)(-sum);
+    output[idx] = (half)(-sum);
 }
 
 kernel void cross_entropy16(
-    device const float* infs [[buffer(0)]],
-    device const float* labels [[buffer(1)]],
-    device float* output [[buffer(2)]],
+    device const half* infs [[buffer(0)]],
+    device const half* labels [[buffer(1)]],
+    device half* output [[buffer(2)]],
     constant Params_ce& P [[buffer(3)]],
     uint idx [[thread_position_in_grid]])
 {
     int bi = idx;
     /*
-    float delta;
-    float k;
-    float t;
-    float sum;
+    half delta;
+    half k;
+    half t;
+    half sum;
     
     delta = 0.0000001;
     sum = 0.0;
@@ -183,7 +183,7 @@ kernel void cross_entropy16(
         sum += t * log(p);
     }
 
-    output[idx] = (float)(-sum);
+    output[idx] = (half)(-sum);
 }
 
 struct Params_rs {
@@ -191,7 +191,7 @@ struct Params_rs {
 };
 
 kernel void reduce_sum_pass(
-    device const float*  in  [[buffer(0)]],
+    device const half*  in  [[buffer(0)]],
     device float*       out [[buffer(1)]],
     constant Params_rs&    P   [[buffer(2)]],
     uint  tid  [[thread_index_in_threadgroup]],
@@ -262,7 +262,7 @@ class LMetal(gpu.Gpu):
         return view.copy()
         
     def init_test_func(self):
-        fn = self.lib.newFunctionWithName_("double_float")
+        fn = self.lib.newFunctionWithName_("double_half")
         self.pipe, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
         if err:
             raise RuntimeError(err)
@@ -332,7 +332,7 @@ class LMetal(gpu.Gpu):
     def scale_layer(self, batch_size, size, scale, mbuf0):
         params = np.zeros(1, dtype=np.dtype([
             ("size", np.uint32),
-            ("scale", np.float32),
+            ("scale", np.float16),
             ], align=True))
         params["size"] = size
         params["scale"] = scale
@@ -366,7 +366,7 @@ class LMetal(gpu.Gpu):
         
         params = np.zeros(1, dtype=np.dtype([
             ("num", np.uint32),
-            ("scale", np.float32),
+            ("scale", np.float16),
             ], align=True))
         params["num"] = num
         params["scale"] = scale
@@ -424,20 +424,20 @@ class LMetal(gpu.Gpu):
         cmd.waitUntilCompleted()
 
 
-    def init_reduce_sum_float(self):
-        fn = self.lib.newFunctionWithName_("reduce_sum_float")
-        self.pipe_reduce_sum_float, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+    def init_reduce_sum_half(self):
+        fn = self.lib.newFunctionWithName_("reduce_sum_half")
+        self.pipe_reduce_sum_half, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
         if err:
             raise RuntimeError(err)
         #
 
-    def reduce_sum_float(self, arr_fp16):# np.ndarray):# -> float:
+    def reduce_sum_half(self, arr_fp16):# np.ndarray):# -> float:
         params = np.zeros(1, dtype=np.dtype([
             ("n", np.uint32),
             ], align=True))
         params["n"] = num
     
-        arr = np.ascontiguousarray(arr_fp16.astype(np.float32, copy=False))
+        arr = np.ascontiguousarray(arr_fp16.astype(np.float16, copy=False))
         N = arr.size
         
         in_buf  = device.newBufferWithBytes_length_options_(memoryview(arr).tobytes(), arr.nbytes, opts)
@@ -454,7 +454,7 @@ class LMetal(gpu.Gpu):
         #mv = self.params_buf.contents().as_buffer(self.params_buf.length())
         #mv[:params.nbytes] = memoryview(params).tobytes()
 
-        cur_in_is_float = True
+        cur_in_is_half = True
         cur_in_buf = in_buf
         cur_len = N
 
@@ -469,10 +469,10 @@ class LMetal(gpu.Gpu):
             grid = Metal.MTLSize(blocks * tpg_x, 1, 1)
             cmd = queue.commandBuffer()
             enc = cmd.computeCommandEncoder()
-            enc.setComputePipelineState_(self.pipe_reduce_sum_float)
+            enc.setComputePipelineState_(self.pipe_reduce_sum_half)
 
-            if cur_in_is_float:
-                enc.setBuffer_offset_atIndex_(cur_in_buf, 0, 0)  # float* in
+            if cur_in_is_half:
+                enc.setBuffer_offset_atIndex_(cur_in_buf, 0, 0)  # half* in
                 enc.setBuffer_offset_atIndex_(out_buf,   0, 1)  # float* out
                 enc.setBuffer_offset_atIndex_(pbuf,      0, 2)
                 enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
@@ -498,13 +498,13 @@ def main():
     m.init_cross_entropy()
     
     n = 4096 # 64 * 64
-    a = (np.random.uniform(size=n).astype(np.float32))
+    a = (np.random.uniform(size=n).astype(np.float16))
     
     a_buf = m.alloc_buf_from_array(a)
     b_buf = m.alloc_buf(a.nbytes)
     
     m.test_func(a_buf, b_buf, n)
-    out = np.frombuffer(b_buf.contents().as_buffer(b_buf.length()), dtype=np.float32)
+    out = np.frombuffer(b_buf.contents().as_buffer(b_buf.length()), dtype=np.float16)
     #ok = np.allclose(out, a * 2, rtol=1e-3, atol=1e-3)
     #print("OK:", ok)
     print("in[:8] :", a[:8])
@@ -513,14 +513,14 @@ def main():
     
     print(type(a.nbytes))
     
-    c = (np.random.uniform(size=n).astype(np.float32))
+    c = (np.random.uniform(size=n).astype(np.float16))
     x = m.alloc_buf_from_array(c)
-    d = (np.random.uniform(size=n).astype(np.float32))
+    d = (np.random.uniform(size=n).astype(np.float16))
     w = m.alloc_buf_from_array(d)
     y = m.alloc_buf(n)
     #m.calc_mac_relu(x, w, y, 16, 16, 1)
     
-    #out = np.frombuffer(y.contents().as_buffer(y.length()), dtype=np.float32)
+    #out = np.frombuffer(y.contents().as_buffer(y.length()), dtype=np.float16)
     #print("y:", out[:8])
     
     print(m.device.supportsFeatureSet_(Metal.MTLFeatureSet_macOS_GPUFamily1_v3))

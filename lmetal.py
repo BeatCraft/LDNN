@@ -102,9 +102,9 @@ kernel void softmax(
 
     for (uint i=0;i<P.num;i++){
         temp = (float)(in[start+i] / P.scale);
-        if (temp>11.0){ // fix overflow
-            temp = 11.0;
-        }
+        //if (temp>11.0){ // fix overflow
+        //    temp = 11.0;
+        //}
         temp = exp(temp);
         if (isinf(temp)){
             temp = 3.402823e+38;

@@ -402,7 +402,8 @@ class Layer(object):
         #
 
     def import_weight_value(self, wi_list):
-        self._weight_matrix = np.array(wi_list, dtype=np.float16).copy()
+        # float32 must be fixed later
+        self._weight_matrix = np.array(wi_list, dtype=np.float32).copy()
 
     def set_id(self, id):
         if id>=0:
@@ -714,10 +715,19 @@ class HiddenLayer(Layer):
         if debug:
             print("HiddenLayer::bp() macOS Metal")
         #
-            
+        
         if self._gpu.type==2:
+            self.delta = (self._next.delta @ self._next._weight_matrix).astype(np.float32)
+            self.delta *= (self._output_array > 0).astype(np.float32)
+            
+            dW = (self._pre._output_array.astype(np.float32).T @ self.delta) / np.float32(self._batch_size)
+            self._weight_matrix -= np.float32(self.learning_rate) * dW.T
+        elif self._gpu.type==3:
             # delta
             self.delta = self._next.delta @ self._next._weight_matrix
+
+            # ReLU derivative
+            self.delta *= (self._output_array > 0).astype(np.float32)
 
             # slope
             self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
@@ -977,63 +987,29 @@ class OutputLayer(Layer):
         #
         
         if self._gpu.type==2:
+            label_array = label_array.astype(np.float32)
+            self.delta = self._softmax_array.astype(np.float32) - label_array
+            
+            dW = (self._pre._output_array.astype(np.float32).T @ self.delta) / np.float32(self._batch_size)  # (in,out)
+
+            self._weight_matrix -= np.float32(self.learning_rate) * dW.T
+        elif self._gpu.type==3:
             # differencial
             self.delta = (self._softmax_array - label_array) # need no batch avg
-            
-            
-            
-            
-            
-            #ddd = self._softmax_array - label_array
-            print("self.delta.shape:", self.delta.shape, type(self.delta[0][0])) # (100, 10)
-            
-            
-            #print("self._pre._output_array.shape:", self._pre._output_array.shape) # (100, 256)
-            
-            #I = self.delta.shape[0] # 100
-            #J = self.delta.shape[1] # 10
-            #for i in range(I):
-            #    for j in range(J):
-            #        if np.isnan(self.delta[i][j]):
-            #            #print("NaN", i, j, self.delta[i][j], self._softmax_array[i][j], label_array[i][j])
-            #            print("NaN", i, self._softmax_array[i])
-            #        #
-            #    #
-            #
-            
-
+      
             # slope for weights
             self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
-            #N = self.dW.shape[0]
-            #M = self.dW.shape[1]
-            #for n in range(N): # 100
-            #    for m in range(M): # 256
-            #        self._pre._output_array[][]
-            
-            #print("self.dW.shape:", self.dW.shape) # (256, 10)
             
             # change weights and derivertive of relu
             self.dW = self.dW.T # transpose
-            #print("self.dW.T.shape:", self.dW.shape) # (10, 256)
-            #print("self._weight_matrix.shape:", self._weight_matrix.shape) # (10, 256)
             N = self.dW.shape[0]
             M = self.dW.shape[1]
-            #cnt = 0
             for n in range(N):
                 for m in range(M):
-                    #if np.isnan(self.dW[n][m]):
-                    #    print("NaN", n, m, self.delta[m][n], self._pre._output_array[m][n], self.delta[m][n]*self._pre._output_array[m][n]/self._batch_size)
-                    #
                     w = self._weight_matrix[n][m]
                     self._weight_matrix[n][m] = w - self.dW[n][m] * np.float32(self.learning_rate)
-                    #if self.dW[n][m]<0:
-                    #    self.dW[n][m] = 0.0
-                    #
                 #
             #
-
-            #self._weight_index_matrix[n][m] = idx - 1
-            #self._weight_matrix[n][m] = WEIGHT_SET[self._weight_index_matrix[n][m]]
             
             self.dW = self.dW.T # transpose
             if debug:
@@ -1041,8 +1017,6 @@ class OutputLayer(Layer):
                 print("dW", self.dW.shape)
                 print(self.dW[0])
             #
-            
-            #dX = self.delta @ self._weight_matrix
         else:
             print("OutputLayer::bp()")
         #
@@ -2188,6 +2162,10 @@ class Roster:
         return ce
     
     def get_cross_entropy(self, debug=0):
+        if debug:
+            print("Roster::get_cross_entropy()", self.qmode)
+        #
+        
         c = self.count_layers()
         output = self.get_layer_at(c-1)
 
@@ -2248,16 +2226,20 @@ class Roster:
                 else: # 32bit
                     self._batch_cross_entropy = self._gpu.read_mbuf_to_numpy(self._gpu_entropy, np.float32, self._batch_cross_entropy.shape)
                 #
-                if debug:
-                    print("Roster::get_cross_entropy()")
-                    print("DEBUG CE:", self._batch_cross_entropy)
+                #if debug:
+                #    print("Roster::get_cross_entropy()")
+                #    print("DEBUG CE:", self._batch_cross_entropy)
                 #
-                
                 s = np.float64(0.0)
                 for i in range(self._batch_size):
+                    #print(output._softmax_array[i])
+                    #print( self._batch_cross_entropy[i], output._output_array[i])
                     s += np.float64(self._batch_cross_entropy[i])
                 #
                 s = s / np.float64(self._batch_size)
+                if debug:
+                    print(type(s), s)
+                #
                 return s
             #
         #

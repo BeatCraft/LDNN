@@ -52,7 +52,7 @@ CNN_WEIGHT_SET_3 = [0.0, 1.0]
 CNN_WEIGHT_SET_4 = [-0.25, -0.125, 0.0, 0.125, 0.25, 0.5]
 CNN_WEIGHT_SET_5 = [-0.5, 0.0, 0.5]
 
-CNN_WEIGHT_SET = WEIGHT_SET_0 # CNN_WEIGHT_SET_4
+CNN_WEIGHT_SET = WEIGHT_SET_3 #WEIGHT_SET_0 # CNN_WEIGHT_SET_4
 CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
 CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
 CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
@@ -273,17 +273,20 @@ class Layer(object):
         #self._weight_index_matrix[ni][ii] = wi
         try:
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
-            
                 if self.qmode==0 or self.qmode==1:
                     self._weight_index_matrix[ni][ii] = np.uint8(wi)
                     self._weight_matrix[ni][ii] = WEIGHT_SET[wi]
                 elif self.qmode==2:
                     self._weight_index_matrix[ni][ii] = np.uint8(wi)
                 #
-            elif self._type==LAYER_TYPE_CONV or self._type==LAYER_TYPE_FCNN:
+            elif self._type==LAYER_TYPE_CONV:
+                self._weight_index_matrix[ni][ii] = np.uint8(wi)
                 self._weight_matrix[ni][ii] = CNN_WEIGHT_SET[wi]
-            elif self._type==LAYER_TYPE_FCNN2:
-                self._weight_matrix[ni][ii] = CNN_WEIGHT_SET2[wi]
+            #
+            
+            # set_weight_index
+            #elif self._type==LAYER_TYPE_FCNN2:
+            #    self._weight_matrix[ni][ii] = CNN_WEIGHT_SET2[wi]
             #
         except Exception as inst:
             print(type(inst))    # the exception type
@@ -307,13 +310,17 @@ class Layer(object):
         if mode==0: # random index
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
                 wmax = WEIGHT_INDEX_SIZE
-            elif self._type==LAYER_TYPE_CONV or self._type==LAYER_TYPE_FCNN:
-                wmax = CNN_WEIGHT_INDEX_SIZE
-            elif self._type==LAYER_TYPE_FCNN2:
-                wmax = CNN_WEIGHT_INDEX_SIZE2
+                wi = random.randrange(wmax)
+                self.set_weight_index(ni, ii, wi)
+            elif self._type==LAYER_TYPE_CONV:
+                #wmax = CNN_WEIGHT_INDEX_SIZE
+                wi = random.randrange(CNN_WEIGHT_INDEX_SIZE)
+                #print("init_weight_mode(%d, %d, %d, %d)" % (ni, ii, mode, wi))
+                self.set_weight_index(ni, ii, wi)
             #
-            wi = random.randrange(wmax)
-            self.set_weight_index(ni, ii, wi)
+            #wi = random.randrange(wmax)
+            #print(wi)
+            #self.set_weight_index(ni, ii, wi)
         elif mode==1: # random index in range
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
                 wmin = 1
@@ -427,7 +434,13 @@ class InputLayer(Layer):
         
     def prepare(self, batch_size):
         self._batch_size = batch_size
-        
+        if self._gpu:
+            pass
+        else:
+            print("no gpu")
+            return
+        #
+                
         if self.qmode==0:
             self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
         elif self.qmode==1:
@@ -435,14 +448,13 @@ class InputLayer(Layer):
         elif self.qmode==2:
             self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.uint8)
         #
-        if self._gpu:
-            if self._gpu.type==0:
-                self._gpu_output = self._gpu.dev_malloc(self._output_array)
-            elif self._gpu.type==1:
-                self._gpu_output = self._gpu.allocateArray(self._output_array)
-            elif self._gpu.type==2:
-                self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
-            #
+        
+        if self._gpu.type==0:
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        elif self._gpu.type==1:
+            self._gpu_output = self._gpu.allocateArray(self._output_array)
+        elif self._gpu.type==2: # macOS metal
+            self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
         #
     
     def debug(self):
@@ -1131,30 +1143,38 @@ class MaxLayer(Layer):
         
     def prepare(self, batch_size):
         print("MaxLayer::prepare(%d)" % (batch_size))
-        self._batch_size = batch_size
-        self._output_array = np.zeros((self._batch_size, self._ch, self._num_node), dtype=np.float16)
-        #
         if self._gpu:
-            if self._gpu.type==0:
-                self._gpu_output = self._gpu.dev_malloc(self._output_array)
-            elif self._gpu.type==1:
-                self._gpu_output = self._gpu.allocateArray(self._output_array)
-            #
+            pass
         else:
-            print("error")
+            print("\tno GPU")
+            return
+        #
+        
+        self._batch_size = batch_size
+        self._output_array = np.zeros((self._batch_size, self._ch, self._num_node), dtype=np.float32)
+        #
+
+        if self._gpu.type==0:
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
+        elif self._gpu.type==1:
+            self._gpu_output = self._gpu.allocateArray(self._output_array)
+        elif self._gpu.type==2: # macOS metal
+            self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
+        else:
+            print("no support", self._gpu.type)
         #
         
     def propagate(self, array_in, debug=0):
-        if self.lock:
-            return
+        #if self.lock:
+        #    return
         #
         if self._gpu:
             pass
         else:
             return
         #
-        if self.cache:
-            return
+        #if self.cache:
+        #    return
         #
         
         if self._gpu.type==0: # opencl
@@ -1168,8 +1188,13 @@ class MaxLayer(Layer):
             #
         elif self._gpu.type==1: # GDX
             self._gpu.max(array_in, self._gpu_output, self._ch, self._x, self._y, self._batch_size)
+        elif self._gpu.type==2: # macOS metal
+            #print("not yet")
+            self._gpu.max_float(self._batch_size, array_in, self._gpu_output, self._ch, self._x, self._y)
+        else:
+            print("no support", self._gpu.type)
         #
-        self.cache = 1
+        #self.cache = 1
 
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
@@ -1187,14 +1212,16 @@ class Conv_4_Layer(Layer):
         super(Conv_4_Layer, self).__init__(i, LAYER_TYPE_CONV, num_input, num_node, pre, gpu)
         #
         # mems for weights
-        self._weight_index_matrix = np.zeros( (self._filter, self._num_of_w), dtype=np.int32)
-        self._weight_matrix = np.zeros( (self._filter, self._num_of_w), dtype=np.float16)
+        self._weight_index_matrix = np.zeros( (self._filter, self._num_of_w), dtype=np.uint8)
+        self._weight_matrix = np.zeros( (self._filter, self._num_of_w), dtype=np.float32)
         #
         if self._gpu:
             if self._gpu.type==0:
                 self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
             elif self._gpu.type==1:
                 self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
+            elif self._gpu.type==2:
+                self._gpu_weight = self._gpu.alloc_buf_from_array(self._weight_matrix)
             #
         else:
             print("error")
@@ -1219,28 +1246,39 @@ class Conv_4_Layer(Layer):
         
     def prepare(self, batch_size):
         print(("Conv_4_Layer::prepare(%d)" %(batch_size)))
+        if self._gpu:
+            pass
+        else:
+            print("no GPU")
+            return
+        #
+    
         self._batch_size = batch_size
         # intermidiate
-        self._padded_array = np.zeros((self._batch_size, (self._w+2)*(self._h+2)*self._ch), dtype=np.float16)
-        self._sum_array = np.zeros((self._batch_size), dtype=np.float16)
-        self._dsum_array = np.zeros((self._batch_size), dtype=np.float16)
-        #self._max_array = np.zeros((self._batch_size), dtype=np.float16)
-        # output
-        self._output_array = np.zeros((self._batch_size, self._filter, self._w*self._h), dtype=np.float16)
-        if self._gpu:
-            if self._gpu.type==0:
-                self._gpu_padded = self._gpu.dev_malloc(self._padded_array)
-                self._gpu_output = self._gpu.dev_malloc(self._output_array)
-                self._gpu_sum = self._gpu.dev_malloc(self._sum_array)
-                #self._gpu_max = self._gpu.dev_malloc(self._max_array)
-            elif self._gpu.type==1:
-                self._gpu_padded = self._gpu.allocateArray(self._padded_array)
-                self._gpu_output = self._gpu.allocateArray(self._output_array)
-                self._gpu_sum = self._gpu.allocateArray(self._sum_array)
-                self._gpu_dsum = self._gpu.allocateArray(self._dsum_array)
+        self._padded_array = np.zeros((self._batch_size, (self._w+2)*(self._h+2)*self._ch), dtype=np.float32)
+        self._sum_array = np.zeros((self._batch_size), dtype=np.float32)
+        self._output_array = np.zeros((self._batch_size, self._filter, self._w*self._h), dtype=np.float32)
+
+        if self._gpu.type==0: # opencl
+            self._gpu_padded = self._gpu.dev_malloc(self._padded_array)
+            self._gpu_output = self._gpu.dev_malloc(self._output_array)
+            self._gpu_sum = self._gpu.dev_malloc(self._sum_array)
+        elif self._gpu.type==1: # cuda
+            self._gpu_padded = self._gpu.allocateArray(self._padded_array)
+            self._gpu_output = self._gpu.allocateArray(self._output_array)
+            self._gpu_sum = self._gpu.allocateArray(self._sum_array)
+        elif self._gpu.type==2: # macOS
+            if self.qmode==0: # wi
+                self._gpu_padded = self._gpu.alloc_buf_from_array(self._padded_array)
+                self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
+                self._gpu_sum = self._gpu.alloc_buf_from_array(self._sum_array)
+            elif self.qmode==1:
+                print("no support for qmode:", self.qmode)
+            elif self.qmode==2:
+                print("no support for qmode:", self.qmode)
             #
         else:
-            print("error")
+            print("no GPU support", self._gpu.type)
         #
 
     def update_weight(self):
@@ -1254,15 +1292,14 @@ class Conv_4_Layer(Layer):
             self._gpu.copy(self._gpu_weight, self._weight_matrix)
         elif self._gpu.type==1:
             self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
+        elif self._gpu.type==2:
+            self._gpu.write_np_to_mbuf(self._weight_matrix, self._gpu_weight)
         #
     
     def reset(self):
         self._cache = 0
         
     def propagate(self, array_in, debug=0):
-        if self.lock:
-            return
-        #
         if self._gpu:
             pass
         else:
@@ -1282,8 +1319,6 @@ class Conv_4_Layer(Layer):
                 self._gpu.copy(self._padded_array, self._gpu_padded)
                 print(self._padded_array[0])
                 self.save_padded(0, 0, self._padded_array[0])
-                #self.save_padded(0, 1, self._padded_array[0])
-                #self.save_padded(0, 2, self._padded_array[0])
             #
             self._gpu.conv_4_roll_batch(self._gpu_padded, self._gpu_weight, self._gpu_output,
                                         self._w, self._h, self._ch, self._filter,
@@ -1350,7 +1385,6 @@ class Conv_4_Layer(Layer):
 
             # scale
             #self._gpu.layerScale(self._gpu_output, self._batch_size, size)
-            
             if debug:
                 print(self._index, "conv, scale")
                 darray = cp.asnumpy(self._gpu_output)
@@ -1359,10 +1393,29 @@ class Conv_4_Layer(Layer):
                 self.save_filter_out(0, 0, darray[0][0])
                 self.save_debug("dgx.txt", self._w, self._h, darray[0][0])
             #
-            #self._gpu.filterScale(self._batch_size, self._filter, self._gpu_output, size, self._w * self._h)
+        elif self._gpu.type==2: # macOS metal
+            # padding
+            self._gpu.padding_float(self._batch_size, array_in, self._gpu_padded, self._w, self._h, self._ch)
+            # conv + relu
+            self._gpu.conv_float(self._batch_size, self._gpu_padded, self._gpu_weight, self._gpu_output, self._w+2, self._h+2, self._ch, self._filter, a_mode)
+            if debug:
+                print("Conv_4_Layer::propagate(), macOS metal")
+                #out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
+                #out = np.frombuffer(self.array_in.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
+                #print(out.shape)
+                #print(out[:28*28])
+                #out = np.frombuffer(array_in.contents().as_buffer(array_in.length()), dtype=np.float32)
+                                
+                out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
+                #out = np.frombuffer(self._gpu_padded.contents().as_buffer(self._gpu_padded.length()), dtype=np.float32)
+                                
+                #out = out.view(np.float32).reshape(self._batch_size, self._filter, self._w*self._h)
+                #print(out.shape)
+                print(out[:1000])
+        else:
+            print("no support", self._gpu.type)
         #
         
-    
     def save_padded(self, bi, ci, data_array):
         w = self._w + 2
         h = self._h + 2
@@ -2248,12 +2301,18 @@ class Roster:
             c = self.count_layers()
             for i in range(1, c):
                 layer = self.get_layer_at(i)
+                type = layer.get_type()
+                if type==LAYER_TYPE_INPUT or type==LAYER_TYPE_MAX:
+                    continue
+                #
+                print("export_weight:", layer, type, mode)
                 if mode==0:
                     data = layer.export_weight_index()
                 elif mode==1:
                     data = layer.export_weight_value()
                 #
                 if data:
+                    print(len(data))
                     writer.writerows(data)
                 #
             # for
@@ -2296,6 +2355,16 @@ class Roster:
     def propagate(self, debug=0):
         c = self.count_layers()
         pre = self.get_layer_at(0)
+        #print(pre._output_array[0])
+        #out = np.frombuffer(pre._gpu_output.contents().as_buffer(pre._gpu_output.length()), dtype=np.float32)
+        #out = out.view(np.float32).reshape(1000, 28*28)
+        #print(out.shape)
+        #print(out[0])
+        #, out[0].sum())
+        
+        #return
+        
+        
         for i in range(1, c):
             layer = self.get_layer_at(i)
             layer.propagate(pre._gpu_output, debug)

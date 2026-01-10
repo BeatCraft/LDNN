@@ -53,11 +53,7 @@ def getGpu(idx=0):
         my_gpu = dgx.Dgx(idx)
     elif ID==3: # macOS Metal
         my_gpu = lmetal.LMetal()
-        #m.init_test_func()
-        my_gpu.init_calc_mac_relu()
-        my_gpu.init_scale_layer()
-        my_gpu.init_softmax()
-        my_gpu.init_cross_entropy()
+        my_gpu.prepare()
     else:
         print("error : undefined platform")
         my_gpu = None

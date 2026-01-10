@@ -740,10 +740,6 @@ class HiddenLayer(Layer):
                 for m in range(M):
                     w = self._weight_matrix[n][m]
                     self._weight_matrix[n][m] = w - self.dW[n][m] * np.float32(self.learning_rate)
-                    # derivertive of relu
-                    #if self.dW[n][m]<=0:
-                    #    self.dW[n][m] = 0.0
-                    #
                 #
             #
             self.dW = self.dW.T
@@ -1010,7 +1006,6 @@ class OutputLayer(Layer):
                     self._weight_matrix[n][m] = w - self.dW[n][m] * np.float32(self.learning_rate)
                 #
             #
-            
             self.dW = self.dW.T # transpose
             if debug:
                 print(self.delta[0])

@@ -330,7 +330,8 @@ struct MaxPoolParams {
 kernel void max_float(
     device const float* input  [[buffer(0)]], // input: (w*2)*(h*2)*ch per batch
     device float*       output [[buffer(1)]], // output: w*h*ch per batch
-    constant MaxPoolParams& p  [[buffer(2)]],
+    device float*       mask [[buffer(2)]],
+    constant MaxPoolParams& p  [[buffer(3)]],
     uint3 gid [[thread_position_in_grid]]
 )
 {
@@ -357,12 +358,56 @@ kernel void max_float(
 
     for (int c = 0; c < p.ch; c++) {
         int k = input_offset + ich_stride * c + base_xy;
-
+        int idx = 0;
         float m = input[k];
-        m = max(m, input[k + 1]);
-        m = max(m, input[k + input_w]);
-        m = max(m, input[k + input_w + 1]);
-
+        float m_next = input[k + 1];
+        //m = max(m, input[k + 1]);
+        //m = max(m, input[k + input_w]);
+        //m = max(m, input[k + input_w + 1]);
+        
+        //
+        if (m_next>m){
+            m = m_next;
+            idx++;
+        }
+        m_next = input[k + input_w];
+        if (m_next>m){
+            m = m_next;
+            idx++;
+        }
+        m_next = input[k + input_w+1];
+        if (m_next>m){
+            m = m_next;
+            idx++;
+        }
+        
+        switch (idx) {
+            case 0:
+                mask[k] = 1.0;
+                mask[k + 1] = 0.0;
+                mask[k + input_w] = 0.0;
+                mask[k + input_w + 1] = 0.0;
+                break;
+            case 1:
+                mask[k] = 0.0;
+                mask[k + 1] = 1.0;
+                mask[k + input_w] = 0.0;
+                mask[k + input_w + 1] = 0.0;
+                break;
+            case 2:
+                mask[k] = 0.0;
+                mask[k + 1] = 0.0;
+                mask[k + input_w] = 1.0;
+                mask[k + input_w + 1] = 0.0;
+                break;
+            case 3:
+                mask[k] = 0.0;
+                mask[k + 1] = 0.0;
+                mask[k + input_w] = 0.0;
+                mask[k + input_w + 1] = 1.0;
+                break;
+        }
+        //
         output[output_offset + och_stride * c + (p.w * y + x)] = m;
     }
 }
@@ -748,7 +793,7 @@ class LMetal(gpu.Gpu):
         if err:
             raise RuntimeError(err)
 
-    def max_float(self, batch_size, mbuf_in, mbuf_out, ch, w, h):
+    def max_float(self, batch_size, mbuf_in, mbuf_out, mbuf_mask, ch, w, h):
         # params (uint32 x3), align=True to match MSL struct layout
         params = np.zeros(1, dtype=np.dtype([
             ("ch", np.uint32),
@@ -767,7 +812,8 @@ class LMetal(gpu.Gpu):
         enc.setComputePipelineState_(self.pipe_max_float)
         enc.setBuffer_offset_atIndex_(mbuf_in, 0, 0)
         enc.setBuffer_offset_atIndex_(mbuf_out, 0, 1)
-        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 2)
+        enc.setBuffer_offset_atIndex_(mbuf_mask, 0, 2)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 3)
 
         # OpenCL: (bi, y, x) -> Metal gid.x=bi, gid.y=y, gid.z=x
         grid = Metal.MTLSize(batch_size, h, w)

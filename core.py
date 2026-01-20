@@ -725,16 +725,26 @@ class HiddenLayer(Layer):
         
     def bp(self, label_array, debug=0):
         if debug:
-            print("HiddenLayer::bp() macOS Metal")
+            print("HiddenLayer::bp()", self._gpu.type)
         #
         
         if self._gpu.type==2:
+            if debug:
+                print("\tmacOS Metal")
+                print("\t", type(self._pre))
+                print("\t", self._pre._output_array.shape)
+                print("\t", self._output_array.shape)
+            #
+            
             self.delta = (self._next.delta @ self._next._weight_matrix).astype(np.float32)
             self.delta *= (self._output_array > 0).astype(np.float32)
-            
+            #print("\tself.delta:", self.delta.shape)
+                        
             dW = (self._pre._output_array.astype(np.float32).T @ self.delta) / np.float32(self._batch_size)
+            #print("\t", dW.shape)
+                            
             self._weight_matrix -= np.float32(self.learning_rate) * dW.T
-        elif self._gpu.type==3:
+        elif self._gpu.type==3: # macOS
             # delta
             self.delta = self._next.delta @ self._next._weight_matrix
 
@@ -1111,14 +1121,14 @@ class RegressionOutputLayer(Layer):
 # w : image width, i : index, h : image height
 class MaxLayer(Layer):
     def __init__(self, i, ch, w, h, pre, gpu=None):
-        print("MaxLayer::__init__()")
+        print("MaxLayer::__init__()", ch, w, h)
         self._ch = ch
         self._batch_stride = w * h * ch
-        num_input = w*h
+        self.num_input = w*h
         self._x = int(w/2)
         self._y = int(h/2)
         num_node = self._x*self._y
-        super(MaxLayer, self).__init__(i, LAYER_TYPE_MAX, num_input, num_node, pre, gpu)
+        super(MaxLayer, self).__init__(i, LAYER_TYPE_MAX, self.num_input, num_node, pre, gpu)
         #
         self.lock = False
         self.cache = 0
@@ -1151,8 +1161,11 @@ class MaxLayer(Layer):
         #
         
         self._batch_size = batch_size
-        self._output_array = np.zeros((self._batch_size, self._ch, self._num_node), dtype=np.float32)
+        #self._output_array = np.zeros((self._batch_size, self._ch, self._num_node), dtype=np.float32)
         #
+        self._output_array = np.zeros((self._batch_size, self._ch*self._num_node), dtype=np.float32)
+        
+        self._mask_array = np.zeros((self._batch_size, self._ch, self.num_input), dtype=np.float32)
 
         if self._gpu.type==0:
             self._gpu_output = self._gpu.dev_malloc(self._output_array)
@@ -1160,14 +1173,16 @@ class MaxLayer(Layer):
             self._gpu_output = self._gpu.allocateArray(self._output_array)
         elif self._gpu.type==2: # macOS metal
             self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
+            self._gpu_mask = self._gpu.alloc_buf_from_array(self._mask_array)
         else:
             print("no support", self._gpu.type)
         #
         
     def propagate(self, array_in, debug=0):
-        #if self.lock:
-        #    return
+        if debug:
+            print(self._index, "MaxLayer::propagate()", debug)
         #
+        
         if self._gpu:
             pass
         else:
@@ -1190,11 +1205,57 @@ class MaxLayer(Layer):
             self._gpu.max(array_in, self._gpu_output, self._ch, self._x, self._y, self._batch_size)
         elif self._gpu.type==2: # macOS metal
             #print("not yet")
-            self._gpu.max_float(self._batch_size, array_in, self._gpu_output, self._ch, self._x, self._y)
+            self._gpu.max_float(self._batch_size, array_in, self._gpu_output, self._gpu_mask, self._ch, self._x, self._y)
+            if debug:
+                out = np.frombuffer(self._gpu_mask.contents().as_buffer(self._gpu_mask.length()), dtype=np.float32)
+                out =  out.view(np.float32).reshape(self._batch_size, self._ch, self._x*2*self._y*2)
+                print(out[0][0][0], out[0][0][1], out[0][0][28], out[0][0][29], )
+            #
         else:
             print("no support", self._gpu.type)
         #
-        #self.cache = 1
+        
+    def bp(self, label_array, debug=0):
+        if debug:
+            print("MaxLayer::bp()", self._gpu.type)
+        #
+        
+        if self._gpu.type==2:
+            # delta
+            self.delta = self._next.delta @ self._next._weight_matrix
+            self.delta = self.delta.view(np.float32).reshape(self._batch_size, self._ch, self._x*self._y)
+            
+            out = np.frombuffer(self._gpu_mask.contents().as_buffer(self._gpu_mask.length()), dtype=np.float32)
+            self._mask_array =  out.view(np.float32).reshape(self._batch_size, self._ch, self._x*2*self._y*2)
+            if debug:
+                print("\tmacOS metal")
+                print("\t\tdelta", self.delta.shape)
+                print("\t\tmask", self._mask_array.shape)
+                #print(self._mask_array[0][0][0], self._mask_array[0][0][1], self._mask_array[0][0][28], self._mask_array[0][0][29] )
+            #
+            
+            self.grad = np.zeros((self._batch_size, self._ch, self.num_input), dtype=np.float32)
+            
+            for bi in range(self._batch_size):
+                for ci in range(self._ch):
+                    for y in range(self._y):
+                        for x in range(self._x):
+                            d = self.delta[bi][ci][y*self._y + x]
+                            d0 = d * self._mask_array[bi][ci][y*self._y*2 + x*2]
+                            d1 = d * self._mask_array[bi][ci][y*self._y*2 + x*2 + 1]
+                            d2 = d * self._mask_array[bi][ci][(y+1)*self._y*2 + x*2]
+                            d3 = d * self._mask_array[bi][ci][(y+1)*self._y*2 + x*2 +1]
+                            #print(d0, d1, d2, d3)
+                            self.grad[bi][ci][y*self._y*2 + x*2] = d0
+                            self.grad[bi][ci][y*self._y*2 + x*2 + 1] = d1
+                            self.grad[bi][ci][(y+1)*self._y*2 + x*2] = d2
+                            self.grad[bi][ci][(y+1)*self._y*2 + x*2 +1] = d3
+                        # x
+                    # y
+                # ci
+            # bi
+        # if self._gpu.type==2:
+        
 
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
@@ -1205,7 +1266,7 @@ class Conv_4_Layer(Layer):
         self._ch = ch # number of inputs
         self._filter = filter # node / # number of outputs
         self._filter_size = 3 * 3 * ch # width and height of filter are fixed to 3
-        self._num_of_w = 3 * 3 * ch# * filter
+        self._num_of_w = 3 * 3 * ch # * filter
         num_input = self._num_of_w # self._filter_size
         num_node = self._filter
         #
@@ -1397,7 +1458,7 @@ class Conv_4_Layer(Layer):
             # padding
             self._gpu.padding_float(self._batch_size, array_in, self._gpu_padded, self._w, self._h, self._ch)
             # conv + relu
-            self._gpu.conv_float(self._batch_size, self._gpu_padded, self._gpu_weight, self._gpu_output, self._w+2, self._h+2, self._ch, self._filter, a_mode)
+            self._gpu.conv_float(self._batch_size, self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, a_mode)
             if debug:
                 print("Conv_4_Layer::propagate(), macOS metal")
                 #out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
@@ -1415,7 +1476,162 @@ class Conv_4_Layer(Layer):
         else:
             print("no support", self._gpu.type)
         #
+
+    #def bp(self, label_array, debug=0):
+    #    if debug:
+    #        print("Conv_4_Layer::bp()", self._gpu.type)
+    #    #
+    #
+    #    if self._gpu.type==2:
+    #        print("\tmacOS metal")
+    #
+    #
+    #
+    #    #
         
+    def bp(self, label_array, debug=0):
+        """
+        NumPy版 Conv(3x3, stride=1, pad=1) + ReLU のBP
+        前提:
+        - self._next.grad が dY (B,F,H*W) または (B,F,H,W) を持つ
+        - 入力は self._pre の出力 (B, C*H*W) もしくは (B,C,H*W)
+        - self._weight_matrix は (F, C*9) で、並びは [f][c][ky][kx] の row-major (ky,kx)
+        生成:
+        - self.delta: 前段へ渡す dX (B, C*H*W) (必要なら)
+        - self.dW:    重み勾配 (F, C*9)
+        - self._weight_matrix 更新
+        """
+        
+        B = self._batch_size
+        H, W = self._h, self._w
+        C = self._ch
+        F = self._filter
+
+        # ----------------------------
+        # 1) dY を取得（MaxLayer から来る）
+        # ----------------------------
+        if not hasattr(self._next, "grad") or self._next.grad is None:
+            raise RuntimeError("Conv_4_Layer.bp(): self._next.grad がありません（MaxLayer.bp() が先に走ってる？）")
+
+        dY = self._next.grad.astype(np.float32)
+        print("dY.ndim", dY.ndim)
+        # dY shape を (B,F,H,W) に揃える
+        if dY.ndim == 3:
+            # (B,F,H*W)
+            if dY.shape != (B, F, H*W):
+                raise ValueError(f"dY shape mismatch: got {dY.shape}, expected {(B,F,H*W)}")
+            dY = dY.reshape(B, F, H, W)
+        elif dY.ndim == 4:
+            # (B,F,H,W)
+            if dY.shape != (B, F, H, W):
+                raise ValueError(f"dY shape mismatch: got {dY.shape}, expected {(B,F,H,W)}")
+        else:
+            raise ValueError(f"dY ndim must be 3 or 4, got {dY.ndim}")
+
+        # ----------------------------
+        # 2) forward 出力（ReLU後）を用意して ReLU 微分を掛ける
+        #    mask = (out > 0)
+        # ----------------------------
+        # Metal等で forward をGPUでやっていても、bpはNumPyでやるので
+        # ここでは「今の self._gpu_output から読み戻す」か、
+        # 「NumPyでconvを再計算」どちらか必要。
+        # 既に self._output_array を保持しているならそれを使う。
+        out = None
+
+        if hasattr(self, "_output_array") and self._output_array is not None and self._output_array.size == B*F*H*W:
+            # 形が合うならそれを使う（Conv_4_Layer.prepare() で確保されてる）
+            out = self._output_array.reshape(B, F, H, W).astype(np.float32)
+        else:
+            # 最低限、GPU(metal)の結果を読む（numpyベースのBPにはこれが一番ラク）
+            if self._gpu and self._gpu.type == 2 and hasattr(self, "_gpu_output"):
+                out = np.frombuffer(
+                    self._gpu_output.contents().as_buffer(self._gpu_output.length()),
+                    dtype=np.float32
+                ).reshape(B, F, H*W).reshape(B, F, H, W)
+            else:
+                raise RuntimeError("Conv_4_Layer.bp(): ReLU mask 用の out を取得できません。")
+
+        relu_mask = (out > 0).astype(np.float32)
+        dZ = dY * relu_mask  # (B,F,H,W)
+
+        # ----------------------------
+        # 3) 入力 X を (B,C,H,W) に揃えて padding する
+        # ----------------------------
+        X = self._pre._output_array
+        if X is None:
+            raise RuntimeError("Conv_4_Layer.bp(): self._pre._output_array がありません（forwardで保持してる？）")
+
+        X = X.astype(np.float32)
+
+        # 形を (B,C,H,W) に揃える
+        if X.ndim == 2:
+            # (B, C*H*W)
+            if X.shape[1] != C*H*W:
+                raise ValueError(f"pre output shape mismatch: got {X.shape}, expected second dim {C*H*W}")
+            X = X.reshape(B, C, H, W)
+        elif X.ndim == 3:
+            # (B,C,H*W)
+            if X.shape != (B, C, H*W):
+                raise ValueError(f"pre output shape mismatch: got {X.shape}, expected {(B,C,H*W)}")
+            X = X.reshape(B, C, H, W)
+        elif X.ndim == 4:
+            # (B,C,H,W)
+            if X.shape != (B, C, H, W):
+                raise ValueError(f"pre output shape mismatch: got {X.shape}, expected {(B,C,H,W)}")
+        else:
+            raise ValueError(f"pre output ndim must be 2/3/4, got {X.ndim}")
+
+        Xpad = np.pad(X, ((0,0),(0,0),(1,1),(1,1)), mode="constant")  # (B,C,H+2,W+2)
+
+        # ----------------------------
+        # 4) 重み W を (F,C,3,3) に展開
+        # ----------------------------
+        Wflat = self._weight_matrix.astype(np.float32)          # (F, C*9)
+        W4 = Wflat.reshape(F, C, 3, 3)                          # (F,C,3,3)
+
+        # ----------------------------
+        # 5) dW と dX を計算
+        # ----------------------------
+        dW4 = np.zeros((F, C, 3, 3), dtype=np.float32)
+        dXpad = np.zeros_like(Xpad, dtype=np.float32)           # (B,C,H+2,W+2)
+
+        # 素直な実装（MNIST規模なら十分動く）
+        for b in range(B):
+            for f in range(F):
+                for y in range(H):
+                    for x in range(W):
+                        g = dZ[b, f, y, x]  # scalar
+                        if g == 0.0:
+                            continue
+                        # 入力窓 (C,3,3)
+                        # dW += Xpad * g
+                        dW4[f] += Xpad[b, :, y:y+3, x:x+3] * g
+                        # dXpad += W * g
+                        dXpad[b, :, y:y+3, x:x+3] += W4[f] * g
+
+        # pad を外して dX
+        dX = dXpad[:, :, 1:-1, 1:-1]  # (B,C,H,W)
+
+        # 平均化（HiddenLayer と同様に /B）
+        dW4 /= np.float32(B)
+
+        # ----------------------------
+        # 6) パラメータ更新（SGD）
+        # ----------------------------
+        self.dW = dW4.reshape(F, C*9)                      # (F,C*9)
+        self._weight_matrix -= np.float32(self.learning_rate) * self.dW
+
+        # ----------------------------
+        # 7) 前段へ渡す delta（必要なら）
+        # ----------------------------
+        self.delta = dX.reshape(B, C*H*W).astype(np.float32)
+        
+        if debug:
+            print("Conv_4_Layer::bp() numpy")
+            print("  dY:", dY.shape, "dZ:", dZ.shape)
+            print("  dW:", self.dW.shape, "delta:", self.delta.shape)
+        #
+
     def save_padded(self, bi, ci, data_array):
         w = self._w + 2
         h = self._h + 2

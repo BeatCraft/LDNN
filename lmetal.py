@@ -412,6 +412,59 @@ kernel void max_float(
     }
 }
 
+struct MaxBPParams {
+    int ch; // channels
+    int w;  // output w (= self._x)
+    int h;  // output h (= self._y)
+};
+
+kernel void max_bp_float(
+    device const float* delta [[buffer(0)]], // (B, ch, h, w) もしくは (B,ch,h*w) のフラット
+    device const float* mask  [[buffer(1)]], // (B, ch, 2h, 2w) のフラット（0/1）
+    device float*       grad  [[buffer(2)]], // (B, ch, 2h, 2w) のフラット 出力
+    constant MaxBPParams& p   [[buffer(3)]],
+    uint3 gid [[thread_position_in_grid]]
+)
+{
+    int bi = (int)gid.x;
+    int y  = (int)gid.y;
+    int x  = (int)gid.z;
+
+    if (x >= p.w || y >= p.h) return;
+
+    int in_w = p.w * 2;
+    int in_h = p.h * 2;
+
+    int out_hw = p.w * p.h;
+    int in_hw  = in_w * in_h;
+
+    // base offsets
+    int delta_b = bi * (p.ch * out_hw);
+    int in_b    = bi * (p.ch * in_hw);
+
+    // 対応する入力 2x2 の左上
+    int in_xy = (y * 2) * in_w + (x * 2);
+    int out_xy = y * p.w + x;
+
+    for (int c = 0; c < p.ch; c++) {
+        int delta_idx = delta_b + c * out_hw + out_xy;
+        float d = delta[delta_idx];
+
+        int base = in_b + c * in_hw + in_xy;
+
+        // mask は入力と同じ並びで 0/1 が入っている想定
+        float m0 = mask[base];
+        float m1 = mask[base + 1];
+        float m2 = mask[base + in_w];
+        float m3 = mask[base + in_w + 1];
+
+        grad[base]             = d * m0;
+        grad[base + 1]         = d * m1;
+        grad[base + in_w]      = d * m2;
+        grad[base + in_w + 1]  = d * m3;
+    }
+}
+
 """
 
 def ceil_div(a, b): return (a + b - 1) // b
@@ -445,6 +498,7 @@ class LMetal(gpu.Gpu):
         self.init_padding_float()
         self.init_conv_float()
         self.init_max_float()
+        self.init_max_bp_float()
         
     def alloc_buf(self, nbytes):
         return self.device.newBufferWithLength_options_(nbytes, self.opts)
@@ -833,8 +887,45 @@ class LMetal(gpu.Gpu):
         enc.endEncoding()
         cmd.commit()
         cmd.waitUntilCompleted()
-        
     
+    def init_max_bp_float(self):
+        #self.pipe_max_bp_float = self._make_pipeline("max_bp_float")
+        fn = self.lib.newFunctionWithName_("max_bp_float")
+        self.pipe_max_bp_float, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+        #
+    
+    def max_bp_float(self, batch_size, mbuf_delta, mbuf_mask, mbuf_grad, ch, w, h):
+        # params (int32 x3)
+        p = np.array([ch, w, h], dtype=np.int32)
+
+        # params_buf に書き込み（あなたの実装が params_buf 方式なら）
+        mv = self.params_buf.contents().as_buffer(16)
+        mv[:12] = p.tobytes()
+
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+        enc.setComputePipelineState_(self.pipe_max_bp_float)
+
+        enc.setBuffer_offset_atIndex_(mbuf_delta, 0, 0)
+        enc.setBuffer_offset_atIndex_(mbuf_mask,  0, 1)
+        enc.setBuffer_offset_atIndex_(mbuf_grad,  0, 2)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 3)
+
+        grid = Metal.MTLSizeMake(batch_size, h, w)
+        #grid = Metal.MTLSize(batch_size, h, w)
+        
+        # threadgroup は無難に (1, 8, 8) など（maxTotalThreadsPerThreadgroup 内で）
+        #tg = self.mtl.MTLSizeMake(1, 8, 8)
+        tg = Metal.MTLSizeMake(1, 8, 8)
+
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tg)
+        enc.endEncoding()
+
+        cmd.commit()
+        cmd.waitUntilCompleted()
+
 def main():
     m = LMetal()
     m.init_test_func()

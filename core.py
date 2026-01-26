@@ -40,12 +40,13 @@ WEIGHT_SET_3 = [-1.0, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1,
  0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # 21
 
 #
-WEIGHT_SET = WEIGHT_SET_3
+WEIGHT_SET = WEIGHT_SET_1
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = int(WEIGHT_INDEX_SIZE/2)
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
 
+CNN_WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0]
 CNN_WEIGHT_SET_1 = [-2.0, -1.0, 0.0, 1.0, 2.0]
 CNN_WEIGHT_SET_2 = [-1.0, -0.5, 0.0, 0.5, 1.0]
 CNN_WEIGHT_SET_3 = [0.0, 1.0]
@@ -1225,38 +1226,25 @@ class MaxLayer(Layer):
             self.delta = self._next.delta @ self._next._weight_matrix
             self.delta = self.delta.view(np.float32).reshape(self._batch_size, self._ch, self._x*self._y)
             
-            out = np.frombuffer(self._gpu_mask.contents().as_buffer(self._gpu_mask.length()), dtype=np.float32)
-            self._mask_array =  out.view(np.float32).reshape(self._batch_size, self._ch, self._x*2*self._y*2)
-            if debug:
-                print("\tmacOS metal")
-                print("\t\tdelta", self.delta.shape)
-                print("\t\tmask", self._mask_array.shape)
-                #print(self._mask_array[0][0][0], self._mask_array[0][0][1], self._mask_array[0][0][28], self._mask_array[0][0][29] )
-            #
+            # delta を GPU バッファへ（すでに持ってるならそれを使う）
+            mbuf_delta = self._gpu.alloc_buf_from_array(self.delta.astype(np.float32))
             
-            self.grad = np.zeros((self._batch_size, self._ch, self.num_input), dtype=np.float32)
+            # grad 出力バッファ確保（サイズ = B * ch * (2y)*(2x) * 4bytes）
+            in_w = self._x * 2
+            in_h = self._y * 2
+            grad_n = self._batch_size * self._ch * in_w * in_h
+            mbuf_grad = self._gpu.alloc_buf(grad_n * 4)
             
-            for bi in range(self._batch_size):
-                for ci in range(self._ch):
-                    for y in range(self._y):
-                        for x in range(self._x):
-                            d = self.delta[bi][ci][y*self._y + x]
-                            d0 = d * self._mask_array[bi][ci][y*self._y*2 + x*2]
-                            d1 = d * self._mask_array[bi][ci][y*self._y*2 + x*2 + 1]
-                            d2 = d * self._mask_array[bi][ci][(y+1)*self._y*2 + x*2]
-                            d3 = d * self._mask_array[bi][ci][(y+1)*self._y*2 + x*2 +1]
-                            #print(d0, d1, d2, d3)
-                            self.grad[bi][ci][y*self._y*2 + x*2] = d0
-                            self.grad[bi][ci][y*self._y*2 + x*2 + 1] = d1
-                            self.grad[bi][ci][(y+1)*self._y*2 + x*2] = d2
-                            self.grad[bi][ci][(y+1)*self._y*2 + x*2 +1] = d3
-                        # x
-                    # y
-                # ci
-            # bi
+            # max backward 実行（mask は self._gpu_mask を使う）
+            self._gpu.init_max_bp_float()
+            self._gpu.max_bp_float(self._batch_size, mbuf_delta, self._gpu_mask, mbuf_grad,
+                       self._ch, self._x, self._y)
+                       
+            # 必要なら numpy に読み戻して self.grad にする（以降CPU BPするなら必要）
+            out = np.frombuffer(mbuf_grad.contents().as_buffer(mbuf_grad.length()), dtype=np.float32)
+            self.grad = out.reshape(self._batch_size, self._ch, in_w*in_h)
         # if self._gpu.type==2:
         
-
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
         print("Convolution Layer ver.4 ::__init__()")
@@ -1510,23 +1498,24 @@ class Conv_4_Layer(Layer):
         # ----------------------------
         # 1) dY を取得（MaxLayer から来る）
         # ----------------------------
-        if not hasattr(self._next, "grad") or self._next.grad is None:
-            raise RuntimeError("Conv_4_Layer.bp(): self._next.grad がありません（MaxLayer.bp() が先に走ってる？）")
+        #if not hasattr(self._next, "grad") or self._next.grad is None:
+        #    raise RuntimeError("Conv_4_Layer.bp(): self._next.grad がありません（MaxLayer.bp() が先に走ってる？）")
 
         dY = self._next.grad.astype(np.float32)
-        print("dY.ndim", dY.ndim)
+        dY = dY.reshape(B, F, H, W)
+        #print("dY.ndim", dY.ndim)
         # dY shape を (B,F,H,W) に揃える
-        if dY.ndim == 3:
-            # (B,F,H*W)
-            if dY.shape != (B, F, H*W):
-                raise ValueError(f"dY shape mismatch: got {dY.shape}, expected {(B,F,H*W)}")
-            dY = dY.reshape(B, F, H, W)
-        elif dY.ndim == 4:
-            # (B,F,H,W)
-            if dY.shape != (B, F, H, W):
-                raise ValueError(f"dY shape mismatch: got {dY.shape}, expected {(B,F,H,W)}")
-        else:
-            raise ValueError(f"dY ndim must be 3 or 4, got {dY.ndim}")
+        #if dY.ndim == 3:
+        #    # (B,F,H*W)
+        #    if dY.shape != (B, F, H*W):
+        #        raise ValueError(f"dY shape mismatch: got {dY.shape}, expected {(B,F,H*W)}")
+        #    dY = dY.reshape(B, F, H, W)
+        #elif dY.ndim == 4:
+        #    # (B,F,H,W)
+        #    if dY.shape != (B, F, H, W):
+        #        raise ValueError(f"dY shape mismatch: got {dY.shape}, expected {(B,F,H,W)}")
+        #else:
+        #   raise ValueError(f"dY ndim must be 3 or 4, got {dY.ndim}")
 
         # ----------------------------
         # 2) forward 出力（ReLU後）を用意して ReLU 微分を掛ける
@@ -1538,18 +1527,22 @@ class Conv_4_Layer(Layer):
         # 既に self._output_array を保持しているならそれを使う。
         out = None
 
-        if hasattr(self, "_output_array") and self._output_array is not None and self._output_array.size == B*F*H*W:
-            # 形が合うならそれを使う（Conv_4_Layer.prepare() で確保されてる）
-            out = self._output_array.reshape(B, F, H, W).astype(np.float32)
-        else:
-            # 最低限、GPU(metal)の結果を読む（numpyベースのBPにはこれが一番ラク）
-            if self._gpu and self._gpu.type == 2 and hasattr(self, "_gpu_output"):
-                out = np.frombuffer(
-                    self._gpu_output.contents().as_buffer(self._gpu_output.length()),
-                    dtype=np.float32
-                ).reshape(B, F, H*W).reshape(B, F, H, W)
-            else:
-                raise RuntimeError("Conv_4_Layer.bp(): ReLU mask 用の out を取得できません。")
+        #if hasattr(self, "_output_array") and self._output_array is not None and self._output_array.size == B*F*H*W:
+        #    # 形が合うならそれを使う（Conv_4_Layer.prepare() で確保されてる）
+        #    print("FUCK")
+        #    out = self._output_array.reshape(B, F, H, W).astype(np.float32)
+        #else:
+        #    print("FUCK2")
+        #    # 最低限、GPU(metal)の結果を読む（numpyベースのBPにはこれが一番ラク）
+        #    if self._gpu and self._gpu.type == 2 and hasattr(self, "_gpu_output"):
+        #        out = np.frombuffer(
+        #            self._gpu_output.contents().as_buffer(self._gpu_output.length()),
+        #            dtype=np.float32
+        #        ).reshape(B, F, H*W).reshape(B, F, H, W)
+        #    else:
+        #        raise RuntimeError("Conv_4_Layer.bp(): ReLU mask 用の out を取得できません。")
+
+        out = self._output_array.reshape(B, F, H, W).astype(np.float32)
 
         relu_mask = (out > 0).astype(np.float32)
         dZ = dY * relu_mask  # (B,F,H,W)
@@ -1558,29 +1551,29 @@ class Conv_4_Layer(Layer):
         # 3) 入力 X を (B,C,H,W) に揃えて padding する
         # ----------------------------
         X = self._pre._output_array
-        if X is None:
-            raise RuntimeError("Conv_4_Layer.bp(): self._pre._output_array がありません（forwardで保持してる？）")
-
+        #if X is None:
+        #    raise RuntimeError("Conv_4_Layer.bp(): self._pre._output_array がありません（forwardで保持してる？）")
         X = X.astype(np.float32)
-
+        #print("X.ndim", X.ndim)
         # 形を (B,C,H,W) に揃える
-        if X.ndim == 2:
-            # (B, C*H*W)
-            if X.shape[1] != C*H*W:
-                raise ValueError(f"pre output shape mismatch: got {X.shape}, expected second dim {C*H*W}")
-            X = X.reshape(B, C, H, W)
-        elif X.ndim == 3:
-            # (B,C,H*W)
-            if X.shape != (B, C, H*W):
-                raise ValueError(f"pre output shape mismatch: got {X.shape}, expected {(B,C,H*W)}")
-            X = X.reshape(B, C, H, W)
-        elif X.ndim == 4:
-            # (B,C,H,W)
-            if X.shape != (B, C, H, W):
-                raise ValueError(f"pre output shape mismatch: got {X.shape}, expected {(B,C,H,W)}")
-        else:
-            raise ValueError(f"pre output ndim must be 2/3/4, got {X.ndim}")
+        #if X.ndim == 2:
+        #    # (B, C*H*W)
+        #    if X.shape[1] != C*H*W:
+        #        raise ValueError(f"pre output shape mismatch: got {X.shape}, expected second dim {C*H*W}")
+        #    X = X.reshape(B, C, H, W)
+        #elif X.ndim == 3:
+        #    # (B,C,H*W)
+        #    if X.shape != (B, C, H*W):
+        #        raise ValueError(f"pre output shape mismatch: got {X.shape}, expected {(B,C,H*W)}")
+        #    X = X.reshape(B, C, H, W)
+        #elif X.ndim == 4:
+        #    # (B,C,H,W)
+        #    if X.shape != (B, C, H, W):
+        #        raise ValueError(f"pre output shape mismatch: got {X.shape}, expected {(B,C,H,W)}")
+        #else:
+        #    raise ValueError(f"pre output ndim must be 2/3/4, got {X.ndim}")
 
+        X = X.reshape(B, C, H, W)
         Xpad = np.pad(X, ((0,0),(0,0),(1,1),(1,1)), mode="constant")  # (B,C,H+2,W+2)
 
         # ----------------------------
@@ -2177,9 +2170,9 @@ class Roster:
         elif self._gpu.type==1: # nvidia
             self.input._gpu_output = self._gpu.allocateArray(data_array)
         elif self._gpu.type==2: # macOS Metal
-            print("Roster::direct_set_data()")
-            print("self._batch_data", type(self._batch_data[0][0]), self._batch_data.shape)
-            print("data_array", type(data_array[0][0]), data_array.shape)
+            #print("Roster::direct_set_data()")
+            #print("self._batch_data", type(self._batch_data[0][0]), self._batch_data.shape)
+            #print("data_array", type(data_array[0][0]), data_array.shape)
             
             self._gpu.write_np_to_mbuf(data_array, self._gpu_input)
             self._gpu.write_np_to_mbuf(data_array, self.input._gpu_output)
@@ -2511,7 +2504,7 @@ class Roster:
 
     def export_weight(self, path, mode=0):
         # mode 0:index, 1:value
-        #print("Roster : export_weight(%s, %d)" % (path, mode))
+        print("Roster : export_weight(%s, %d)" % (path, mode))
         with open(path, "w") as f:
             writer = csv.writer(f, lineterminator='\n')
             c = self.count_layers()
@@ -2519,9 +2512,10 @@ class Roster:
                 layer = self.get_layer_at(i)
                 type = layer.get_type()
                 if type==LAYER_TYPE_INPUT or type==LAYER_TYPE_MAX:
+                    print("\tskip", i, type)
                     continue
                 #
-                print("export_weight:", layer, type, mode)
+                print("\texport_weight:", layer, type, mode)
                 if mode==0:
                     data = layer.export_weight_index()
                 elif mode==1:
@@ -2595,7 +2589,8 @@ class Roster:
             layer = self.get_layer_at(i)
             layer.bp(self.label_array, debug)
         #
-        
+    
+    
 def main():
     return 0
 

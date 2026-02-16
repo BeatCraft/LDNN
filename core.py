@@ -32,41 +32,43 @@ import util
 #
 # constant values
 #
-WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0, 0.0625, 0.125, 0.25, 0.5, 1.0] # 11
-WEIGHT_SET_1 = [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0] # 9
-WEIGHT_SET_2 = [-1.0, -0.5, -0.25, -0.125, 0.125, 0.25, 0.5, 1.0] # 8
-WEIGHT_SET_3 = [-1.0, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1,
- 0,
- 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # 21
 
-#
-WEIGHT_SET = WEIGHT_SET_1
+WEIGHT_SET_0 = [-1.0, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # 21
+WEIGHT_SET_1 = [-1.0, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1.0] # 11
+WEIGHT_SET_2 = [-1.0, -0.5, -0.25, -0.125, -0.0625, 0, 0.0625, 0.125, 0.25, 0.5, 1.0] # 11
+WEIGHT_SET_3 = [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0] # 9
+WEIGHT_SET_4 = [-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0] # 7
+WEIGHT_SET_5 = [-1.0, -0.5, 0.0, 0.5, 1.0] # 5
+WEIGHT_SET_6 = [-1.0, 0.0, 1.0] #
+
+
+WEIGHT_SET = WEIGHT_SET_4
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = int(WEIGHT_INDEX_SIZE/2)
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
 
-CNN_WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0]
-CNN_WEIGHT_SET_1 = [-2.0, -1.0, 0.0, 1.0, 2.0]
-CNN_WEIGHT_SET_2 = [-1.0, -0.5, 0.0, 0.5, 1.0]
-CNN_WEIGHT_SET_3 = [0.0, 1.0]
-CNN_WEIGHT_SET_4 = [-0.25, -0.125, 0.0, 0.125, 0.25, 0.5]
-CNN_WEIGHT_SET_5 = [-0.5, 0.0, 0.5]
+#CNN_WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0]
+#CNN_WEIGHT_SET_1 = [-2.0, -1.0, 0.0, 1.0, 2.0]
+#CNN_WEIGHT_SET_2 = [-1.0, -0.5, 0.0, 0.5, 1.0]
+#CNN_WEIGHT_SET_3 = [0.0, 1.0]
+#CNN_WEIGHT_SET_4 = [-0.25, -0.125, 0.0, 0.125, 0.25, 0.5]
+#CNN_WEIGHT_SET_5 = [-0.5, 0.0, 0.5]
 
-CNN_WEIGHT_SET = WEIGHT_SET_3 #WEIGHT_SET_0 # CNN_WEIGHT_SET_4
+CNN_WEIGHT_SET = WEIGHT_SET_5 #CNN_WEIGHT_SET_2 # WEIGHT_SET_0 # CNN_WEIGHT_SET_4
 CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
 CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
 CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
 CNN_WEIGHT_INDEX_MIN = 0
 
-CNN_WEIGHT_SET2 = CNN_WEIGHT_SET_5
-CNN_WEIGHT_INDEX_SIZE2 = len(CNN_WEIGHT_SET2)
-CNN_WEIGHT_INDEX_ZERO2 = int(CNN_WEIGHT_INDEX_SIZE2/2)
-CNN_WEIGHT_INDEX_MAX2 = CNN_WEIGHT_INDEX_SIZE2 - 1
-CNN_WEIGHT_INDEX_MIN2 = 0
+#CNN_WEIGHT_SET2 = CNN_WEIGHT_SET_5
+#CNN_WEIGHT_INDEX_SIZE2 = len(CNN_WEIGHT_SET2)
+#CNN_WEIGHT_INDEX_ZERO2 = int(CNN_WEIGHT_INDEX_SIZE2/2)
+#CNN_WEIGHT_INDEX_MAX2 = CNN_WEIGHT_INDEX_SIZE2 - 1
+#CNN_WEIGHT_INDEX_MIN2 = 0
 
 RNDWT = [norm.pdf(x, 0, 1) for x in WEIGHT_SET]
-RNDWT[5] *= 0.1
+#RNDWT[5] *= 0.1
 
 def wi_std_11():
     idx = random.choices(range(WEIGHT_INDEX_SIZE), weights=RNDWT, k=1)[0]
@@ -2512,10 +2514,10 @@ class Roster:
                 layer = self.get_layer_at(i)
                 type = layer.get_type()
                 if type==LAYER_TYPE_INPUT or type==LAYER_TYPE_MAX:
-                    print("\tskip", i, type)
+                    #print("\tskip", i, type)
                     continue
                 #
-                print("\texport_weight:", layer, type, mode)
+                #print("\texport_weight:", layer, type, mode)
                 if mode==0:
                     data = layer.export_weight_index()
                 elif mode==1:
@@ -2571,9 +2573,7 @@ class Roster:
         #print(out.shape)
         #print(out[0])
         #, out[0].sum())
-        
         #return
-        
         
         for i in range(1, c):
             layer = self.get_layer_at(i)

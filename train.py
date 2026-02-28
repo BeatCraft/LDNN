@@ -56,12 +56,11 @@ class Train:
             if w.momentum==0:
                 pass
             else:
-                #print(w.momentum)
                 w_list_momentum.append(w)
             #
         #
         return w_list_momentum
-    
+        
     def make_w_list(self, type_list=None):
         r = self._r
         if type_list is None:
@@ -72,14 +71,13 @@ class Train:
         for li in range(1, c):
             layer = r.get_layer_at(li)
             type = layer.get_type()
-        
-            for t in type_list:
-                if type!=t:
-                    continue
-                #
+            #for t in type_list:
+            #    if type!=t:
+            #        continue
+            #    #
+            if type in type_list:
                 for ni in range(layer._num_node):
                     for ii in range(layer._num_input):
-                        #w_list.append(layer.getWeight(ni, ii))
                         w_list.append(layer.get_weight(ni, ii))
                     #
                 #
@@ -97,7 +95,6 @@ class Train:
             if cw > 0:
                 for ni in range(layer._num_node):
                     for ii in range(layer._num_input):
-                        #w_list.append(layer.getWeight(ni, ii))
                         w_list.append(layer.get_weight(ni, ii))
                     #
                 #

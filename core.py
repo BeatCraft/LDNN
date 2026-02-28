@@ -41,31 +41,17 @@ WEIGHT_SET_4 = [-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0] # 7
 WEIGHT_SET_5 = [-1.0, -0.5, 0.0, 0.5, 1.0] # 5
 WEIGHT_SET_6 = [-1.0, 0.0, 1.0] #
 
-
 WEIGHT_SET = WEIGHT_SET_4
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = int(WEIGHT_INDEX_SIZE/2)
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
 
-#CNN_WEIGHT_SET_0 = [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0]
-#CNN_WEIGHT_SET_1 = [-2.0, -1.0, 0.0, 1.0, 2.0]
-#CNN_WEIGHT_SET_2 = [-1.0, -0.5, 0.0, 0.5, 1.0]
-#CNN_WEIGHT_SET_3 = [0.0, 1.0]
-#CNN_WEIGHT_SET_4 = [-0.25, -0.125, 0.0, 0.125, 0.25, 0.5]
-#CNN_WEIGHT_SET_5 = [-0.5, 0.0, 0.5]
-
-CNN_WEIGHT_SET = WEIGHT_SET_5 #CNN_WEIGHT_SET_2 # WEIGHT_SET_0 # CNN_WEIGHT_SET_4
+CNN_WEIGHT_SET = WEIGHT_SET
 CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
 CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
 CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
 CNN_WEIGHT_INDEX_MIN = 0
-
-#CNN_WEIGHT_SET2 = CNN_WEIGHT_SET_5
-#CNN_WEIGHT_INDEX_SIZE2 = len(CNN_WEIGHT_SET2)
-#CNN_WEIGHT_INDEX_ZERO2 = int(CNN_WEIGHT_INDEX_SIZE2/2)
-#CNN_WEIGHT_INDEX_MAX2 = CNN_WEIGHT_INDEX_SIZE2 - 1
-#CNN_WEIGHT_INDEX_MIN2 = 0
 
 RNDWT = [norm.pdf(x, 0, 1) for x in WEIGHT_SET]
 #RNDWT[5] *= 0.1
@@ -182,6 +168,7 @@ class Weight:
         self.mark = 0
         self.type = type
         self.momentum = 0
+        self.slope = 0.0
         #print("Weight::init()")
         
 class Node:
@@ -257,6 +244,12 @@ class Layer(object):
 
     def propagate(self, array_in, debug=0):
         pass
+    
+    def bp(self, label_array, debug=0):
+        pass
+
+    def slope(self, label_array, debug=0):
+        pass
         
     #def getWeight(self, ni, ii):
     #    wi = self._weight_index_matrix[ni][ii]
@@ -312,8 +305,8 @@ class Layer(object):
         wmax = WEIGHT_INDEX_SIZE
         if mode==0: # random index
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
-                wmax = WEIGHT_INDEX_SIZE
-                wi = random.randrange(wmax)
+                #wmax = WEIGHT_INDEX_SIZE
+                wi = random.randrange(WEIGHT_INDEX_SIZE)
                 self.set_weight_index(ni, ii, wi)
             elif self._type==LAYER_TYPE_CONV:
                 #wmax = CNN_WEIGHT_INDEX_SIZE
@@ -769,6 +762,18 @@ class HiddenLayer(Layer):
             #
             self.dW = self.dW.T
         #
+    def slope(self, label_array, debug=0):
+        if debug:
+            print("HiddenLayer::slope() macOS Metal")
+        #
+        self.delta = self._next.delta @ self._next._weight_matrix
+
+        # ReLU derivative
+        self.delta *= (self._output_array > 0).astype(np.float32)
+
+        # slope
+        self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
+        
         
 class OutputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None, smax=False):
@@ -1040,7 +1045,17 @@ class OutputLayer(Layer):
         else:
             print("OutputLayer::bp()")
         #
-        
+
+    def slope(self, label_array, debug=0):
+        if debug:
+            print("OutputLayer::slope() macOS Metal")
+        #
+        self.delta = (self._softmax_array - label_array) # need no batch avg
+      
+        # slope for weights
+        self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
+        #print(self.dW[0])
+
 class RegressionOutputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
         print("RegressionOutputLayer::__init__()")
@@ -1396,7 +1411,8 @@ class Conv_4_Layer(Layer):
             self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, a_mode)
             
             # scale
-            #self._gpu.scale_layer(self._batch_size, self._gpu_output, size)
+            self._gpu.scale_layer(self._batch_size, self._gpu_output, size)
+                            
             if debug:
                 print(self._index, "conv, scale")
                 self._gpu.copy(self._output_array, self._gpu_output)
@@ -2590,7 +2606,13 @@ class Roster:
             layer.bp(self.label_array, debug)
         #
     
-    
+    def slope(self, debug=0):
+        c = self.count_layers()
+        for i in range(c-1, -1, -1):
+            layer = self.get_layer_at(i)
+            layer.slope(self.label_array, debug)
+        #
+        
 def main():
     return 0
 

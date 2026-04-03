@@ -368,17 +368,17 @@ kernel void max_float(
         //
         if (m_next>m){
             m = m_next;
-            idx++;
+            idx=1;
         }
         m_next = input[k + input_w];
         if (m_next>m){
             m = m_next;
-            idx++;
+            idx=2;
         }
         m_next = input[k + input_w+1];
         if (m_next>m){
             m = m_next;
-            idx++;
+            idx=3;
         }
         
         switch (idx) {
@@ -465,6 +465,188 @@ kernel void max_bp_float(
     }
 }
 
+struct ConvBackParams {
+    int batch;
+    int w;
+    int h;
+    int ch;
+    int filter;
+};
+
+kernel void conv4_relu_back_input(
+    device const float* dY    [[buffer(0)]], // (B,F,H,W)
+    device const float* out   [[buffer(1)]], // (B,F,H,W) after ReLU
+    device const float* weight[[buffer(2)]], // (F,C,3,3)
+    device float*       dX    [[buffer(3)]], // (B,C,H,W)
+    constant ConvBackParams& p[[buffer(4)]],
+    uint3 gid [[thread_position_in_grid]]
+)
+{
+    int bi = (int)gid.x;
+    int xi = (int)gid.y;
+    int yi = (int)gid.z;
+
+    if (bi >= p.batch || xi >= p.w || yi >= p.h) return;
+
+    int hw = p.w * p.h;
+    int dy_b_stride = p.filter * hw;
+    int dx_b_stride = p.ch * hw;
+
+    for (int ci = 0; ci < p.ch; ci++) {
+        float sum = 0.0f;
+
+        for (int fi = 0; fi < p.filter; fi++) {
+            int dy_base = bi * dy_b_stride + fi * hw;
+
+            for (int ky = 0; ky < 3; ky++) {
+                for (int kx = 0; kx < 3; kx++) {
+                    int oy = yi - ky + 1;
+                    int ox = xi - kx + 1;
+                    if (oy < 0 || oy >= p.h || ox < 0 || ox >= p.w) continue;
+
+                    int out_idx = dy_base + oy * p.w + ox;
+                    float g = dY[out_idx];
+                    if (out[out_idx] <= 0.0f) g = 0.0f;
+
+                    int w_idx = fi * (p.ch * 9) + ci * 9 + ky * 3 + kx;
+                    sum += weight[w_idx] * g;
+                }
+            }
+        }
+
+        int dx_idx = bi * dx_b_stride + ci * hw + yi * p.w + xi;
+        dX[dx_idx] = sum;
+    }
+}
+
+kernel void conv4_relu_back_weight(
+    device const float* xpad  [[buffer(0)]], // (B,C,H+2,W+2)
+    device const float* dY    [[buffer(1)]], // (B,F,H,W)
+    device const float* out   [[buffer(2)]], // (B,F,H,W) after ReLU
+    device float*       dW    [[buffer(3)]], // (F,C,3,3)
+    constant ConvBackParams& p[[buffer(4)]],
+    uint3 gid [[thread_position_in_grid]]
+)
+{
+    int fi = (int)gid.x;
+    int ci = (int)gid.y;
+    int kk = (int)gid.z;
+
+    if (fi >= p.filter || ci >= p.ch || kk >= 9) return;
+
+    int ky = kk / 3;
+    int kx = kk % 3;
+
+    int hw = p.w * p.h;
+    int xpad_w = p.w + 2;
+    int xpad_h = p.h + 2;
+    int xpad_hw = xpad_w * xpad_h;
+
+    int dy_b_stride   = p.filter * hw;
+    int xpad_b_stride = p.ch * xpad_hw;
+
+    float acc = 0.0f;
+
+    for (int bi = 0; bi < p.batch; bi++) {
+        int dy_base   = bi * dy_b_stride   + fi * hw;
+        int xpad_base = bi * xpad_b_stride + ci * xpad_hw;
+
+        for (int y = 0; y < p.h; y++) {
+            for (int x = 0; x < p.w; x++) {
+                int out_idx = dy_base + y * p.w + x;
+                float g = dY[out_idx];
+                if (out[out_idx] <= 0.0f) g = 0.0f;
+
+                int x_idx = xpad_base + (y + ky) * xpad_w + (x + kx);
+                acc += xpad[x_idx] * g;
+            }
+        }
+    }
+
+    dW[fi * (p.ch * 9) + ci * 9 + kk] = acc / (float)p.batch;
+}
+
+
+// =========================
+// FC backward kernels
+// =========================
+
+struct FCBackDeltaParams {
+    int batch;
+    int cur_nodes;
+    int next_nodes;
+};
+
+kernel void fc_hidden_delta_relu(
+    device const float* next_delta [[buffer(0)]],
+    device const float* next_w     [[buffer(1)]],
+    device const float* cur_out    [[buffer(2)]],
+    device float*       cur_delta  [[buffer(3)]],
+    constant FCBackDeltaParams& p  [[buffer(4)]],
+    uint2 gid [[thread_position_in_grid]]
+)
+{
+    int bi = (int)gid.x;
+    int ci = (int)gid.y;
+
+    if (bi >= p.batch || ci >= p.cur_nodes) return;
+
+    float acc = 0.0f;
+    int nd_base = bi * p.next_nodes;
+
+    for (int nj = 0; nj < p.next_nodes; nj++) {
+        acc += next_delta[nd_base + nj] * next_w[nj * p.cur_nodes + ci];
+    }
+
+    float y = cur_out[bi * p.cur_nodes + ci];
+    if (y <= 0.0f) acc = 0.0f;
+
+    cur_delta[bi * p.cur_nodes + ci] = acc;
+}
+
+struct FCGradParams {
+    int batch;
+    int in_nodes;
+    int out_nodes;
+};
+
+kernel void fc_weight_grad(
+    device const float* x_pre [[buffer(0)]],
+    device const float* delta [[buffer(1)]],
+    device float*       dW    [[buffer(2)]],
+    constant FCGradParams& p  [[buffer(3)]],
+    uint2 gid [[thread_position_in_grid]]
+)
+{
+    int ii = (int)gid.x;
+    int oi = (int)gid.y;
+
+    if (ii >= p.in_nodes || oi >= p.out_nodes) return;
+
+    float acc = 0.0f;
+    for (int b = 0; b < p.batch; b++) {
+        acc += x_pre[b * p.in_nodes + ii] * delta[b * p.out_nodes + oi];
+    }
+
+    dW[ii * p.out_nodes + oi] = acc / (float)p.batch;
+}
+
+struct FCOutputDeltaParams {
+    int n;
+};
+
+kernel void fc_output_delta(
+    device const float* softmax [[buffer(0)]],
+    device const float* label   [[buffer(1)]],
+    device float*       delta   [[buffer(2)]],
+    constant FCOutputDeltaParams& p [[buffer(3)]],
+    uint idx [[thread_position_in_grid]])
+{
+    if ((int)idx >= p.n) return;
+    delta[idx] = softmax[idx] - label[idx];
+}
+
+
 """
 
 def ceil_div(a, b): return (a + b - 1) // b
@@ -499,6 +681,11 @@ class LMetal(gpu.Gpu):
         self.init_conv_float()
         self.init_max_float()
         self.init_max_bp_float()
+        self.init_conv4_back_input()
+        self.init_conv4_back_weight()
+        self.init_fc_hidden_delta_relu()
+        self.init_fc_weight_grad()
+        self.init_fc_output_delta()
         
     def alloc_buf(self, nbytes):
         return self.device.newBufferWithLength_options_(nbytes, self.opts)
@@ -522,7 +709,7 @@ class LMetal(gpu.Gpu):
         return arr
     
     def copy_mbuf_to_numpy(self, mbuf, dtype, shape=None):
-        view = mtlbuffer_to_numpy_view(buf, dtype, shape)
+        view = mtlbuffer_to_numpy_view(mbuf, dtype, shape)
         return view.copy()
         
     def init_test_func(self):
@@ -925,7 +1112,229 @@ class LMetal(gpu.Gpu):
 
         cmd.commit()
         cmd.waitUntilCompleted()
+        
+    def init_conv4_back_input(self):
+        fn = self.lib.newFunctionWithName_("conv4_relu_back_input")
+        self.pipe_conv4_back_input, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+        #
+        
+    def init_conv4_back_weight(self):
+        fn = self.lib.newFunctionWithName_("conv4_relu_back_weight")
+        self.pipe_conv4_back_weight, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+        #
 
+    def init_fc_hidden_delta_relu(self):
+        fn = self.lib.newFunctionWithName_("fc_hidden_delta_relu")
+        self.pipe_fc_hidden_delta_relu, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+
+    def init_fc_weight_grad(self):
+        fn = self.lib.newFunctionWithName_("fc_weight_grad")
+        self.pipe_fc_weight_grad, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+
+    def init_fc_output_delta(self):
+        fn = self.lib.newFunctionWithName_("fc_output_delta")
+        self.pipe_fc_output_delta, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+
+    def conv4_back_input(self, batch_size, mbuf_dy, mbuf_out, mbuf_w, mbuf_dx, w, h, ch, filter):
+        params = np.zeros(1, dtype=np.dtype([
+            ("batch",  np.int32),
+            ("w",      np.int32),
+            ("h",      np.int32),
+            ("ch",     np.int32),
+            ("filter", np.int32),
+        ], align=True))
+        params["batch"] = batch_size
+        params["w"] = w
+        params["h"] = h
+        params["ch"] = ch
+        params["filter"] = filter
+
+        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
+        mv[:params.nbytes] = memoryview(params).tobytes()
+
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+        enc.setComputePipelineState_(self.pipe_conv4_back_input)
+        enc.setBuffer_offset_atIndex_(mbuf_dy,  0, 0)
+        enc.setBuffer_offset_atIndex_(mbuf_out, 0, 1)
+        enc.setBuffer_offset_atIndex_(mbuf_w,   0, 2)
+        enc.setBuffer_offset_atIndex_(mbuf_dx,  0, 3)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 4)
+
+        grid = Metal.MTLSize(batch_size, w, h)
+
+        max_t = int(self.pipe_conv4_back_input.maxTotalThreadsPerThreadgroup())
+        tx, ty, tz = 1, 16, 16
+        while tx * ty * tz > max_t:
+            if tz > 1:
+                tz //= 2
+            elif ty > 1:
+                ty //= 2
+            else:
+                break
+            #
+        # while
+        
+        tpg = Metal.MTLSize(tx, min(ty, w if w > 0 else 1), min(tz, h if h > 0 else 1))
+
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+        enc.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()
+
+    def conv4_back_weight(self, batch_size, mbuf_xpad, mbuf_dy, mbuf_out, mbuf_dw, w, h, ch, filter):
+        params = np.zeros(1, dtype=np.dtype([
+            ("batch",  np.int32),
+            ("w",      np.int32),
+            ("h",      np.int32),
+            ("ch",     np.int32),
+            ("filter", np.int32),
+        ], align=True))
+        params["batch"] = batch_size
+        params["w"] = w
+        params["h"] = h
+        params["ch"] = ch
+        params["filter"] = filter
+
+        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
+        mv[:params.nbytes] = memoryview(params).tobytes()
+
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+        enc.setComputePipelineState_(self.pipe_conv4_back_weight)
+        enc.setBuffer_offset_atIndex_(mbuf_xpad, 0, 0)
+        enc.setBuffer_offset_atIndex_(mbuf_dy,   0, 1)
+        enc.setBuffer_offset_atIndex_(mbuf_out,  0, 2)
+        enc.setBuffer_offset_atIndex_(mbuf_dw,   0, 3)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 4)
+
+        grid = Metal.MTLSize(filter, ch, 9)
+
+        max_t = int(self.pipe_conv4_back_weight.maxTotalThreadsPerThreadgroup())
+        tx, ty, tz = 1, min(ch, 8), 9
+        while tx * ty * tz > max_t:
+            if tz > 1:
+                tz //= 2
+            elif ty > 1:
+                ty //= 2
+            else:
+                break
+            #
+        #
+        tpg = Metal.MTLSize(tx, max(1, ty), max(1, tz))
+
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+        enc.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()
+
+    def fc_hidden_delta_relu(self, batch_size, mbuf_next_delta, mbuf_next_w, mbuf_cur_out, mbuf_cur_delta,
+                             cur_nodes, next_nodes):
+        params = np.zeros(1, dtype=np.dtype([
+            ("batch", np.int32),
+            ("cur_nodes", np.int32),
+            ("next_nodes", np.int32),
+        ], align=True))
+        params["batch"] = batch_size
+        params["cur_nodes"] = cur_nodes
+        params["next_nodes"] = next_nodes
+
+        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
+        mv[:params.nbytes] = memoryview(params).tobytes()
+
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+        enc.setComputePipelineState_(self.pipe_fc_hidden_delta_relu)
+        enc.setBuffer_offset_atIndex_(mbuf_next_delta, 0, 0)
+        enc.setBuffer_offset_atIndex_(mbuf_next_w,     0, 1)
+        enc.setBuffer_offset_atIndex_(mbuf_cur_out,    0, 2)
+        enc.setBuffer_offset_atIndex_(mbuf_cur_delta,  0, 3)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 4)
+
+        grid = Metal.MTLSize(batch_size, cur_nodes, 1)
+
+        max_t = int(self.pipe_fc_hidden_delta_relu.maxTotalThreadsPerThreadgroup())
+        tx, ty = 1, min(cur_nodes if cur_nodes > 0 else 1, 256)
+        while tx * ty > max_t and ty > 1:
+            ty //= 2
+        tpg = Metal.MTLSize(tx, max(1, ty), 1)
+
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+        enc.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()
+
+    def fc_weight_grad(self, batch_size, mbuf_x_pre, mbuf_delta, mbuf_dw, in_nodes, out_nodes):
+        params = np.zeros(1, dtype=np.dtype([
+            ("batch", np.int32),
+            ("in_nodes", np.int32),
+            ("out_nodes", np.int32),
+        ], align=True))
+        params["batch"] = batch_size
+        params["in_nodes"] = in_nodes
+        params["out_nodes"] = out_nodes
+
+        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
+        mv[:params.nbytes] = memoryview(params).tobytes()
+
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+        enc.setComputePipelineState_(self.pipe_fc_weight_grad)
+        enc.setBuffer_offset_atIndex_(mbuf_x_pre,      0, 0)
+        enc.setBuffer_offset_atIndex_(mbuf_delta,      0, 1)
+        enc.setBuffer_offset_atIndex_(mbuf_dw,         0, 2)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 3)
+
+        grid = Metal.MTLSize(in_nodes, out_nodes, 1)
+
+        max_t = int(self.pipe_fc_weight_grad.maxTotalThreadsPerThreadgroup())
+        tx, ty = 1, min(out_nodes if out_nodes > 0 else 1, 256)
+        while tx * ty > max_t and ty > 1:
+            ty //= 2
+        tpg = Metal.MTLSize(tx, max(1, ty), 1)
+
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+        enc.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()
+
+
+    def fc_output_delta(self, batch_size, num_nodes, mbuf_softmax, mbuf_label, mbuf_delta):
+        total = int(batch_size * num_nodes)
+        params = np.zeros(1, dtype=np.dtype([
+            ("n", np.int32),
+        ], align=True))
+        params["n"] = total
+
+        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
+        mv[:params.nbytes] = memoryview(params).tobytes()
+
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+        enc.setComputePipelineState_(self.pipe_fc_output_delta)
+        enc.setBuffer_offset_atIndex_(mbuf_softmax,    0, 0)
+        enc.setBuffer_offset_atIndex_(mbuf_label,      0, 1)
+        enc.setBuffer_offset_atIndex_(mbuf_delta,      0, 2)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 3)
+
+        grid = Metal.MTLSize(total, 1, 1)
+        tpg = Metal.MTLSize(min(self.pipe_fc_output_delta.maxTotalThreadsPerThreadgroup(), max(1, total), 256), 1, 1)
+
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+        enc.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()
+    
 def main():
     m = LMetal()
     m.init_test_func()

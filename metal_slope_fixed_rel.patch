@@ -1,0 +1,285 @@
+--- lmetal.py
++++ lmetal.py
+@@ -567,6 +567,71 @@
+ }
+ 
+ 
++// =========================
++// FC backward kernels
++// =========================
++
++struct FCBackDeltaParams {
++    int batch;
++    int cur_nodes;
++    int next_nodes;
++};
++
++kernel void fc_hidden_delta_relu(
++    device const float* next_delta [[buffer(0)]],
++    device const float* next_w     [[buffer(1)]],
++    device const float* cur_out    [[buffer(2)]],
++    device float*       cur_delta  [[buffer(3)]],
++    constant FCBackDeltaParams& p  [[buffer(4)]],
++    uint2 gid [[thread_position_in_grid]]
++)
++{
++    int bi = (int)gid.x;
++    int ci = (int)gid.y;
++
++    if (bi >= p.batch || ci >= p.cur_nodes) return;
++
++    float acc = 0.0f;
++    int nd_base = bi * p.next_nodes;
++
++    for (int nj = 0; nj < p.next_nodes; nj++) {
++        acc += next_delta[nd_base + nj] * next_w[nj * p.cur_nodes + ci];
++    }
++
++    float y = cur_out[bi * p.cur_nodes + ci];
++    if (y <= 0.0f) acc = 0.0f;
++
++    cur_delta[bi * p.cur_nodes + ci] = acc;
++}
++
++struct FCGradParams {
++    int batch;
++    int in_nodes;
++    int out_nodes;
++};
++
++kernel void fc_weight_grad(
++    device const float* x_pre [[buffer(0)]],
++    device const float* delta [[buffer(1)]],
++    device float*       dW    [[buffer(2)]],
++    constant FCGradParams& p  [[buffer(3)]],
++    uint2 gid [[thread_position_in_grid]]
++)
++{
++    int ii = (int)gid.x;
++    int oi = (int)gid.y;
++
++    if (ii >= p.in_nodes || oi >= p.out_nodes) return;
++
++    float acc = 0.0f;
++    for (int b = 0; b < p.batch; b++) {
++        acc += x_pre[b * p.in_nodes + ii] * delta[b * p.out_nodes + oi];
++    }
++
++    dW[ii * p.out_nodes + oi] = acc / (float)p.batch;
++}
++
++
+ 
+ """
+ 
+@@ -604,6 +669,8 @@
+         self.init_max_bp_float()
+         self.init_conv4_back_input()
+         self.init_conv4_back_weight()
++        self.init_fc_hidden_delta_relu()
++        self.init_fc_weight_grad()
+         
+     def alloc_buf(self, nbytes):
+         return self.device.newBufferWithLength_options_(nbytes, self.opts)
+@@ -1045,6 +1112,18 @@
+             raise RuntimeError(err)
+         #
+ 
++    def init_fc_hidden_delta_relu(self):
++        fn = self.lib.newFunctionWithName_("fc_hidden_delta_relu")
++        self.pipe_fc_hidden_delta_relu, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
++        if err:
++            raise RuntimeError(err)
++
++    def init_fc_weight_grad(self):
++        fn = self.lib.newFunctionWithName_("fc_weight_grad")
++        self.pipe_fc_weight_grad, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
++        if err:
++            raise RuntimeError(err)
++
+     def conv4_back_input(self, batch_size, mbuf_dy, mbuf_out, mbuf_w, mbuf_dx, w, h, ch, filter):
+         params = np.zeros(1, dtype=np.dtype([
+             ("batch",  np.int32),
+@@ -1135,6 +1214,76 @@
+ 
+         enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+         enc.endEncoding()
++        cmd.commit()
++        cmd.waitUntilCompleted()
++
++    def fc_hidden_delta_relu(self, batch_size, mbuf_next_delta, mbuf_next_w, mbuf_cur_out, mbuf_cur_delta,
++                             cur_nodes, next_nodes):
++        params = np.zeros(1, dtype=np.dtype([
++            ("batch", np.int32),
++            ("cur_nodes", np.int32),
++            ("next_nodes", np.int32),
++        ], align=True))
++        params["batch"] = batch_size
++        params["cur_nodes"] = cur_nodes
++        params["next_nodes"] = next_nodes
++
++        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
++        mv[:params.nbytes] = memoryview(params).tobytes()
++
++        cmd = self.queue.commandBuffer()
++        enc = cmd.computeCommandEncoder()
++        enc.setComputePipelineState_(self.pipe_fc_hidden_delta_relu)
++        enc.setBuffer_offset_atIndex_(mbuf_next_delta, 0, 0)
++        enc.setBuffer_offset_atIndex_(mbuf_next_w,     0, 1)
++        enc.setBuffer_offset_atIndex_(mbuf_cur_out,    0, 2)
++        enc.setBuffer_offset_atIndex_(mbuf_cur_delta,  0, 3)
++        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 4)
++
++        grid = Metal.MTLSize(batch_size, cur_nodes, 1)
++
++        max_t = int(self.pipe_fc_hidden_delta_relu.maxTotalThreadsPerThreadgroup())
++        tx, ty = 1, min(cur_nodes if cur_nodes > 0 else 1, 256)
++        while tx * ty > max_t and ty > 1:
++            ty //= 2
++        tpg = Metal.MTLSize(tx, max(1, ty), 1)
++
++        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
++        enc.endEncoding()
++        cmd.commit()
++        cmd.waitUntilCompleted()
++
++    def fc_weight_grad(self, batch_size, mbuf_x_pre, mbuf_delta, mbuf_dw, in_nodes, out_nodes):
++        params = np.zeros(1, dtype=np.dtype([
++            ("batch", np.int32),
++            ("in_nodes", np.int32),
++            ("out_nodes", np.int32),
++        ], align=True))
++        params["batch"] = batch_size
++        params["in_nodes"] = in_nodes
++        params["out_nodes"] = out_nodes
++
++        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
++        mv[:params.nbytes] = memoryview(params).tobytes()
++
++        cmd = self.queue.commandBuffer()
++        enc = cmd.computeCommandEncoder()
++        enc.setComputePipelineState_(self.pipe_fc_weight_grad)
++        enc.setBuffer_offset_atIndex_(mbuf_x_pre,      0, 0)
++        enc.setBuffer_offset_atIndex_(mbuf_delta,      0, 1)
++        enc.setBuffer_offset_atIndex_(mbuf_dw,         0, 2)
++        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 3)
++
++        grid = Metal.MTLSize(in_nodes, out_nodes, 1)
++
++        max_t = int(self.pipe_fc_weight_grad.maxTotalThreadsPerThreadgroup())
++        tx, ty = 1, min(out_nodes if out_nodes > 0 else 1, 256)
++        while tx * ty > max_t and ty > 1:
++            ty //= 2
++        tpg = Metal.MTLSize(tx, max(1, ty), 1)
++
++        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
++        enc.endEncoding()
+         cmd.commit()
+         cmd.waitUntilCompleted()
+     
+--- core.py
++++ core.py
+@@ -809,18 +809,58 @@
+         if debug:
+             print("HiddenLayer::slope() macOS Metal")
+         #
+-        x_next = np.asarray(self._next.delta, dtype=np.float32, order="C").copy()
+-        w_next = np.asarray(self._next._weight_matrix, dtype=np.float32, order="C").copy()
+-        out    = np.asarray(self._output_array, dtype=np.float32, order="C").copy()
+-        x_pre  = np.asarray(self._pre._output_array, dtype=np.float32, order="C").copy()
+-        #print(self._index, "out",  self._output_array)
+-        #print(self._index, "x_pre",  self._pre._output_array)
+-        self.delta = safe_matmul(x_next, w_next)
+-        self.delta *= (out > 0).astype(np.float32)
+-        self.dW = safe_matmul(x_pre.T, self.delta) / np.float32(self._batch_size)
+-        #print(self._index, x_pre.T)
+-        #print(self._index, self.delta)
+-        #print(self._index, self.dW)
++        if self._gpu.type != 2:
++            x_next = np.asarray(self._next.delta, dtype=np.float32, order="C")
++            w_next = np.asarray(self._next._weight_matrix, dtype=np.float32, order="C")
++            out    = np.asarray(self._output_array, dtype=np.float32, order="C")
++            x_pre  = np.asarray(self._pre._output_array, dtype=np.float32, order="C")
++            self.delta = safe_matmul(x_next, w_next)
++            self.delta *= (out > 0).astype(np.float32)
++            self.dW = safe_matmul(x_pre.T, self.delta) / np.float32(self._batch_size)
++            return
++        #
++
++        x_next = np.ascontiguousarray(self._next.delta, dtype=np.float32)
++        w_next = np.ascontiguousarray(self._next._weight_matrix, dtype=np.float32)
++        out    = np.ascontiguousarray(self._output_array, dtype=np.float32)
++        x_pre  = np.ascontiguousarray(self._pre._output_array, dtype=np.float32)
++
++        mbuf_next_delta = self._gpu.alloc_buf_from_array(x_next)
++        mbuf_next_w     = self._gpu.alloc_buf_from_array(w_next)
++        mbuf_cur_out    = self._gpu.alloc_buf_from_array(out)
++
++        mbuf_cur_delta  = self._gpu.alloc_buf(self._batch_size * self._num_node * 4)
++        mbuf_dw         = self._gpu.alloc_buf(self._num_input * self._num_node * 4)
++
++        self._gpu.fc_hidden_delta_relu(
++            self._batch_size,
++            mbuf_next_delta,
++            mbuf_next_w,
++            mbuf_cur_out,
++            mbuf_cur_delta,
++            self._num_node,
++            self._next._num_node
++        )
++
++        mbuf_x_pre = self._gpu.alloc_buf_from_array(x_pre)
++        self._gpu.fc_weight_grad(
++            self._batch_size,
++            mbuf_x_pre,
++            mbuf_cur_delta,
++            mbuf_dw,
++            self._num_input,
++            self._num_node
++        )
++
++        self.delta = np.frombuffer(
++            mbuf_cur_delta.contents().as_buffer(mbuf_cur_delta.length()),
++            dtype=np.float32
++        ).reshape(self._batch_size, self._num_node).copy()
++
++        self.dW = np.frombuffer(
++            mbuf_dw.contents().as_buffer(mbuf_dw.length()),
++            dtype=np.float32
++        ).reshape(self._num_input, self._num_node).copy()
+ 
+     def slope3(self, label_array, debug=0):
+         if debug:
+@@ -1168,9 +1208,29 @@
+         xpre = np.ascontiguousarray(self._pre._output_array, dtype=np.float32)
+ 
+         self.delta = smax - lab
+-        #self.dW = (xpre.T @ self.delta) / np.float32(self._batch_size)
+-        self.dW = safe_matmul(xpre.T, self.delta)
+-        self.dW = self.dW / np.float32(self._batch_size)
++
++        if self._gpu.type != 2:
++            self.dW = safe_matmul(xpre.T, self.delta) / np.float32(self._batch_size)
++            return
++        #
++
++        mbuf_xpre  = self._gpu.alloc_buf_from_array(xpre)
++        mbuf_delta = self._gpu.alloc_buf_from_array(np.ascontiguousarray(self.delta, dtype=np.float32))
++        mbuf_dw    = self._gpu.alloc_buf(self._num_input * self._num_node * 4)
++
++        self._gpu.fc_weight_grad(
++            self._batch_size,
++            mbuf_xpre,
++            mbuf_delta,
++            mbuf_dw,
++            self._num_input,
++            self._num_node
++        )
++
++        self.dW = np.frombuffer(
++            mbuf_dw.contents().as_buffer(mbuf_dw.length()),
++            dtype=np.float32
++        ).reshape(self._num_input, self._num_node).copy()
+     
+     def slope2(self, label_array, debug=0):
+         if debug:

@@ -41,13 +41,13 @@ WEIGHT_SET_4 = [-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0] # 7
 WEIGHT_SET_5 = [-1.0, -0.5, 0.0, 0.5, 1.0] # 5
 WEIGHT_SET_6 = [-1.0, 0.0, 1.0] #
 
-WEIGHT_SET = WEIGHT_SET_6
+WEIGHT_SET = WEIGHT_SET_0
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = int(WEIGHT_INDEX_SIZE/2)
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
 
-CNN_WEIGHT_SET = WEIGHT_SET
+CNN_WEIGHT_SET = WEIGHT_SET_0
 CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
 CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
 CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
@@ -55,7 +55,18 @@ CNN_WEIGHT_INDEX_MIN = 0
 
 RNDWT = [norm.pdf(x, 0, 1) for x in WEIGHT_SET]
 #RNDWT[5] *= 0.1
-
+def safe_matmul(a, b):
+    a = np.asarray(a, dtype=np.float32, order="C")
+    b = np.asarray(b, dtype=np.float32, order="C")
+    m, k = a.shape
+    k2, n = b.shape
+    assert k == k2
+    out = np.empty((m, n), dtype=np.float32)
+    for j in range(n):
+        out[:, j] = np.sum(a * b[:, j][None, :], axis=1, dtype=np.float32)
+    #
+    return out
+    
 def wi_std_11():
     idx = random.choices(range(WEIGHT_INDEX_SIZE), weights=RNDWT, k=1)[0]
     return idx
@@ -169,7 +180,18 @@ class Weight:
         self.type = type
         self.momentum = 0
         self.slope = 0.0
-        #print("Weight::init()")
+        self.dw = np.float32(0.0)
+        self.dwd = np.float32(0.0)
+        
+    def value(self):
+        if self.type==LAYER_TYPE_HIDDEN or self.type==LAYER_TYPE_OUTPUT:
+            value = WEIGHT_SET[self.wi]
+        elif self.type==LAYER_TYPE_CONV:
+            value = CNN_WEIGHT_SET[self.wi]
+        else:
+            value = 0.0
+        #
+        return value
         
 class Node:
     def __init__(self):
@@ -560,6 +582,10 @@ class HiddenLayer(Layer):
                 self._output_array = np.zeros((self._batch_size, self._num_node), dtype=np.float32)
                 self._gpu_weight = self._gpu.alloc_buf_from_array(self._weight_matrix)
                 self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
+                self._gpu_delta = self._gpu.alloc_buf(self._batch_size * self._num_node * 4)
+                self._gpu_dW = self._gpu.alloc_buf(self._num_input * self._num_node * 4)
+                self.dWd = np.zeros((self._num_input, self._num_node), dtype=np.float32)
+                                
             elif self.qmode==1:
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
@@ -691,8 +717,10 @@ class HiddenLayer(Layer):
                 self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, a_mode)
                 self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
                 if self.backprop:
+                    #print(self._index, "self._output_array", self._output_array)
                     self._output_array = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
                     self._output_array = self._output_array.view(np.float32).reshape(self._batch_size, self._num_node)
+                    #print(self._index, "self._output_array", self._output_array)
                 #
                 if debug:
                     out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
@@ -722,6 +750,22 @@ class HiddenLayer(Layer):
     def bp(self, label_array, debug=0):
         if debug:
             print("HiddenLayer::bp()", self._gpu.type)
+        #
+        
+        print("Hidden bp layer", self._index)
+        print("next.delta finite:", np.isfinite(self._next.delta).all())
+        print("next.weight finite:", np.isfinite(self._next._weight_matrix).all())
+
+        if not np.isfinite(self._next.delta).all():
+            d = self._next.delta
+            print("next.delta nan:", np.isnan(d).sum(), "inf:", np.isinf(d).sum())
+            print("next.delta maxabs:", np.nanmax(np.abs(d)))
+        #
+
+        if not np.isfinite(self._next._weight_matrix).all():
+            w = self._next._weight_matrix
+            print("next.weight nan:", np.isnan(w).sum(), "inf:", np.isinf(w).sum())
+            print("next.weight maxabs:", np.nanmax(np.abs(w)))
         #
         
         if self._gpu.type==2:
@@ -762,18 +806,116 @@ class HiddenLayer(Layer):
             #
             self.dW = self.dW.T
         #
+    
     def slope(self, label_array, debug=0):
         if debug:
             print("HiddenLayer::slope() macOS Metal")
         #
-        self.delta = self._next.delta @ self._next._weight_matrix
+        if self._gpu.type != 2:
+            x_next = np.asarray(self._next.delta, dtype=np.float32, order="C")
+            w_next = np.asarray(self._next._weight_matrix, dtype=np.float32, order="C")
+            out    = np.asarray(self._output_array, dtype=np.float32, order="C")
+            x_pre  = np.asarray(self._pre._output_array, dtype=np.float32, order="C")
+            self.delta = safe_matmul(x_next, w_next)
+            self.delta *= (out > 0).astype(np.float32)
+            self.dW = safe_matmul(x_pre.T, self.delta) / np.float32(self._batch_size)
+            return
+        #
 
-        # ReLU derivative
+        self._gpu.fc_hidden_delta_relu(
+            self._batch_size,
+            self._next._gpu_delta,
+            self._next._gpu_weight,
+            self._gpu_output,
+            self._gpu_delta,
+            self._num_node,
+            self._next._num_node
+        )
+
+        self._gpu.fc_weight_grad(
+            self._batch_size,
+            self._pre._gpu_output,
+            self._gpu_delta,
+            self._gpu_dW,
+            self._num_input,
+            self._num_node
+        )
+
+        self.delta = self._gpu.read_mbuf_to_numpy(
+            self._gpu_delta,
+            np.float32,
+            (self._batch_size, self._num_node)
+        ).copy()
+
+        self.dW = self._gpu.read_mbuf_to_numpy(
+            self._gpu_dW,
+            np.float32,
+            (self._num_input, self._num_node)
+        ).copy()
+
+    def slope3(self, label_array, debug=0):
+        if debug:
+            print("HiddenLayer::slope() macOS Metal")
+        #
+
+        x_next = np.ascontiguousarray(self._next.delta, dtype=np.float32)
+        w_next = np.ascontiguousarray(self._next._weight_matrix, dtype=np.float32)
+        out    = np.ascontiguousarray(self._output_array, dtype=np.float32)
+        x_pre  = np.ascontiguousarray(self._pre._output_array, dtype=np.float32)
+
+        if debug:
+            print("  x_next shape:", x_next.shape, "contig:", x_next.flags["C_CONTIGUOUS"])
+            print("  w_next shape:", w_next.shape, "contig:", w_next.flags["C_CONTIGUOUS"])
+            print("  out    shape:", out.shape,    "contig:", out.flags["C_CONTIGUOUS"])
+            print("  x_pre  shape:", x_pre.shape,  "contig:", x_pre.flags["C_CONTIGUOUS"])
+            print("  x_next maxabs:", np.max(np.abs(x_next)))
+            print("  w_next maxabs:", np.max(np.abs(w_next)))
+        #
+
+        self.delta = x_next @ w_next
+        self.delta *= (out > 0).astype(np.float32)
+        self.dW = (x_pre.T @ self.delta) / np.float32(self._batch_size)
+    
+    def slope2(self, label_array, debug=0):
+        if debug:
+            print("HiddenLayer::slope() macOS Metal")
+        #
+        x_next = self._next.delta.astype(np.float64)
+        w_next = self._next._weight_matrix.astype(np.float64)
+        print("Hidden slope layer", self._index)
+        print("next.delta maxabs:", np.max(np.abs(x_next)))
+        print("next.weight maxabs:", np.max(np.abs(w_next)))
+
+        self.delta = (x_next @ w_next).astype(np.float32)
         self.delta *= (self._output_array > 0).astype(np.float32)
 
-        # slope
-        self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
+        x = self._pre._output_array.astype(np.float32)
+        self.dW = (x.T @ self.delta) / np.float32(self._batch_size)
+
+        #x_next = self._next.delta.astype(np.float32)
+        #w_next = self._next._weight_matrix.astype(np.float32)
+        #
+        #x_next = self._next.delta.astype(np.float32)
+        #w_next = self._next._weight_matrix.astype(np.float32)
+        #
+        #tmp = x_next.astype(np.float64) @ w_next.astype(np.float64)
+        #print("tmp64 maxabs:", np.max(np.abs(tmp)))
+        #
+        #self.delta = tmp.astype(np.float32)
+        #if not np.isfinite(self.delta).all():
+        #    raise RuntimeError("HiddenLayer.bp(): delta overflowed after cast to float32")
+        #
+        #self.delta *= (self._output_array > 0).astype(np.float32)
+        #self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
         
+        
+        #self.delta = self._next.delta @ self._next._weight_matrix
+
+        # ReLU derivative
+        #self.delta *= (self._output_array > 0).astype(np.float32)
+
+        # slope
+        #self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
         
 class OutputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None, smax=False):
@@ -849,6 +991,11 @@ class OutputLayer(Layer):
                 self._gpu_weight = self._gpu.alloc_buf_from_array(self._weight_matrix)
                 self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
                 self._gpu_softmax = self._gpu.alloc_buf_from_array(self._softmax_array)
+                self._gpu_label = self._gpu.alloc_buf(self._batch_size * self._num_node * 4)
+                self._gpu_delta = self._gpu.alloc_buf(self._batch_size * self._num_node * 4)
+                self._gpu_dW = self._gpu.alloc_buf(self._num_input * self._num_node * 4)
+                
+                self.dWd = np.zeros((self._num_input, self._num_node), dtype=np.float32)
             elif self.qmode==1:
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
@@ -1050,11 +1197,85 @@ class OutputLayer(Layer):
         if debug:
             print("OutputLayer::slope() macOS Metal")
         #
-        self.delta = (self._softmax_array - label_array) # need no batch avg
-      
-        # slope for weights
-        self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
-        #print(self.dW[0])
+        smax = np.ascontiguousarray(self._softmax_array, dtype=np.float32)
+        lab  = np.ascontiguousarray(label_array, dtype=np.float32)
+        xpre = np.ascontiguousarray(self._pre._output_array, dtype=np.float32)
+
+        self.delta = smax - lab
+
+        if self._gpu.type != 2:
+            self.dW = safe_matmul(xpre.T, self.delta) / np.float32(self._batch_size)
+            return
+        #
+
+        self._gpu.write_np_to_mbuf(lab, self._gpu_label)
+        self._gpu.fc_output_delta(
+            self._batch_size,
+            self._num_node,
+            self._gpu_softmax,
+            self._gpu_label,
+            self._gpu_delta
+        )
+
+        self._gpu.fc_weight_grad(
+            self._batch_size,
+            self._pre._gpu_output,
+            self._gpu_delta,
+            self._gpu_dW,
+            self._num_input,
+            self._num_node
+        )
+
+        self.delta = self._gpu.read_mbuf_to_numpy(
+            self._gpu_delta,
+            np.float32,
+            (self._batch_size, self._num_node)
+        ).copy()
+
+        self.dW = self._gpu.read_mbuf_to_numpy(
+            self._gpu_dW,
+            np.float32,
+            (self._num_input, self._num_node)
+        ).copy()
+    
+    def slope2(self, label_array, debug=0):
+        if debug:
+            print("OutputLayer::slope() macOS Metal")
+        #
+        y = self._softmax_array.astype(np.float32)
+        t = label_array.astype(np.float32)
+        x = self._pre._output_array.astype(np.float32)
+        
+        # delta
+        self.delta = y - t
+    
+        if self._batch_size == 0:
+            raise RuntimeError("batch_size is 0")
+        #
+        if not np.isfinite(y).all():
+            print("OutputLayer slope: NaN/Inf in softmax")
+            print("nan:", np.isnan(y).sum(), "inf:", np.isinf(y).sum())
+            print("maxabs:", np.nanmax(np.abs(y)))
+        #
+        
+        if not np.isfinite(self.delta).all():
+            print("OutputLayer slope: NaN/Inf in delta")
+            print("nan:", np.isnan(self.delta).sum(), "inf:", np.isinf(self.delta).sum())
+            print("maxabs:", np.nanmax(np.abs(self.delta)))
+        #
+
+        if not np.isfinite(x).all():
+            print("OutputLayer slope: NaN/Inf in pre output")
+            print("nan:", np.isnan(x).sum(), "inf:", np.isinf(x).sum())
+            print("maxabs:", np.nanmax(np.abs(x)))
+        #
+
+        # gradient
+        self.dW = (x.T @ self.delta) / np.float32(self._batch_size)
+        if debug:
+            print(" delta shape", self.delta.shape)
+            print(" dW shape", self.dW.shape)
+        #
 
 class RegressionOutputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
@@ -1224,6 +1445,15 @@ class MaxLayer(Layer):
         elif self._gpu.type==2: # macOS metal
             #print("not yet")
             self._gpu.max_float(self._batch_size, array_in, self._gpu_output, self._gpu_mask, self._ch, self._x, self._y)
+            
+            if self.backprop:
+                out = np.frombuffer(
+                    self._gpu_output.contents().as_buffer(self._gpu_output.length()),
+                    dtype=np.float32
+                )
+                self._output_array = out.reshape(self._batch_size, self._ch * self._num_node)
+            #
+            
             if debug:
                 out = np.frombuffer(self._gpu_mask.contents().as_buffer(self._gpu_mask.length()), dtype=np.float32)
                 out =  out.view(np.float32).reshape(self._batch_size, self._ch, self._x*2*self._y*2)
@@ -1233,17 +1463,46 @@ class MaxLayer(Layer):
             print("no support", self._gpu.type)
         #
         
+        
+        
     def bp(self, label_array, debug=0):
+        self.slope(label_array, debug)
+    
+    def slope(self, label_array, debug=0):
         if debug:
             print("MaxLayer::bp()", self._gpu.type)
         #
         
+
         if self._gpu.type==2:
+            next_type = self._next.get_type()
+        
             # delta
-            self.delta = self._next.delta @ self._next._weight_matrix
-            self.delta = self.delta.view(np.float32).reshape(self._batch_size, self._ch, self._x*self._y)
-            
-            # delta を GPU バッファへ（すでに持ってるならそれを使う）
+            #self.delta = self._next.delta @ self._next._weight_matrix
+            #self.delta = self.delta.view(np.float32).reshape(self._batch_size, self._ch, self._x*self._y)
+            if next_type == LAYER_TYPE_CONV:
+            #if self._next._type == LAYER_TYPE_CONV:
+                self.delta = self._next.delta.astype(np.float32)
+                self.delta = self.delta.reshape(self._batch_size, self._ch, self._x * self._y)
+
+            elif next_type == LAYER_TYPE_HIDDEN:
+                x_next = np.ascontiguousarray(self._next.delta, dtype=np.float32)
+                w_next = np.ascontiguousarray(self._next._weight_matrix, dtype=np.float32)
+                #self.delta = x_next @ w_next
+                self.delta = safe_matmul(x_next, w_next)
+                self.delta = np.ascontiguousarray(self.delta, dtype=np.float32)
+                self.delta = self.delta.reshape(self._batch_size, self._ch, self._x * self._y)
+            #elif next_type == LAYER_TYPE_HIDDEN:
+            #if self._next._type == LAYER_TYPE_HIDDEN:
+            #    self.delta = (self._next.delta @ self._next._weight_matrix).astype(np.float32)
+            #    self.delta = self.delta.reshape(self._batch_size, self._ch, self._x * self._y)
+            else:
+                raise RuntimeError(
+                    "MaxLayer.slope(): unsupported next layer type = %s" % str(self._next._type)
+                )
+            #
+
+            # delta を GPU バッファへ
             mbuf_delta = self._gpu.alloc_buf_from_array(self.delta.astype(np.float32))
             
             # grad 出力バッファ確保（サイズ = B * ch * (2y)*(2x) * 4bytes）
@@ -1251,15 +1510,30 @@ class MaxLayer(Layer):
             in_h = self._y * 2
             grad_n = self._batch_size * self._ch * in_w * in_h
             mbuf_grad = self._gpu.alloc_buf(grad_n * 4)
-            
+
             # max backward 実行（mask は self._gpu_mask を使う）
-            self._gpu.init_max_bp_float()
-            self._gpu.max_bp_float(self._batch_size, mbuf_delta, self._gpu_mask, mbuf_grad,
-                       self._ch, self._x, self._y)
-                       
-            # 必要なら numpy に読み戻して self.grad にする（以降CPU BPするなら必要）
-            out = np.frombuffer(mbuf_grad.contents().as_buffer(mbuf_grad.length()), dtype=np.float32)
-            self.grad = out.reshape(self._batch_size, self._ch, in_w*in_h)
+            #self._gpu.init_max_bp_float()
+            self._gpu.max_bp_float(
+                self._batch_size,
+                mbuf_delta,
+                self._gpu_mask,
+                mbuf_grad,
+                self._ch,
+                self._x,
+                self._y
+            )
+
+            # numpy に読み戻して self.grad にする（以降CPU BPするなら必要）
+            out = np.frombuffer(
+                mbuf_grad.contents().as_buffer(mbuf_grad.length()),
+                dtype=np.float32
+            )
+            self.grad = out.reshape(self._batch_size, self._ch, in_w * in_h)
+            if debug:
+                print("  next_type:", next_type)
+                print("  delta.shape:", self.delta.shape)
+                print("  grad.shape :", self.grad.shape)
+            #
         # if self._gpu.type==2:
         
 class Conv_4_Layer(Layer):
@@ -1338,6 +1612,7 @@ class Conv_4_Layer(Layer):
                 self._gpu_padded = self._gpu.alloc_buf_from_array(self._padded_array)
                 self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
                 self._gpu_sum = self._gpu.alloc_buf_from_array(self._sum_array)
+                self.dWd = np.zeros((self._num_input, self._num_node), dtype=np.float32)
             elif self.qmode==1:
                 print("no support for qmode:", self.qmode)
             elif self.qmode==2:
@@ -1465,6 +1740,9 @@ class Conv_4_Layer(Layer):
             self._gpu.padding_float(self._batch_size, array_in, self._gpu_padded, self._w, self._h, self._ch)
             # conv + relu
             self._gpu.conv_float(self._batch_size, self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, a_mode)
+            
+            self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
+                            
             if debug:
                 print("Conv_4_Layer::propagate(), macOS metal")
                 #out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
@@ -1479,6 +1757,13 @@ class Conv_4_Layer(Layer):
                 #out = out.view(np.float32).reshape(self._batch_size, self._filter, self._w*self._h)
                 #print(out.shape)
                 print(out[:1000])
+            #
+            if self.backprop:
+                self._output_array = np.frombuffer(
+                    self._gpu_output.contents().as_buffer(self._gpu_output.length()),
+                    dtype=np.float32
+                ).reshape(self._batch_size, self._filter, self._w * self._h)
+            #
         else:
             print("no support", self._gpu.type)
         #
@@ -1494,7 +1779,150 @@ class Conv_4_Layer(Layer):
     #
     #
     #    #
-        
+
+    def slope(self, label_array, debug=0):
+        if self._gpu.type != 2:
+            # fallback: 既存の NumPy 実装を残す
+            B = self._batch_size
+            H, W = self._h, self._w
+            C = self._ch
+            F = self._filter
+
+            dY = self._next.grad.astype(np.float32).reshape(B, F, H, W)
+            out = self._output_array.reshape(B, F, H, W).astype(np.float32)
+            relu_mask = (out > 0).astype(np.float32)
+            dZ = dY * relu_mask
+
+            X = self._pre._output_array.astype(np.float32).reshape(B, C, H, W)
+            Xpad = np.pad(X, ((0,0),(0,0),(1,1),(1,1)), mode="constant")
+            W4 = self._weight_matrix.astype(np.float32).reshape(F, C, 3, 3)
+
+            dW4 = np.zeros((F, C, 3, 3), dtype=np.float32)
+            dXpad = np.zeros_like(Xpad, dtype=np.float32)
+
+            for b in range(B):
+                for f in range(F):
+                    for y in range(H):
+                        for x in range(W):
+                            g = dZ[b, f, y, x]
+                            if g == 0.0:
+                                continue
+                            #
+                            dW4[f] += Xpad[b, :, y:y+3, x:x+3] * g
+                            dXpad[b, :, y:y+3, x:x+3] += W4[f] * g
+                        #
+                    #
+                #
+            # for
+
+            dX = dXpad[:, :, 1:-1, 1:-1]
+            dW4 /= np.float32(B)
+
+            self.dW = dW4.reshape(F, C * 9).T.astype(np.float32)
+            self.delta = dX.reshape(B, C * H * W).astype(np.float32)
+            return
+        #
+
+        B = self._batch_size
+        H, W = self._h, self._w
+        C = self._ch
+        F = self._filter
+
+        # next.grad: (B,F,H*W) -> (B,F,H,W)
+        dY = self._next.grad.astype(np.float32).reshape(B, F, H, W)
+
+        # pre output: (B,C,H*W) or (B,C*H*W) -> (B,C,H,W)
+        X = self._pre._output_array.astype(np.float32).reshape(B, C, H, W)
+
+        # pad input on CPU, then upload
+        Xpad = np.pad(X, ((0,0),(0,0),(1,1),(1,1)), mode="constant").astype(np.float32)
+
+        mbuf_dy = self._gpu.alloc_buf_from_array(np.ascontiguousarray(dY))
+        mbuf_xpad = self._gpu.alloc_buf_from_array(np.ascontiguousarray(Xpad))
+        mbuf_out = self._gpu.alloc_buf_from_array(
+            np.ascontiguousarray(self._output_array.astype(np.float32).reshape(B, F, H, W))
+        )
+
+        mbuf_dx = self._gpu.alloc_buf(B * C * H * W * 4)
+        mbuf_dw = self._gpu.alloc_buf(F * C * 9 * 4)
+
+        self._gpu.conv4_back_input(
+            B, mbuf_dy, mbuf_out, self._gpu_weight, mbuf_dx,
+            W, H, C, F
+        )
+        self._gpu.conv4_back_weight(
+            B, mbuf_xpad, mbuf_dy, mbuf_out, mbuf_dw,
+            W, H, C, F
+        )
+
+        dX = np.frombuffer(
+            mbuf_dx.contents().as_buffer(mbuf_dx.length()),
+            dtype=np.float32
+        ).reshape(B, C, H, W)
+
+        dW4 = np.frombuffer(
+            mbuf_dw.contents().as_buffer(mbuf_dw.length()),
+            dtype=np.float32
+        ).reshape(F, C, 3, 3)
+
+        # train_slope() が dW[ii][ni] で読める向きに合わせる
+        self.dW = dW4.reshape(F, C * 9).T.astype(np.float32)
+        self.delta = dX.reshape(B, C * H * W).astype(np.float32)
+
+        if debug:
+            print("Conv_4_Layer::slope() Metal")
+            print("  dW   :", self.dW.shape)   # (C*9, F)
+            print("  delta:", self.delta.shape)
+        #
+
+    def slope_np(self, label_array, debug=0):
+        B = self._batch_size
+        H, W = self._h, self._w
+        C = self._ch
+        F = self._filter
+
+        dY = self._next.grad.astype(np.float32).reshape(B, F, H, W)
+
+        out = self._output_array.reshape(B, F, H, W).astype(np.float32)
+        relu_mask = (out > 0).astype(np.float32)
+        dZ = dY * relu_mask
+
+        X = self._pre._output_array.astype(np.float32).reshape(B, C, H, W)
+        Xpad = np.pad(X, ((0,0),(0,0),(1,1),(1,1)), mode="constant")
+
+        W4 = self._weight_matrix.astype(np.float32).reshape(F, C, 3, 3)
+
+        dW4 = np.zeros((F, C, 3, 3), dtype=np.float32)
+        dXpad = np.zeros_like(Xpad, dtype=np.float32)
+
+        for b in range(B):
+            for f in range(F):
+                for y in range(H):
+                    for x in range(W):
+                        g = dZ[b, f, y, x]
+                        if g == 0.0:
+                            continue
+                        #
+                        dW4[f] += Xpad[b, :, y:y+3, x:x+3] * g
+                        dXpad[b, :, y:y+3, x:x+3] += W4[f] * g
+                    #
+                #
+            #
+        #
+
+        dX = dXpad[:, :, 1:-1, 1:-1]
+        dW4 /= np.float32(B)
+
+        # train_slope() が l.dW[ii][ni] で読める向きにする
+        self.dW = dW4.reshape(F, C * 9).T.astype(np.float32)   # (C*9, F)
+        self.delta = dX.reshape(B, C * H * W).astype(np.float32)
+
+        if debug:
+            print("Conv_4_Layer::slope()")
+            print("  dW   :", self.dW.shape)     # (C*9, F)
+            print("  delta:", self.delta.shape)
+        #
+
     def bp(self, label_array, debug=0):
         """
         NumPy版 Conv(3x3, stride=1, pad=1) + ReLU のBP
@@ -1606,6 +2034,9 @@ class Conv_4_Layer(Layer):
         dW4 = np.zeros((F, C, 3, 3), dtype=np.float32)
         dXpad = np.zeros_like(Xpad, dtype=np.float32)           # (B,C,H+2,W+2)
 
+
+
+
         # 素直な実装（MNIST規模なら十分動く）
         for b in range(B):
             for f in range(F):
@@ -1629,14 +2060,19 @@ class Conv_4_Layer(Layer):
         # ----------------------------
         # 6) パラメータ更新（SGD）
         # ----------------------------
-        self.dW = dW4.reshape(F, C*9)                      # (F,C*9)
-        self._weight_matrix -= np.float32(self.learning_rate) * self.dW
+        
+        #self.dW = dW4.reshape(F, C*9)                      # (F,C*9)
+        #self._weight_matrix -= np.float32(self.learning_rate) * self.dW
+        self.dW = dW4.reshape(F, C * 9).T.astype(np.float32)   # (C*9, F)
+        self._weight_matrix -= np.float32(self.learning_rate) * self.dW.T
+        
 
         # ----------------------------
         # 7) 前段へ渡す delta（必要なら）
         # ----------------------------
         self.delta = dX.reshape(B, C*H*W).astype(np.float32)
-        
+        self.delta = dX.reshape(B, C * H * W).astype(np.float32)
+                
         if debug:
             print("Conv_4_Layer::bp() numpy")
             print("  dY:", dY.shape, "dZ:", dZ.shape)

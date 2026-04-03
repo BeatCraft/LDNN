@@ -523,3 +523,191 @@ class Train:
         print(attack_num, "hit rate:", hit, "/", num, "ce=", ce)
         #r.save()
         return ce, hit_rate
+        
+    def train_slope(self, b, my_gpu, r, wmode, batch_size, attack_num, ce, n, undo=False):
+        r.slope(0)
+        cnt = 0
+        attack_list = []
+        th_list = []
+    
+        lc = r.count_layers()
+        for li in range(0, lc):
+            layer = r.get_layer_at(li)
+            type = layer.get_type()
+            if type not in (core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_CONV, core.LAYER_TYPE_OUTPUT):
+                th_list.append(np.float32(0.0))
+            else:
+                th = np.quantile(np.abs(layer.dW), 0.95)
+                th_list.append(th)
+            #
+        #
+    
+        while cnt<attack_num:
+            k = random.randint(0, len(self.w_list)-1)
+            w = self.w_list[k]
+            li = w.li
+            ni = w.ni
+            ii = w.ii
+            l = r.get_layer_at(li)
+            wi = w.wi
+            type = w.type
+            if type==core.LAYER_TYPE_CONV:
+                kmax = core.CNN_WEIGHT_INDEX_MAX
+                kmin = core.CNN_WEIGHT_INDEX_MIN
+            else:
+                kmax = core.WEIGHT_INDEX_MAX
+                kmin = core.WEIGHT_INDEX_MIN
+            #
+        
+            th = th_list[li]
+            g = l.dW[ii][ni]
+            if abs(g)<th:
+                cnt += 1
+                continue
+            #
+        
+            if g<0.0: # ++
+                if wi==kmax:
+                    pass
+                else:
+                    w.wi_alt = w.wi
+                    w.wi = wi + 1
+                    l.set_weight_index(w.ni, w.ii, wi+1) # attack
+                    #print("-", w.value(), g)
+                    attack_list.append(w)
+                #
+            elif g>0.0: # --
+                if wi==kmin:
+                    pass
+                else:
+                    w.wi_alt = w.wi
+                    w.wi = wi - 1
+                    l.set_weight_index(w.ni, w.ii, wi-1) # attack
+                    #print("+", w.value(), g)
+                    attack_list.append(w)
+                #
+            #
+            cnt += 1
+        # while
+    
+        if len(attack_list)==0:
+            print("skip")
+            return 0
+        #
+    
+        r.update_weight()
+        ce_alt = r.evaluate(0)
+        if ce_alt>ce: # undo
+            if undo:
+                print("[%d](%d/%d)" % (n, len(attack_list), attack_num), ce, "(", ce_alt, "), UNDO")
+                for w in attack_list:
+                    li = w.li
+                    l = r.get_layer_at(w.li)
+                    w.wi = w.wi_alt
+                    l.set_weight_index(w.ni, w.ii, w.wi)
+                #
+                r.update_weight()
+            #
+            else:
+                print("[%d](%d/%d)" % (n, len(attack_list), attack_num), ce, "=>", ce_alt)
+                ce = ce_alt
+            #
+        else:
+            print("[%d](%d/%d)" % (n, len(attack_list), attack_num), ce, "->", ce_alt)
+            ce = ce_alt
+        #
+        return ce
+
+
+    def slope_batch(self, r):
+        r.slope(0)
+        lc = r.count_layers()
+        for li in range(0, lc):
+            layer = r.get_layer_at(li)
+            type = layer.get_type()
+            if type not in (core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_CONV, core.LAYER_TYPE_OUTPUT):
+                pass
+            else:
+                layer.dWd += layer.dW
+            #
+        #
+
+    def get_th_list(self, r, batch_size):
+        th_list = []
+        
+        lc = r.count_layers()
+        for li in range(0, lc):
+            layer = r.get_layer_at(li)
+            type = layer.get_type()
+            if type not in (core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_CONV, core.LAYER_TYPE_OUTPUT):
+                th_list.append(np.float32(0.0))
+            else:
+                th = np.quantile(np.abs(layer.dWd/np.float32(batch_size)), 0.95)
+                th_list.append(th)
+            #
+        #
+        return th_list
+
+    def slope_batch_attack(self, r, batch_size, attack_num, ce, th_list):
+        cnt = 0
+        attack_list = []
+        while cnt<attack_num:
+            k = random.randint(0, len(self.w_list)-1)
+            w = self.w_list[k]
+            li = w.li
+            ni = w.ni
+            ii = w.ii
+            l = r.get_layer_at(li)
+            wi = w.wi
+            type = w.type
+            if type==core.LAYER_TYPE_CONV:
+                kmax = core.CNN_WEIGHT_INDEX_MAX
+                kmin = core.CNN_WEIGHT_INDEX_MIN
+            else:
+                kmax = core.WEIGHT_INDEX_MAX
+                kmin = core.WEIGHT_INDEX_MIN
+            #
+        
+            th = th_list[li]
+            g = l.dWd[ii][ni]
+            if abs(g)<th:
+                cnt += 1
+                continue
+            #
+        
+            if g<0.0: # ++
+                if wi==kmax:
+                    pass
+                else:
+                    w.wi_alt = w.wi
+                    w.wi = wi + 1
+                    l.set_weight_index(w.ni, w.ii, wi+1) # attack
+                    print("-", w.value(), g)
+                    attack_list.append(w)
+                #
+            elif g>0.0: # --
+                if wi==kmin:
+                    pass
+                else:
+                    w.wi_alt = w.wi
+                    w.wi = wi - 1
+                    l.set_weight_index(w.ni, w.ii, wi-1) # attack
+                    print("+", w.value(), g)
+                    attack_list.append(w)
+                #
+            #
+            cnt += 1
+        # while
+        
+        print(len(attack_list))
+        r.update_weight()
+        #ce_alt = r.evaluate(0)
+        
+    def train_slope_mini(self, b, my_gpu, r, wmode, batch_size, attack_num, ce, n, undo=False):
+        pass
+
+    
+
+
+    
+

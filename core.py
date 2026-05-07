@@ -40,12 +40,15 @@ WEIGHT_SET_3 = [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0] # 9
 WEIGHT_SET_4 = [-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0] # 7
 WEIGHT_SET_5 = [-1.0, -0.5, 0.0, 0.5, 1.0] # 5
 WEIGHT_SET_6 = [-1.0, 0.0, 1.0] #
+WEIGHT_SET_7 = [-2.0, -1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0, 2.0,] # 11, 2 - 8
 
-WEIGHT_SET = WEIGHT_SET_0
+WEIGHT_SET = WEIGHT_SET_3
 WEIGHT_INDEX_SIZE = len(WEIGHT_SET)
 WEIGHT_INDEX_ZERO = int(WEIGHT_INDEX_SIZE/2)
 WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
+
+WEIGHT_SET_8 = [-0.25, -0.125, -0.0625, -0.03125, 0.0, 0.03125, 0.0625, 0.125, 0.25]
 
 CNN_WEIGHT_SET = WEIGHT_SET_0
 CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
@@ -327,18 +330,14 @@ class Layer(object):
         wmax = WEIGHT_INDEX_SIZE
         if mode==0: # random index
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
-                #wmax = WEIGHT_INDEX_SIZE
-                wi = random.randrange(WEIGHT_INDEX_SIZE)
+                #wi = random.randrange(WEIGHT_INDEX_SIZE)
+                wi = random.randrange(2, WEIGHT_INDEX_SIZE-2)
                 self.set_weight_index(ni, ii, wi)
             elif self._type==LAYER_TYPE_CONV:
-                #wmax = CNN_WEIGHT_INDEX_SIZE
-                wi = random.randrange(CNN_WEIGHT_INDEX_SIZE)
-                #print("init_weight_mode(%d, %d, %d, %d)" % (ni, ii, mode, wi))
+                #wi = random.randrange(CNN_WEIGHT_INDEX_SIZE)
+                wi = random.randrange(CNN_WEIGHT_INDEX_ZERO-2, CNN_WEIGHT_INDEX_ZERO+2)
                 self.set_weight_index(ni, ii, wi)
             #
-            #wi = random.randrange(wmax)
-            #print(wi)
-            #self.set_weight_index(ni, ii, wi)
         elif mode==1: # random index in range
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
                 wmin = 1
@@ -1091,12 +1090,14 @@ class OutputLayer(Layer):
             
             if self.qmode==0:
                 self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, 0)
+                #debug = 1
                 if debug:
                     out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
                     out = out.view(np.float32).reshape(self._batch_size, self._num_node)
                     print(out.shape)
                     print(out[0])
                 #
+                #debug = 0
                 if self.smax:
                     self._gpu.softmax(self._batch_size, self._num_node, self.softmax_scale, self._gpu_output, self._gpu_softmax)
                     
@@ -1427,9 +1428,6 @@ class MaxLayer(Layer):
         else:
             return
         #
-        #if self.cache:
-        #    return
-        #
         
         if self._gpu.type==0: # opencl
             self._gpu.max_batch(array_in, self._gpu_output,
@@ -1443,17 +1441,36 @@ class MaxLayer(Layer):
         elif self._gpu.type==1: # GDX
             self._gpu.max(array_in, self._gpu_output, self._ch, self._x, self._y, self._batch_size)
         elif self._gpu.type==2: # macOS metal
-            #print("not yet")
             self._gpu.max_float(self._batch_size, array_in, self._gpu_output, self._gpu_mask, self._ch, self._x, self._y)
             
+            #if self.backprop:
+            #    out = np.frombuffer(
+            #        self._gpu_output.contents().as_buffer(self._gpu_output.length()),
+            #        dtype=np.float32
+            #    )
+            #    self._output_array = out.reshape(self._batch_size, self._ch * self._num_node)
+            #
+
             if self.backprop:
                 out = np.frombuffer(
                     self._gpu_output.contents().as_buffer(self._gpu_output.length()),
                     dtype=np.float32
+                    )
+                self._output_array = out.reshape(
+                    self._batch_size,
+                    self._ch * self._num_node
+                ).copy()
+
+                mask = np.frombuffer(
+                    self._gpu_mask.contents().as_buffer(self._gpu_mask.length()),
+                    dtype=np.float32
                 )
-                self._output_array = out.reshape(self._batch_size, self._ch * self._num_node)
+                self._mask_array = mask.reshape(
+                    self._batch_size,
+                    self._ch,
+                    self._x * 2 * self._y * 2
+                ).copy()
             #
-            
             if debug:
                 out = np.frombuffer(self._gpu_mask.contents().as_buffer(self._gpu_mask.length()), dtype=np.float32)
                 out =  out.view(np.float32).reshape(self._batch_size, self._ch, self._x*2*self._y*2)
@@ -1463,8 +1480,6 @@ class MaxLayer(Layer):
             print("no support", self._gpu.type)
         #
         
-        
-        
     def bp(self, label_array, debug=0):
         self.slope(label_array, debug)
     
@@ -1473,7 +1488,6 @@ class MaxLayer(Layer):
             print("MaxLayer::bp()", self._gpu.type)
         #
         
-
         if self._gpu.type==2:
             next_type = self._next.get_type()
         
@@ -1535,7 +1549,7 @@ class MaxLayer(Layer):
                 print("  grad.shape :", self.grad.shape)
             #
         # if self._gpu.type==2:
-        
+
 class Conv_4_Layer(Layer):
     def __init__(self, i, w, h, ch, filter, pre, gpu=None):
         print("Convolution Layer ver.4 ::__init__()")
@@ -1740,9 +1754,9 @@ class Conv_4_Layer(Layer):
             self._gpu.padding_float(self._batch_size, array_in, self._gpu_padded, self._w, self._h, self._ch)
             # conv + relu
             self._gpu.conv_float(self._batch_size, self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, a_mode)
-            
-            self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
-                            
+            # disabled, for test
+            #self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
+            #
             if debug:
                 print("Conv_4_Layer::propagate(), macOS metal")
                 #out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
@@ -1780,6 +1794,34 @@ class Conv_4_Layer(Layer):
     #
     #    #
 
+    def check_conv_grad(self, label_array):
+        # Metal版
+        self.slope(label_array)
+        dW_metal = self.dW.copy()
+        delta_metal = self.delta.copy()
+
+        # NumPy版
+        self.slope_np(label_array)
+        dW_np = self.dW.copy()
+        delta_np = self.delta.copy()
+
+        eps = 1e-12
+
+        print("=== Conv grad check ===")
+        print("dW max abs diff:", np.max(np.abs(dW_metal - dW_np)))
+        print("dW mean abs diff:", np.mean(np.abs(dW_metal - dW_np)))
+
+        sign_mask = np.abs(dW_np) > eps
+        print(
+            "dW sign match:",
+            np.mean(np.sign(dW_metal[sign_mask]) == np.sign(dW_np[sign_mask])),
+            "nonzero:",
+            np.sum(sign_mask)
+        )
+
+        print("delta max abs diff:", np.max(np.abs(delta_metal - delta_np)))
+        print("delta mean abs diff:", np.mean(np.abs(delta_metal - delta_np)))
+    
     def slope(self, label_array, debug=0):
         if self._gpu.type != 2:
             # fallback: 既存の NumPy 実装を残す

@@ -49,8 +49,16 @@ WEIGHT_INDEX_MAX = WEIGHT_INDEX_SIZE-1
 WEIGHT_INDEX_MIN = 0
 
 WEIGHT_SET_8 = [-0.25, -0.125, -0.0625, -0.03125, 0.0, 0.03125, 0.0625, 0.125, 0.25]
-
-CNN_WEIGHT_SET = WEIGHT_SET_0
+WEIGHT_SET_9 = [-1.00, -0.95, -0.90, -0.85, -0.80, -0.75, -0.70, -0.65, -0.60, -0.55, -0.50, -0.45, -0.40, -0.35, -0.30, -0.25, -0.20, -0.15 -0.10, -0.05, 0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00]
+WEIGHT_SET_10 = [-0.25, -0.20, -0.15, -0.10, -0.05, -0.04, -0.03, -0.02, -0.01,
+                0.00,
+                0.01, 0.02, 0.03, 0.04, 0.05, 0.10, 0.15, 0.20, 0.25]
+WEIGHT_SET_11 = [-0.10, -0.09, -0.08, -0.07, -0.06, -0.05, -0.04, -0.03, -0.02, -0.01,
+                0.00,
+                0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10]
+#
+#
+CNN_WEIGHT_SET = WEIGHT_SET_3
 CNN_WEIGHT_INDEX_SIZE = len(CNN_WEIGHT_SET)
 CNN_WEIGHT_INDEX_ZERO = int(CNN_WEIGHT_INDEX_SIZE/2)
 CNN_WEIGHT_INDEX_MAX = CNN_WEIGHT_INDEX_SIZE - 1
@@ -243,6 +251,8 @@ class Layer(object):
         self.qmode = qmode
         #
         self.backprop = False
+        self.wcnt = 0
+        self.bias = None
     
     def set_backpropagation(self, sw, lr=0.01):
         self.backprop = sw
@@ -330,12 +340,13 @@ class Layer(object):
         wmax = WEIGHT_INDEX_SIZE
         if mode==0: # random index
             if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
-                #wi = random.randrange(WEIGHT_INDEX_SIZE)
-                wi = random.randrange(2, WEIGHT_INDEX_SIZE-2)
+                wi = random.randrange(WEIGHT_INDEX_SIZE)
+                #wi = random.randrange(2, WEIGHT_INDEX_SIZE-2)
+                #wi = random.randrange(WEIGHT_INDEX_ZERO-2, WEIGHT_INDEX_ZERO+2)
                 self.set_weight_index(ni, ii, wi)
             elif self._type==LAYER_TYPE_CONV:
                 #wi = random.randrange(CNN_WEIGHT_INDEX_SIZE)
-                wi = random.randrange(CNN_WEIGHT_INDEX_ZERO-2, CNN_WEIGHT_INDEX_ZERO+2)
+                wi = random.randrange(CNN_WEIGHT_INDEX_ZERO-1, CNN_WEIGHT_INDEX_ZERO+1)
                 self.set_weight_index(ni, ii, wi)
             #
         elif mode==1: # random index in range
@@ -546,7 +557,7 @@ class HiddenLayer(Layer):
     def prepare(self, batch_size):
         print("HiddenLayer::prepare(%d), %d" % (batch_size, self.qmode))
         self._batch_size = batch_size
-        
+        self.wcnt = self._num_node * self._num_input
         if self._gpu.type==0:
             if self.qmode==0:
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
@@ -584,7 +595,10 @@ class HiddenLayer(Layer):
                 self._gpu_delta = self._gpu.alloc_buf(self._batch_size * self._num_node * 4)
                 self._gpu_dW = self._gpu.alloc_buf(self._num_input * self._num_node * 4)
                 self.dWd = np.zeros((self._num_input, self._num_node), dtype=np.float32)
-                                
+                
+                self.bias_index = np.zeros(self._num_node, dtype=np.uint8)
+                self.bias_array = np.zeros(self._num_node, dtype=np.float32)
+                self.bias_gpu = self._gpu.alloc_buf(self._num_node * 4)
             elif self.qmode==1:
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
@@ -936,7 +950,7 @@ class OutputLayer(Layer):
     def prepare(self, batch_size):
         print("OutputLayer::prepare(%d), %d" % (batch_size, self.qmode))
         self._batch_size = batch_size
-        
+        self.wcnt = self._num_node * self._num_input
         if self._gpu.type==0:
             if self.qmode==0:
                 #self._momentum = np.zeros( (self._num_node, self._num_input), dtype=np.int8)
@@ -995,6 +1009,11 @@ class OutputLayer(Layer):
                 self._gpu_dW = self._gpu.alloc_buf(self._num_input * self._num_node * 4)
                 
                 self.dWd = np.zeros((self._num_input, self._num_node), dtype=np.float32)
+                
+                self.bias_index = np.zeros(self._num_node, dtype=np.uint8)
+                self.bias_array = np.zeros(self._num_node, dtype=np.float32)
+                self.bias_gpu = self._gpu.alloc_buf(self._num_node * 4)
+                
             elif self.qmode==1:
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
@@ -1606,8 +1625,9 @@ class Conv_4_Layer(Layer):
             print("no GPU")
             return
         #
-    
         self._batch_size = batch_size
+        self.wcnt = self._ch * 3 * 3 * self._filter
+        
         # intermidiate
         self._padded_array = np.zeros((self._batch_size, (self._w+2)*(self._h+2)*self._ch), dtype=np.float32)
         self._sum_array = np.zeros((self._batch_size), dtype=np.float32)
@@ -1627,6 +1647,10 @@ class Conv_4_Layer(Layer):
                 self._gpu_output = self._gpu.alloc_buf_from_array(self._output_array)
                 self._gpu_sum = self._gpu.alloc_buf_from_array(self._sum_array)
                 self.dWd = np.zeros((self._num_input, self._num_node), dtype=np.float32)
+                
+                self.bias_index = np.zeros(self._num_node, dtype=np.uint8)
+                self.bias_array = np.zeros(self._num_node, dtype=np.float32)
+                self.bias_gpu = self._gpu.alloc_buf(self._num_node * 4)
             elif self.qmode==1:
                 print("no support for qmode:", self.qmode)
             elif self.qmode==2:
@@ -1753,10 +1777,25 @@ class Conv_4_Layer(Layer):
             # padding
             self._gpu.padding_float(self._batch_size, array_in, self._gpu_padded, self._w, self._h, self._ch)
             # conv + relu
+            a_mode = 0
             self._gpu.conv_float(self._batch_size, self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, a_mode)
             # disabled, for test
             #self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
             #
+            
+            self._gpu.bn2d_forward(
+                self._batch_size,
+                self._gpu_output,
+                self._filter,
+                self._w * self._h,
+                1e-5
+            )
+            
+            self._gpu.relu(
+                self._gpu_output,
+                self._batch_size * self._filter * self._w * self._h
+            )
+
             if debug:
                 print("Conv_4_Layer::propagate(), macOS metal")
                 #out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)

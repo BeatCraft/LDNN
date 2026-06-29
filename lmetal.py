@@ -646,6 +646,80 @@ kernel void fc_output_delta(
     delta[idx] = softmax[idx] - label[idx];
 }
 
+struct BN2DParams {
+    int batch;
+    int ch;
+    int hw;
+    float eps;
+};
+
+kernel void bn2d_mean_var(
+    device const float* x [[buffer(0)]],   // (B,C,HW)
+    device float* mean [[buffer(1)]],      // (C)
+    device float* var [[buffer(2)]],       // (C)
+    constant BN2DParams& p [[buffer(3)]],
+    uint c [[thread_position_in_grid]]
+)
+{
+    if ((int)c >= p.ch) return;
+
+    float sum = 0.0f;
+    float sum2 = 0.0f;
+    int n = p.batch * p.hw;
+
+    for (int b = 0; b < p.batch; b++) {
+        int base = b * p.ch * p.hw + c * p.hw;
+        for (int i = 0; i < p.hw; i++) {
+            float v = x[base + i];
+            sum += v;
+            sum2 += v * v;
+        }
+    }
+
+    float m = sum / (float)n;
+    float v = sum2 / (float)n - m * m;
+    if (v < 0.0f) v = 0.0f;
+
+    mean[c] = m;
+    var[c] = v;
+}
+
+kernel void bn2d_apply(
+    device float* x [[buffer(0)]],          // in-place (B,C,HW)
+    device const float* mean [[buffer(1)]],
+    device const float* var [[buffer(2)]],
+    constant BN2DParams& p [[buffer(3)]],
+    uint3 gid [[thread_position_in_grid]]
+)
+{
+    int b = (int)gid.x;
+    int c = (int)gid.y;
+    int i = (int)gid.z;
+
+    if (b >= p.batch || c >= p.ch || i >= p.hw) return;
+
+    int idx = b * p.ch * p.hw + c * p.hw + i;
+
+    float m = mean[c];
+    float v = var[c];
+
+    x[idx] = (x[idx] - m) * rsqrt(v + p.eps);
+}
+
+kernel void relu_float(
+    device float* x [[buffer(0)]],
+    constant int& size [[buffer(1)]],
+    uint gid [[thread_position_in_grid]]
+)
+{
+    if ((int)gid >= size) return;
+
+    float v = x[gid];
+
+    if (v < 0.0f) {
+        x[gid] = 0.0f;
+    }
+}
 
 """
 
@@ -686,6 +760,117 @@ class LMetal(gpu.Gpu):
         self.init_fc_hidden_delta_relu()
         self.init_fc_weight_grad()
         self.init_fc_output_delta()
+        self.init_bn2d()
+        self.init_relu()
+        
+    def init_relu(self):
+        fn = self.lib.newFunctionWithName_("relu_float")
+        self.pipe_relu, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+        #
+        
+    def relu(self, mbuf_x, size):
+        params = np.array([size], dtype=np.int32)
+
+        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
+        mv[:params.nbytes] = memoryview(params).tobytes()
+
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+
+        enc.setComputePipelineState_(self.pipe_relu)
+
+        enc.setBuffer_offset_atIndex_(mbuf_x, 0, 0)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 1)
+
+        grid = Metal.MTLSize(size, 1, 1)
+
+        t = min(
+            self.pipe_relu.maxTotalThreadsPerThreadgroup(),
+            256
+        )
+
+        tpg = Metal.MTLSize(t, 1, 1)
+
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+
+        enc.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()
+    
+    def init_bn2d(self):
+        fn = self.lib.newFunctionWithName_("bn2d_mean_var")
+        self.pipe_bn2d_mean_var, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+        #
+
+        fn = self.lib.newFunctionWithName_("bn2d_apply")
+        self.pipe_bn2d_apply, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+        #
+
+    def bn2d_forward(self, batch_size, mbuf_x, ch, hw, eps=1e-5):
+        mean = np.zeros((ch,), dtype=np.float32)
+        var = np.zeros((ch,), dtype=np.float32)
+
+        mbuf_mean = self.alloc_buf_from_array(mean)
+        mbuf_var = self.alloc_buf_from_array(var)
+
+        params = np.zeros(1, dtype=np.dtype([
+            ("batch", np.int32),
+            ("ch",    np.int32),
+            ("hw",    np.int32),
+            ("eps",   np.float32),
+        ], align=True))
+
+        params["batch"] = batch_size
+        params["ch"] = ch
+        params["hw"] = hw
+        params["eps"] = np.float32(eps)
+
+        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
+        mv[:params.nbytes] = memoryview(params).tobytes()
+
+        # mean / var
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+        enc.setComputePipelineState_(self.pipe_bn2d_mean_var)
+        enc.setBuffer_offset_atIndex_(mbuf_x, 0, 0)
+        enc.setBuffer_offset_atIndex_(mbuf_mean, 0, 1)
+        enc.setBuffer_offset_atIndex_(mbuf_var, 0, 2)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 3)
+
+        grid = Metal.MTLSize(ch, 1, 1)
+        tpg = Metal.MTLSize(min(self.pipe_bn2d_mean_var.maxTotalThreadsPerThreadgroup(), ch), 1, 1)
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+        enc.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()
+
+        # apply
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+        enc.setComputePipelineState_(self.pipe_bn2d_apply)
+        enc.setBuffer_offset_atIndex_(mbuf_x, 0, 0)
+        enc.setBuffer_offset_atIndex_(mbuf_mean, 0, 1)
+        enc.setBuffer_offset_atIndex_(mbuf_var, 0, 2)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 3)
+
+        grid = Metal.MTLSize(batch_size, ch, hw)
+
+        max_t = int(self.pipe_bn2d_apply.maxTotalThreadsPerThreadgroup())
+        tx, ty, tz = 1, 1, min(hw, 256)
+        while tx * ty * tz > max_t and tz > 1:
+            tz //= 2
+        #
+        tpg = Metal.MTLSize(tx, ty, max(1, tz))
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+        enc.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()
         
     def alloc_buf(self, nbytes):
         return self.device.newBufferWithLength_options_(nbytes, self.opts)

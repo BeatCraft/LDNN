@@ -161,64 +161,14 @@ class Train:
         for ws in attack_list:
             widx = ws[0]
             wi = ws[1]
-            #w = self.w_list[widx]
             w = w_list[widx]
             w.wi = wi
             layer = self._r.get_layer_at(w.li)
             layer.set_weight_index(w.ni, w.ii, wi)
-            #self.w_list[widx].wi = wi
             w_list[widx].wi = wi
         #
         self._r.update_weight()
 
-    def undo_attack_reset_momentum(self, attack_list):
-        for ws in attack_list:
-            widx = ws[0]
-            wi = ws[1]
-            w = self.w_list[widx]
-            w.wi = wi
-            layer = self._r.get_layer_at(w.li)
-            layer.set_weight_index(w.ni, w.ii, wi)
-            self.w_list[widx].wi = wi
-            self.w_list[widx].momentum = 0
-        #
-        self._r.update_weight()
-        
-    def attack_set_momentum(self, attack_list):
-        for ws in attack_list:
-            widx = ws[0]
-            w = self.w_list[widx]
-            layer = self._r.get_layer_at(w.li)
-            if layer._type==core.LAYER_TYPE_HIDDEN or layer._type==core.LAYER_TYPE_OUTPUT:
-                if self._r.wi_mode==3:
-                    wi_alt = core.wi_8020()
-                else:
-                    wi_alt = random.randint(0, len(core.WEIGHT_SET)-1)
-                #
-            else:
-                wi_alt = random.randint(0, len(core.CNN_WEIGHT_SET)-1)
-            #
-            
-            #
-            # momentum
-            #
-            momentum = w.wi - wi_alt
-            #print("momentum: wi_alt - w.wi :", wi_alt, w.wi, momentum)
-            if momentum>0:
-                w.momentum = 1
-            elif momentum<0:
-                w.momentum = -1
-            else:
-                w.momentum = 0
-            #
-            # momentum
-            #
-            
-            w.wi = wi_alt
-            layer.set_weight_index(w.ni, w.ii, wi_alt)
-        #
-        self._r.update_weight()
-        
     def main_simple_loop(self, idx, loop, ce, loop_max, attack_num, save=0, debug=0, bi=0):
         r = self._r
         w_num = len(self.w_list)
@@ -272,205 +222,6 @@ class Train:
         print(bi, attack_num, "hit rate:", hit, "/", loop_max, "=", hit_rate, "ce=", ce)
         r.save()
         return ce, hit_rate
-
-    def momentum_loop(self, idx, loop, loop_max, attack_num, save=0, debug=0):
-        r = self._r
-        w_num = len(self.w_list)
-        num = 0
-        hit = 0
-        ce = r.evaluate(0)
-        
-        #
-        # attack
-        #
-        while num<loop_max:
-            attack_list = self.make_attack_list(w_num, attack_num)
-            self.attack_set_momentum(attack_list)
-            ce_alt = r.evaluate(0)
-            if ce_alt<=ce: # keep
-                print(idx, "%d, [%d/%d]" % (loop, num, loop_max), attack_num, "\t", ce, ">", ce_alt)
-                ce = ce_alt
-                ret = 1
-                hit = hit + 1
-
-            else: # undo
-                print(idx, "%d, [%d/%d]" % (loop, num, loop_max), attack_num, "\t", ce)
-                self.undo_attack_reset_momentum(attack_list)
-            #
-            num = num + 1
-        #
-
-
-    def make_attack_list_momentum(self, w_num, attack_num):
-        attack_list = []
-        while len(attack_list)<attack_num:
-            widx = random.randint(0, w_num-1)
-            w = self.w_list_momentum[widx]
-            wi = w.wi
-            attack_list.append((widx, wi))
-        #
-        return attack_list
-        
-    def reset_mommentum(self):
-        r = self._r
-        for w in self.w_list:
-            w.momentum = 0
-        #
-        
-    def auto_momentum_loop(self, idx, loop, loop_max, attack_num, save=0, debug=0):
-        #print("train::auto_momentum_loop()")
-        r = self._r
-        num = 0
-        hit = 0
-        
-        self.w_list_momentum = self.make_w_list_momentum()
-        #print(self.w_list_momentum)
-        w_num = len(self.w_list_momentum)
-        if w_num>0:
-            pass
-        else:
-            return 0
-        #
-        
-        while num<loop_max:
-            #
-            # attack
-            #
-            attack_list = self.make_attack_list_momentum(w_num, attack_num)
-            ce = r.evaluate(0)
-        
-            for ws in attack_list:
-                widx = ws[0]
-                w = self.w_list_momentum[widx]
-                wi = w.wi
-                momentum = w.momentum
-                wi_alt = w.wi + momentum
-                if momentum>0:
-                    if wi_alt<=core.WEIGHT_INDEX_MAX:
-                        w.wi = wi_alt
-                        layer = r.get_layer_at(w.li)
-                        layer.set_weight_index(w.ni, w.ii, w.wi)
-                    #
-                else:
-                    if wi_alt>=0:
-                        w.wi = wi_alt
-                        layer = r.get_layer_at(w.li)
-                        layer.set_weight_index(w.ni, w.ii, w.wi)
-                    #
-                #
-            #
-            r.update_weight()
-            ce_alt = r.evaluate(0)
-
-            if ce_alt<=ce: # keep
-                print("*", idx, "%d, [%d/%d]" % (loop, num, loop_max), attack_num, "\t", ce, ">", ce_alt)
-                ce = ce_alt
-                ret = 1
-                hit = hit + 1
-            else: # undo
-                print("*", idx, "%d, [%d/%d]"%(loop, num, loop_max), attack_num, "\t", ce)
-                self.undo_attack(attack_list, self.w_list_momentum)
-            #
-            num = num + 1
-        #
-        self.reset_mommentum()
-        
-        return 1
-
-    def momentum_challenge(self, idx, loop, loop_max, attack_num, save=0, debug=0):
-        r = self._r
-        w_num = len(self.w_list)
-        num = 0
-        hit = 0
-        ce = r.evaluate(0)
-        
-        #
-        # attack
-        #
-        while num<loop_max:
-            attack_list = self.make_attack_list(w_num, attack_num)
-            self.attack_set_momentum(attack_list)
-            ce_alt = r.evaluate(0)
-            if ce_alt<=ce: # keep
-                print(idx, "%d, [%d/%d]" % (loop, num, loop_max), attack_num, "\t", ce, ">", ce_alt)
-                ce = ce_alt
-                ret = 1
-                hit = hit + 1
-                return attack_list
-            else: # undo
-                print(idx, "%d, [%d/%d]" % (loop, num, loop_max), attack_num, "\t", ce)
-                self.undo_attack_reset_momentum(attack_list)
-            #
-            num = num + 1
-        #
-        
-        empty_list = []
-        return empty_list
-
-    def auto_momentum_challenge(self, idx, loop, loop_max, attack_list, attack_num, save=0, debug=0):
-        #print("train::auto_momentum_loop()")
-        r = self._r
-        num = 0
-        hit = 0
-        w_num = len(attack_list)
-        #self.w_list_momentum = self.make_w_list_momentum()
-        #print(self.w_list_momentum)
-        #w_num = len(self.w_list_momentum)
-        #if w_num>0:
-        #    pass
-        #else:
-        #    return 0
-        #
-        ce = r.evaluate(0)
-        loop_max = 1
-        while num<loop_max:
-            #
-            # attack
-            #
-            #attack_list = self.make_attack_list_momentum(w_num, attack_num)
-            for ws in attack_list:
-                widx = ws[0]
-                #w = self.w_list_momentum[widx]
-                w = self.w_list[widx]
-                wi = w.wi
-                momentum = w.momentum
-                wi_alt = w.wi + momentum
-                if momentum>0:
-                    if wi_alt<=core.WEIGHT_INDEX_MAX:
-                        w.wi = wi_alt
-                        layer = r.get_layer_at(w.li)
-                        layer.set_weight_index(w.ni, w.ii, w.wi)
-                    #
-                else:
-                    if wi_alt>=0:
-                        w.wi = wi_alt
-                        layer = r.get_layer_at(w.li)
-                        layer.set_weight_index(w.ni, w.ii, w.wi)
-                    #
-                #
-            #
-            r.update_weight()
-            ce_alt = r.evaluate(0)
-
-            if ce_alt<=ce: # keep
-                print("*", idx, "%d, [%d/%d]" % (loop, num, loop_max), attack_num, "\t", ce, ">", ce_alt)
-                ce = ce_alt
-                ret = 1
-                hit = hit + 1
-                return 1
-            else: # undo
-                print("*", idx, "%d, [%d/%d]"%(loop, num, loop_max), attack_num, "\t", ce)
-                #self.undo_attack(attack_list, self.w_list_momentum)
-                self.undo_attack_reset_momentum(attack_list)
-            #
-            num = num + 1
-        #
-        
-        #self.reset_mommentum()
-        #for w in self.w_list:
-        #    w.momentum = 0
-        #
-        return 1
 
     def main_challenge_loop(self, ce, loop_max, attack_num, one=False, save=0, debug=0, bi=0):
         r = self._r
@@ -533,54 +284,38 @@ class Train:
         #r.save()
         return ce, hit_rate
 
-    def train_slope2(self, b, my_gpu, r, wmode, batch_size, attack_num, ce, n, undo=False):
+    def train_slope3(self, b, my_gpu, r, wmode, batch_size, ce, n, qfc, qcnn, attack_max_list, undo=False):
         r.slope(0)
         
         cnt = 0
+        conv_cnt = 0
+        lc = r.count_layers()
+        if len(attack_max_list)==lc:
+            pass
+        else:
+            print("error :: attack_max_list=%d, lc=%d" % (len(attack_max_list), lc))
+            return 0.0
+        #
+        
+        attack_cnt = [0]*lc
         attack_list_fc = []
         attack_list_cnn = []
-        th_list = []
-        conv_cnt = 0
-        
-        lc = r.count_layers()
-        for li in range(lc):
-            layer = r.get_layer_at(li)
-            type = layer.get_type()
-            #
-            if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT:
-                th = np.quantile(np.abs(layer.dW), 0.96)
-                th_list.append(th)
-            elif type==core.LAYER_TYPE_CONV:
-                th = np.quantile(np.abs(layer.dW), 0.99)
-                th_list.append(th)
-            else:
-                th_list.append(np.float32(0.0))
-            #
-        #
-        # mnist
-        #attack_max = [0, 4, 0, 32, 0, 96, 8]
-        #attack_max = [0, 3, 0, 3, 0, 64, 8]
-        #attack_max = [0, 3, 0, 3, 0, 48, 8]
-        # cifar-10
-        attack_max = [0, 1, 0, 1, 0, 56, 8]
+        th_list = self.get_th_list2(r, qfc, qcnn)
     
-        attack_cnt = [0, 0, 0, 0, 0, 0, 0]
         for li in range(lc):
-            w_list = self.w_lists[li]
-            if len(w_list)==0:
+            l = r.get_layer_at(li)
+            if l.wcnt==0:
                 continue
             #
             
-            l = r.get_layer_at(li)
             th = th_list[li]
             cand = np.argwhere(np.abs(l.dW) >= th)
-            #print(cand)
             widx_list = list(range(len(cand)))
             random.shuffle(widx_list)
             cnt = 0
             for k in widx_list:
                 ii, ni = cand[k]
-                if cnt>attack_max[li]-1:
+                if cnt>attack_max_list[li]-1:
                     break
                 #
                 
@@ -603,8 +338,6 @@ class Train:
                     else:
                         w.wi_alt = w.wi
                         w.wi = wi + 1
-                        #l.set_weight_index(w.ni, w.ii, wi+1) # attack
-                        #attack_list.append(w)
                         if type==core.LAYER_TYPE_CONV:
                             attack_list_cnn.append(w)
                         else:
@@ -619,8 +352,6 @@ class Train:
                     else:
                         w.wi_alt = w.wi
                         w.wi = wi - 1
-                        #l.set_weight_index(w.ni, w.ii, wi-1) # attack
-                        #attack_list.append(w)
                         #attack_list_cnn.append(w)
                         if type==core.LAYER_TYPE_CONV:
                             attack_list_cnn.append(w)
@@ -630,7 +361,7 @@ class Train:
                         cnt += 1
                     #
                 else:
-                    print("ZERO")
+                    print("ZERO : no slope, must be error")
                 #
             # for k
         # for li
@@ -640,12 +371,10 @@ class Train:
         #
 
         # cnn
-        #print(attack_list_cnn)
         for w in attack_list_cnn:
             li = w.li
             l = r.get_layer_at(li)
-            l.set_weight_index(w.ni, w.ii, w.wi) # attac
-            #print(li, w.ni, w.ii, w.wi)
+            l.set_weight_index(w.ni, w.ii, w.wi) # attack
         #
         r.update_weight()
         
@@ -674,7 +403,153 @@ class Train:
         for w in attack_list_fc:
             li = w.li
             l = r.get_layer_at(li)
-            l.set_weight_index(w.ni, w.ii, w.wi) # attac
+            l.set_weight_index(w.ni, w.ii, w.wi) # attack
+        #
+        r.update_weight()
+        
+        ce_alt = r.evaluate(0)
+        if ce_alt>ce: # undo
+            if undo:
+                print("[%d] *FC(%d)" % (n, len(attack_list_fc)), ce, "(", ce_alt, "), UNDO")
+                for w in attack_list_fc:
+                    li = w.li
+                    l = r.get_layer_at(w.li)
+                    w.wi = w.wi_alt
+                    l.set_weight_index(w.ni, w.ii, w.wi)
+                #
+                r.update_weight()
+            #
+            else:
+                print("[%d] FC(%d)" % (n, len(attack_list_fc)), ce, "=>", ce_alt)
+                ce = ce_alt
+            #
+        else:
+            print("[%d] FC(%d)" % (n, len(attack_list_fc)), ce, "->", ce_alt)
+            ce = ce_alt
+        #
+        
+        return ce
+        
+    def train_slope2(self, b, my_gpu, r, wmode, batch_size, ce, n, qfc, qcnn, attack_max_list, undo=False):
+        r.slope(0)
+        
+        cnt = 0
+        conv_cnt = 0
+        lc = r.count_layers()
+        if len(attack_max_list)==lc:
+            pass
+        else:
+            print("error :: attack_max_list=%d, lc=%d" % (len(attack_max_list), lc))
+            return 0.0
+        #
+        attack_cnt = [0]*lc
+        attack_list_fc = []
+        attack_list_cnn = []
+        th_list = self.get_th_list2(r, qfc, qcnn)
+        #print(th_list)
+    
+        for li in range(lc):
+            l = r.get_layer_at(li)
+            if l.wcnt==0:
+                continue
+            #
+            
+            th = th_list[li]
+            cand = np.argwhere(np.abs(l.dW) >= th)
+            widx_list = list(range(len(cand)))
+            random.shuffle(widx_list)
+            cnt = 0
+            for k in widx_list:
+                ii, ni = cand[k]
+                if cnt>attack_max_list[li]-1:
+                    break
+                #
+                
+                w = l.get_weight(ni, ii)
+                wi = w.wi
+                type = w.type
+                if type==core.LAYER_TYPE_CONV:
+                    kmax = core.CNN_WEIGHT_INDEX_MAX
+                    kmin = core.CNN_WEIGHT_INDEX_MIN
+                else:
+                    kmax = core.WEIGHT_INDEX_MAX
+                    kmin = core.WEIGHT_INDEX_MIN
+                #
+                
+                g = l.dW[ii][ni]
+                if g<0.0: # ++
+                    if wi==kmax:
+                        #print("kmax", type, li)
+                        pass
+                    else:
+                        w.wi_alt = w.wi
+                        w.wi = wi + 1
+                        if type==core.LAYER_TYPE_CONV:
+                            attack_list_cnn.append(w)
+                        else:
+                            attack_list_fc.append(w)
+                        #
+                        cnt += 1
+                    #
+                elif g>0.0: # --
+                    if wi==kmin:
+                        #print("kmin", type, li)
+                        pass
+                    else:
+                        w.wi_alt = w.wi
+                        w.wi = wi - 1
+                        #attack_list_cnn.append(w)
+                        if type==core.LAYER_TYPE_CONV:
+                            attack_list_cnn.append(w)
+                        else:
+                            attack_list_fc.append(w)
+                        #
+                        cnt += 1
+                    #
+                else:
+                    print("ZERO : no slope, must be error")
+                #
+            # for k
+        # for li
+        if len(attack_list_fc) + len(attack_list_cnn)==0:
+            print("skip : none in attack_list")
+            return 0
+        #
+
+        # cnn
+        for w in attack_list_cnn:
+            li = w.li
+            l = r.get_layer_at(li)
+            l.set_weight_index(w.ni, w.ii, w.wi) # attack
+        #
+        r.update_weight()
+        
+        ce_alt = r.evaluate(0)
+        if ce_alt>ce: # undo
+            if undo:
+                print("[%d] *CNN(%d)" % (n, len(attack_list_cnn)), ce, "(", ce_alt, "), UNDO")
+                for w in attack_list_cnn:
+                    li = w.li
+                    l = r.get_layer_at(w.li)
+                    w.wi = w.wi_alt
+                    l.set_weight_index(w.ni, w.ii, w.wi)
+                #
+                r.update_weight()
+            #
+            else:
+                print("[%d] CNN(%d)" % (n, len(attack_list_cnn)), ce, "=>", ce_alt)
+                ce = ce_alt
+            #
+        else:
+            print("[%d] CNN(%d)" % (n, len(attack_list_cnn)), ce, "->", ce_alt)
+            ce = ce_alt
+        #
+
+        # fc
+        for w in attack_list_fc:
+            li = w.li
+            l = r.get_layer_at(li)
+            l.set_weight_index(w.ni, w.ii, w.wi) # attack
         #
         r.update_weight()
         
@@ -802,20 +677,26 @@ class Train:
         #
         return ce
 
-
-    def slope_batch(self, r):
-        r.slope(0)
+    def get_th_list2(self, r, qfc, qcnn):
+        th_list = []
+        
         lc = r.count_layers()
-        for li in range(0, lc):
+        for li in range(lc):
             layer = r.get_layer_at(li)
             type = layer.get_type()
-            if type not in (core.LAYER_TYPE_HIDDEN, core.LAYER_TYPE_CONV, core.LAYER_TYPE_OUTPUT):
-                pass
+            #
+            if type==core.LAYER_TYPE_HIDDEN or type==core.LAYER_TYPE_OUTPUT:
+                th = np.quantile(np.abs(layer.dW), qfc)
+                th_list.append(th)
+            elif type==core.LAYER_TYPE_CONV:
+                th = np.quantile(np.abs(layer.dW), qcnn)
+                th_list.append(th)
             else:
-                layer.dWd += layer.dW
+                th_list.append(np.float32(0.0))
             #
         #
-
+        return th_list
+        
     def get_th_list(self, r, batch_size):
         th_list = []
         
@@ -887,8 +768,6 @@ class Train:
         r.update_weight()
         #ce_alt = r.evaluate(0)
         
-    def train_slope_mini(self, b, my_gpu, r, wmode, batch_size, attack_num, ce, n, undo=False):
-        pass
     
     def zero_dWd(self, r):
         lc = r.count_layers()
@@ -902,109 +781,7 @@ class Train:
                 layer.dWd[:] = np.float32(0.0)
             #
         # for
-
-    def slope_batch_avg(self, r):
-        r.slope(0)
-
-        lc = r.count_layers()
-        for li in range(lc):
-            layer = r.get_layer_at(li)
-            if layer.get_type() in (
-                core.LAYER_TYPE_HIDDEN,
-                core.LAYER_TYPE_CONV,
-                core.LAYER_TYPE_OUTPUT
-            ):
-                layer.dWd += layer.dW
-            # if
-        # for
     
-    def get_th_list_avg(self, r, accum_count, q=0.70):
-        th_list = []
 
-        lc = r.count_layers()
-        for li in range(lc):
-            layer = r.get_layer_at(li)
-            if layer.get_type() not in (
-                core.LAYER_TYPE_HIDDEN,
-                core.LAYER_TYPE_CONV,
-                core.LAYER_TYPE_OUTPUT
-            ):
-                th_list.append(np.float32(0.0))
-            else:
-                avg = layer.dWd / np.float32(accum_count)
-                th = np.quantile(np.abs(avg), q)
-                th_list.append(th)
-            #
-        return th_list
         
-    def slope_batch_attack_avg(self, r, accum_count, attack_num, ce, th_list, undo=True):
-        cnt = 0
-        attack_list = []
-
-        while cnt < attack_num:
-            k = random.randint(0, len(self.w_list)-1)
-            w = self.w_list[k]
-
-            li = w.li
-            ni = w.ni
-            ii = w.ii
-            l = r.get_layer_at(li)
-            wi = w.wi
-
-            if w.type == core.LAYER_TYPE_CONV:
-                kmax = core.CNN_WEIGHT_INDEX_MAX
-                kmin = core.CNN_WEIGHT_INDEX_MIN
-            else:
-                kmax = core.WEIGHT_INDEX_MAX
-                kmin = core.WEIGHT_INDEX_MIN
-            #
-
-            g = l.dWd[ii][ni] / np.float32(accum_count)
-            th = th_list[li]
-
-            if abs(g) < th:
-                cnt += 1
-                continue
-            #
-
-            if g < 0.0:
-                if wi < kmax:
-                    w.wi_alt = w.wi
-                    w.wi = wi + 1
-                    l.set_weight_index(w.ni, w.ii, wi + 1)
-                    attack_list.append(w)
-                #
-            elif g > 0.0:
-                if wi > kmin:
-                    w.wi_alt = w.wi
-                    w.wi = wi - 1
-                    l.set_weight_index(w.ni, w.ii, wi - 1)
-                    attack_list.append(w)
-                #
-            cnt += 1
-        # while
-
-        if len(attack_list) == 0:
-            print("avg skip")
-            return ce
-        #
-
-        r.update_weight()
-        ce_alt = r.evaluate(0)
-
-        if ce_alt > ce and undo:
-            for w in attack_list:
-                l = r.get_layer_at(w.li)
-                w.wi = w.wi_alt
-                l.set_weight_index(w.ni, w.ii, w.wi)
-            # for
-            r.update_weight()
-            print("AVG (%d/%d) %s ( %s ), UNDO" %
-              (len(attack_list), attack_num, ce, ce_alt))
-            return ce
-        # if
-
-        print("AVG (%d/%d) %s -> %s" %
-          (len(attack_list), attack_num, ce, ce_alt))
-        return ce_alt
-
+    

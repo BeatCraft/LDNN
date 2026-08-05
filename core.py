@@ -82,37 +82,6 @@ def wi_std_11():
     idx = random.choices(range(WEIGHT_INDEX_SIZE), weights=RNDWT, k=1)[0]
     return idx
 
-def wi_std_3bit():
-    p = random.random()
-    if p >= 0.0 and p<0.0625:
-        wi = 0
-    elif p > 0.0625 and p<=0.125:
-        wi = 1
-    elif p > 0.125 and p<=0.25:
-        wi = 2
-    elif p > 0.25 and p<=0.5:
-        wi = 3
-    elif p > 0.50 and p<=0.75:
-        wi = 4
-    elif p > 0.75 and p<=0.825:
-        wi = 5
-    elif p > 0.825 and p<=0.9375:
-        wi = 6
-    elif p > 0.9375 and p<=1.00:
-        wi = 7
-    #
-    return wi
-
-def wi_8020_3bit():
-    wmax = int( (WEIGHT_INDEX_SIZE - 1) / 2 )
-    i = random.randint(0, wmax-1)
-    if random.random() < 0.8:
-        wi = wmax + i
-    else:
-        wi = i
-    #
-    return wi
-
 def wi_8020():
     if random.random() < 0.05:
         wi = WEIGHT_INDEX_ZERO
@@ -128,8 +97,6 @@ def wi_8020():
     #
     return wi
 
-# [-1.0, -0.5, -0.25, -0.125, 0, 0.125, 0.25, 0.5, 1.0]
-# 1, 2, 3, 4
 def wi_std():
     if random.random() < 0.05:
         wi = WEIGHT_INDEX_ZERO
@@ -154,8 +121,6 @@ def wi_std():
         wi = 8
     #
     return wi
-
-# [-1.0, -0.5, -0.25, -0.125, 0.0, 0.125, 0.25, 0.5, 1.0]
 
 def wi_std2():
     p = random.random()
@@ -375,16 +340,11 @@ class Layer(object):
             self.set_weight_index(ni, ii, wi)
         elif mode==6: # random value in normal distribution
             v = 0.25 * np.random.standard_normal()
-            #print(mode, v)
             if v==0.0:
                 v = 0.0000001
             #
             self._weight_matrix[ni][ii] = v
         elif mode==7:
-            #print("mode==7")
-            #wi = wi_std_3bit()
-            #wi = wi_std2()
-            #wi = random.randrange(WEIGHT_INDEX_SIZE)
             wi = wi_std_11()
             self.set_weight_index(ni, ii, wi)
         #
@@ -396,16 +356,6 @@ class Layer(object):
                 self.init_weight_mode(ni, ii, mode, value)
             #
         #
-
-    #def init_weight(self, ni, ii, wi=-1):
-    #    if wi<0:
-    #        if self._type==LAYER_TYPE_HIDDEN or self._type==LAYER_TYPE_OUTPUT:
-    #            wi = random.randrange(WEIGHT_INDEX_SIZE)
-    #        elif self._type==LAYER_TYPE_CONV:
-    #            wi = random.randrange(CNN_WEIGHT_INDEX_SIZE)
-    #        #
-    #    #
-    #    self.set_weight_index(ni, ii, wi)
         
     def init_weight_with_random_index(self):
         for ni in range(self._num_node):
@@ -439,6 +389,105 @@ class Layer(object):
     def import_weight_value(self, wi_list):
         # float32 must be fixed later
         self._weight_matrix = np.array(wi_list, dtype=np.float32).copy()
+
+    def bias_weight_set(self):
+        if self._type == LAYER_TYPE_CONV:
+            return CNN_WEIGHT_SET
+        return WEIGHT_SET
+
+    def bias_index_zero(self):
+        if self._type == LAYER_TYPE_CONV:
+            return CNN_WEIGHT_INDEX_ZERO
+        return WEIGHT_INDEX_ZERO
+
+    def bias_index_min(self):
+        if self._type == LAYER_TYPE_CONV:
+            return CNN_WEIGHT_INDEX_MIN
+        return WEIGHT_INDEX_MIN
+
+    def bias_index_max(self):
+        if self._type == LAYER_TYPE_CONV:
+            return CNN_WEIGHT_INDEX_MAX
+        return WEIGHT_INDEX_MAX
+
+    def init_bias_index(self):
+        if self.count_weight() <= 0:
+            return
+        zi = self.bias_index_zero()
+        self.bias_index = np.full(self._num_node, zi, dtype=np.uint8)
+        self.sync_bias_array_from_index()
+
+    def sync_bias_array_from_index(self):
+        if not hasattr(self, "bias_index"):
+            return
+        ws = np.asarray(self.bias_weight_set(), dtype=np.float32)
+        idx = np.asarray(self.bias_index, dtype=np.uint8).reshape(-1)
+        self.bias_array = ws[idx].astype(np.float32).copy()
+
+    def set_bias_index(self, ni, wi):
+        if self.count_weight() <= 0:
+            return
+        wi = int(wi)
+        if wi < self.bias_index_min():
+            wi = self.bias_index_min()
+        elif wi > self.bias_index_max():
+            wi = self.bias_index_max()
+        #
+        if not hasattr(self, "bias_index"):
+            self.init_bias_index()
+        #
+        self.bias_index[ni] = np.uint8(wi)
+        self.bias_array[ni] = np.float32(self.bias_weight_set()[wi])
+
+    def export_bias_value(self):
+        # Compatibility name: the bias sidecar now stores quantized indexes,
+        # not float values.  One row is written per weighted layer.
+        if hasattr(self, "bias_index"):
+            return np.asarray(self.bias_index, dtype=np.uint8).tolist()
+        if self.count_weight() > 0:
+            return np.full(self._num_node, self.bias_index_zero(), dtype=np.uint8).tolist()
+        return None
+
+    def import_bias_value(self, bias_list):
+        # Compatibility name: load bias indexes.  If an older sidecar contains
+        # float bias values such as 0.0, map each value to the nearest entry in
+        # the layer's weight set.
+        if bias_list is None:
+            return
+        if self.count_weight() <= 0:
+            return
+
+        if len(bias_list) != self._num_node:
+            raise RuntimeError(
+                "import_bias_value(): layer %d expects %d biases, got %d"
+                % (self._index, self._num_node, len(bias_list))
+            )
+
+        ws = np.asarray(self.bias_weight_set(), dtype=np.float32)
+        idx = []
+        for v in bias_list:
+            s = str(v).strip()
+            if s == "":
+                idx.append(self.bias_index_zero())
+                continue
+            #
+            if ("." in s) or ("e" in s.lower()):
+                fv = np.float32(float(s))
+                wi = int(np.argmin(np.abs(ws - fv)))
+            else:
+                wi = int(s)
+            #
+            if wi < self.bias_index_min():
+                wi = self.bias_index_min()
+            elif wi > self.bias_index_max():
+                wi = self.bias_index_max()
+            idx.append(wi)
+        #
+        self.bias_index = np.asarray(idx, dtype=np.uint8).copy()
+        self.sync_bias_array_from_index()
+        if hasattr(self, "bias_gpu") and self._gpu is not None:
+            if self._gpu.type == 2:
+                self._gpu.write_np_to_mbuf(self.bias_array.astype(np.float32), self.bias_gpu)
 
     def set_id(self, id):
         if id>=0:
@@ -596,9 +645,8 @@ class HiddenLayer(Layer):
                 self._gpu_dW = self._gpu.alloc_buf(self._num_input * self._num_node * 4)
                 self.dWd = np.zeros((self._num_input, self._num_node), dtype=np.float32)
                 
-                self.bias_index = np.zeros(self._num_node, dtype=np.uint8)
-                self.bias_array = np.zeros(self._num_node, dtype=np.float32)
-                self.bias_gpu = self._gpu.alloc_buf(self._num_node * 4)
+                self.init_bias_index()
+                self.bias_gpu = self._gpu.alloc_buf_from_array(self.bias_array)
             elif self.qmode==1:
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
                 self._weight_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.float16)
@@ -628,6 +676,9 @@ class HiddenLayer(Layer):
             self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
         elif self._gpu.type==2:
             self._gpu.write_np_to_mbuf(self._weight_matrix, self._gpu_weight)
+            if hasattr(self, "bias_gpu") and hasattr(self, "bias_index"):
+                self.sync_bias_array_from_index()
+                self._gpu.write_np_to_mbuf(self.bias_array.astype(np.float32), self.bias_gpu)
         #
 
     def propagate(self, array_in, debug=0):
@@ -727,8 +778,10 @@ class HiddenLayer(Layer):
             #
             
             if self.qmode==0:
-                self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, a_mode)
+                self._gpu.calc_mac_relu_bias(self._batch_size, array_in, self._gpu_weight, self.bias_gpu, self._gpu_output, self._num_node, self._num_input, a_mode)
+                # scale
                 self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
+                #
                 if self.backprop:
                     #print(self._index, "self._output_array", self._output_array)
                     self._output_array = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
@@ -794,9 +847,19 @@ class HiddenLayer(Layer):
             #print("\tself.delta:", self.delta.shape)
                         
             dW = (self._pre._output_array.astype(np.float32).T @ self.delta) / np.float32(self._batch_size)
+            dB = np.mean(self.delta, axis=0).astype(np.float32)
             #print("\t", dW.shape)
                             
             self._weight_matrix -= np.float32(self.learning_rate) * dW.T
+            if hasattr(self, "bias_index"):
+                # Bias is quantized by index.  For continuous backprop updates,
+                # move one index step in the descent direction.
+                for ni, g in enumerate(np.asarray(dB, dtype=np.float32).reshape(-1)):
+                    wi = int(self.bias_index[ni])
+                    if g < 0.0:
+                        self.set_bias_index(ni, wi + 1)
+                    elif g > 0.0:
+                        self.set_bias_index(ni, wi - 1)
         elif self._gpu.type==3: # macOS
             # delta
             self.delta = self._next.delta @ self._next._weight_matrix
@@ -832,6 +895,7 @@ class HiddenLayer(Layer):
             self.delta = safe_matmul(x_next, w_next)
             self.delta *= (out > 0).astype(np.float32)
             self.dW = safe_matmul(x_pre.T, self.delta) / np.float32(self._batch_size)
+            self.dB = np.mean(self.delta, axis=0).astype(np.float32)
             return
         #
 
@@ -866,69 +930,8 @@ class HiddenLayer(Layer):
             (self._num_input, self._num_node)
         ).copy()
 
-    def slope3(self, label_array, debug=0):
-        if debug:
-            print("HiddenLayer::slope() macOS Metal")
-        #
+        self.dB = np.mean(self.delta, axis=0).astype(np.float32)
 
-        x_next = np.ascontiguousarray(self._next.delta, dtype=np.float32)
-        w_next = np.ascontiguousarray(self._next._weight_matrix, dtype=np.float32)
-        out    = np.ascontiguousarray(self._output_array, dtype=np.float32)
-        x_pre  = np.ascontiguousarray(self._pre._output_array, dtype=np.float32)
-
-        if debug:
-            print("  x_next shape:", x_next.shape, "contig:", x_next.flags["C_CONTIGUOUS"])
-            print("  w_next shape:", w_next.shape, "contig:", w_next.flags["C_CONTIGUOUS"])
-            print("  out    shape:", out.shape,    "contig:", out.flags["C_CONTIGUOUS"])
-            print("  x_pre  shape:", x_pre.shape,  "contig:", x_pre.flags["C_CONTIGUOUS"])
-            print("  x_next maxabs:", np.max(np.abs(x_next)))
-            print("  w_next maxabs:", np.max(np.abs(w_next)))
-        #
-
-        self.delta = x_next @ w_next
-        self.delta *= (out > 0).astype(np.float32)
-        self.dW = (x_pre.T @ self.delta) / np.float32(self._batch_size)
-    
-    def slope2(self, label_array, debug=0):
-        if debug:
-            print("HiddenLayer::slope() macOS Metal")
-        #
-        x_next = self._next.delta.astype(np.float64)
-        w_next = self._next._weight_matrix.astype(np.float64)
-        print("Hidden slope layer", self._index)
-        print("next.delta maxabs:", np.max(np.abs(x_next)))
-        print("next.weight maxabs:", np.max(np.abs(w_next)))
-
-        self.delta = (x_next @ w_next).astype(np.float32)
-        self.delta *= (self._output_array > 0).astype(np.float32)
-
-        x = self._pre._output_array.astype(np.float32)
-        self.dW = (x.T @ self.delta) / np.float32(self._batch_size)
-
-        #x_next = self._next.delta.astype(np.float32)
-        #w_next = self._next._weight_matrix.astype(np.float32)
-        #
-        #x_next = self._next.delta.astype(np.float32)
-        #w_next = self._next._weight_matrix.astype(np.float32)
-        #
-        #tmp = x_next.astype(np.float64) @ w_next.astype(np.float64)
-        #print("tmp64 maxabs:", np.max(np.abs(tmp)))
-        #
-        #self.delta = tmp.astype(np.float32)
-        #if not np.isfinite(self.delta).all():
-        #    raise RuntimeError("HiddenLayer.bp(): delta overflowed after cast to float32")
-        #
-        #self.delta *= (self._output_array > 0).astype(np.float32)
-        #self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
-        
-        
-        #self.delta = self._next.delta @ self._next._weight_matrix
-
-        # ReLU derivative
-        #self.delta *= (self._output_array > 0).astype(np.float32)
-
-        # slope
-        #self.dW = (self._pre._output_array.T @ self.delta) / self._batch_size
         
 class OutputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None, smax=False):
@@ -1010,9 +1013,8 @@ class OutputLayer(Layer):
                 
                 self.dWd = np.zeros((self._num_input, self._num_node), dtype=np.float32)
                 
-                self.bias_index = np.zeros(self._num_node, dtype=np.uint8)
-                self.bias_array = np.zeros(self._num_node, dtype=np.float32)
-                self.bias_gpu = self._gpu.alloc_buf(self._num_node * 4)
+                self.init_bias_index()
+                self.bias_gpu = self._gpu.alloc_buf_from_array(self.bias_array)
                 
             elif self.qmode==1:
                 self._weight_index_matrix = np.zeros( (self._num_node, self._num_input), dtype=np.uint8)
@@ -1039,6 +1041,9 @@ class OutputLayer(Layer):
             self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
         elif self._gpu.type==2: # macOS Metal
             self._gpu.write_np_to_mbuf(self._weight_matrix, self._gpu_weight)
+            if hasattr(self, "bias_gpu") and hasattr(self, "bias_index"):
+                self.sync_bias_array_from_index()
+                self._gpu.write_np_to_mbuf(self.bias_array.astype(np.float32), self.bias_gpu)
         #
         
     def propagate(self, array_in, debug=0):
@@ -1108,7 +1113,7 @@ class OutputLayer(Layer):
             #
             
             if self.qmode==0:
-                self._gpu.calc_mac_relu(self._batch_size, array_in, self._gpu_weight, self._gpu_output, self._num_node, self._num_input, 0)
+                self._gpu.calc_mac_relu_bias(self._batch_size, array_in, self._gpu_weight, self.bias_gpu, self._gpu_output, self._num_node, self._num_input, 0)
                 #debug = 1
                 if debug:
                     out = np.frombuffer(self._gpu_output.contents().as_buffer(self._gpu_output.length()), dtype=np.float32)
@@ -1184,8 +1189,18 @@ class OutputLayer(Layer):
             self.delta = self._softmax_array.astype(np.float32) - label_array
             
             dW = (self._pre._output_array.astype(np.float32).T @ self.delta) / np.float32(self._batch_size)  # (in,out)
+            dB = np.mean(self.delta, axis=0).astype(np.float32)
 
             self._weight_matrix -= np.float32(self.learning_rate) * dW.T
+            if hasattr(self, "bias_index"):
+                # Bias is quantized by index.  For continuous backprop updates,
+                # move one index step in the descent direction.
+                for ni, g in enumerate(np.asarray(dB, dtype=np.float32).reshape(-1)):
+                    wi = int(self.bias_index[ni])
+                    if g < 0.0:
+                        self.set_bias_index(ni, wi + 1)
+                    elif g > 0.0:
+                        self.set_bias_index(ni, wi - 1)
         elif self._gpu.type==3:
             # differencial
             self.delta = (self._softmax_array - label_array) # need no batch avg
@@ -1225,6 +1240,7 @@ class OutputLayer(Layer):
 
         if self._gpu.type != 2:
             self.dW = safe_matmul(xpre.T, self.delta) / np.float32(self._batch_size)
+            self.dB = np.mean(self.delta, axis=0).astype(np.float32)
             return
         #
 
@@ -1257,45 +1273,9 @@ class OutputLayer(Layer):
             np.float32,
             (self._num_input, self._num_node)
         ).copy()
-    
-    def slope2(self, label_array, debug=0):
-        if debug:
-            print("OutputLayer::slope() macOS Metal")
-        #
-        y = self._softmax_array.astype(np.float32)
-        t = label_array.astype(np.float32)
-        x = self._pre._output_array.astype(np.float32)
-        
-        # delta
-        self.delta = y - t
-    
-        if self._batch_size == 0:
-            raise RuntimeError("batch_size is 0")
-        #
-        if not np.isfinite(y).all():
-            print("OutputLayer slope: NaN/Inf in softmax")
-            print("nan:", np.isnan(y).sum(), "inf:", np.isinf(y).sum())
-            print("maxabs:", np.nanmax(np.abs(y)))
-        #
-        
-        if not np.isfinite(self.delta).all():
-            print("OutputLayer slope: NaN/Inf in delta")
-            print("nan:", np.isnan(self.delta).sum(), "inf:", np.isinf(self.delta).sum())
-            print("maxabs:", np.nanmax(np.abs(self.delta)))
-        #
 
-        if not np.isfinite(x).all():
-            print("OutputLayer slope: NaN/Inf in pre output")
-            print("nan:", np.isnan(x).sum(), "inf:", np.isinf(x).sum())
-            print("maxabs:", np.nanmax(np.abs(x)))
-        #
-
-        # gradient
-        self.dW = (x.T @ self.delta) / np.float32(self._batch_size)
-        if debug:
-            print(" delta shape", self.delta.shape)
-            print(" dW shape", self.dW.shape)
-        #
+        self.dB = np.mean(self.delta, axis=0).astype(np.float32)
+        
 
 class RegressionOutputLayer(Layer):
     def __init__(self, i, num_input, num_node, pre, gpu=None):
@@ -1648,9 +1628,8 @@ class Conv_4_Layer(Layer):
                 self._gpu_sum = self._gpu.alloc_buf_from_array(self._sum_array)
                 self.dWd = np.zeros((self._num_input, self._num_node), dtype=np.float32)
                 
-                self.bias_index = np.zeros(self._num_node, dtype=np.uint8)
-                self.bias_array = np.zeros(self._num_node, dtype=np.float32)
-                self.bias_gpu = self._gpu.alloc_buf(self._num_node * 4)
+                self.init_bias_index()
+                self.bias_gpu = self._gpu.alloc_buf_from_array(self.bias_array)
             elif self.qmode==1:
                 print("no support for qmode:", self.qmode)
             elif self.qmode==2:
@@ -1673,6 +1652,9 @@ class Conv_4_Layer(Layer):
             self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
         elif self._gpu.type==2:
             self._gpu.write_np_to_mbuf(self._weight_matrix, self._gpu_weight)
+            if hasattr(self, "bias_gpu") and hasattr(self, "bias_index"):
+                self.sync_bias_array_from_index()
+                self._gpu.write_np_to_mbuf(self.bias_array.astype(np.float32), self.bias_gpu)
         #
     
     def reset(self):
@@ -1765,6 +1747,7 @@ class Conv_4_Layer(Layer):
 
             # scale
             #self._gpu.layerScale(self._gpu_output, self._batch_size, size)
+            #
             if debug:
                 print(self._index, "conv, scale")
                 darray = cp.asnumpy(self._gpu_output)
@@ -1778,9 +1761,9 @@ class Conv_4_Layer(Layer):
             self._gpu.padding_float(self._batch_size, array_in, self._gpu_padded, self._w, self._h, self._ch)
             # conv + relu
             a_mode = 0
-            self._gpu.conv_float(self._batch_size, self._gpu_padded, self._gpu_weight, self._gpu_output, self._w, self._h, self._ch, self._filter, a_mode)
+            self._gpu.conv_float_bias(self._batch_size, self._gpu_padded, self._gpu_weight, self.bias_gpu, self._gpu_output, self._w, self._h, self._ch, self._filter, a_mode)
             # disabled, for test
-            #self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
+            self._gpu.scale_layer(self._batch_size, self._num_node, 1.0, self._gpu_output)
             #
             
             self._gpu.bn2d_forward(
@@ -1837,11 +1820,13 @@ class Conv_4_Layer(Layer):
         # Metal版
         self.slope(label_array)
         dW_metal = self.dW.copy()
+        dB_metal = self.dB.copy()
         delta_metal = self.delta.copy()
 
         # NumPy版
         self.slope_np(label_array)
         dW_np = self.dW.copy()
+        dB_np = self.dB.copy()
         delta_np = self.delta.copy()
 
         eps = 1e-12
@@ -1849,6 +1834,8 @@ class Conv_4_Layer(Layer):
         print("=== Conv grad check ===")
         print("dW max abs diff:", np.max(np.abs(dW_metal - dW_np)))
         print("dW mean abs diff:", np.mean(np.abs(dW_metal - dW_np)))
+        print("dB max abs diff:", np.max(np.abs(dB_metal - dB_np)))
+        print("dB mean abs diff:", np.mean(np.abs(dB_metal - dB_np)))
 
         sign_mask = np.abs(dW_np) > eps
         print(
@@ -1898,6 +1885,7 @@ class Conv_4_Layer(Layer):
 
             dX = dXpad[:, :, 1:-1, 1:-1]
             dW4 /= np.float32(B)
+            self.dB = np.sum(dZ, axis=(0, 2, 3), dtype=np.float32) / np.float32(B)
 
             self.dW = dW4.reshape(F, C * 9).T.astype(np.float32)
             self.delta = dX.reshape(B, C * H * W).astype(np.float32)
@@ -1911,6 +1899,9 @@ class Conv_4_Layer(Layer):
 
         # next.grad: (B,F,H*W) -> (B,F,H,W)
         dY = self._next.grad.astype(np.float32).reshape(B, F, H, W)
+        out4 = self._output_array.astype(np.float32).reshape(B, F, H, W)
+        dZ = dY * (out4 > 0).astype(np.float32)
+        self.dB = np.sum(dZ, axis=(0, 2, 3), dtype=np.float32) / np.float32(B)
 
         # pre output: (B,C,H*W) or (B,C*H*W) -> (B,C,H,W)
         X = self._pre._output_array.astype(np.float32).reshape(B, C, H, W)
@@ -1921,7 +1912,7 @@ class Conv_4_Layer(Layer):
         mbuf_dy = self._gpu.alloc_buf_from_array(np.ascontiguousarray(dY))
         mbuf_xpad = self._gpu.alloc_buf_from_array(np.ascontiguousarray(Xpad))
         mbuf_out = self._gpu.alloc_buf_from_array(
-            np.ascontiguousarray(self._output_array.astype(np.float32).reshape(B, F, H, W))
+            np.ascontiguousarray(out4)
         )
 
         mbuf_dx = self._gpu.alloc_buf(B * C * H * W * 4)
@@ -2234,342 +2225,7 @@ class Conv_4_Layer(Layer):
             #
         #
         
-class Conv_5_Layer(Layer):
-    def __init__(self, i, w, h, ch, filter, size, stride, pre, gpu=None):
-        print("Convolution Layer ver.5 ::__init__()")
-        
-        self._w = w
-        self._h = h
-        self._ch = ch # number of inputs
-        self._filter = filter # node / # number of outputs
-        self._filter_len = size
-        self._filter_size = size * size * ch
-        self._stride = stride
-        self._out_w = self._w - (self._filter_len - self._stride)
-        self._out_h = self._h - (self._filter_len - self._stride)
-        #
-        num_node = self._filter
-        num_input = self._filter_size
-        super(Conv_5_Layer, self).__init__(i, LAYER_TYPE_CONV, num_input, num_node, pre, gpu)
-        
-        # mems for weights
-        self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        print(self._weight_index_matrix.shape)
-        
-        self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float16)
-        if self._gpu:
-            if self._gpu.type==0:
-                self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
-            elif self._gpu.type==1:
-                self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
-            #
-        else:
-            print("error")
-        #
-        
-    def prepare(self, batch_size):
-        print(("Conv_5_Layer::prepare(%d)" %(batch_size)))
-        
-        self._batch_size = batch_size
-        # intermidiate
-        self._sum_array = np.zeros((self._batch_size), dtype=np.float16)
-        self._dsum_array = np.zeros((self._batch_size), dtype=np.float16)
-        # output
-        self._output_array = np.zeros((self._batch_size, self._filter, self._out_w*self._out_h), dtype=np.float16)
-        
-        if self._gpu:
-            if self._gpu.type==0:
-                self._gpu_output = self._gpu.dev_malloc(self._output_array)
-                self._gpu_sum = self._gpu.dev_malloc(self._sum_array)
-            elif self._gpu.type==1:
-                self._gpu_output = self._gpu.allocateArray(self._output_array)
-                self._gpu_sum = self._gpu.allocateArray(self._sum_array)
-                self._gpu_dsum = self._gpu.allocateArray(self._dsum_array)
-            #
-        else:
-            print("error")
-        #
 
-    def update_weight(self):
-        if self._gpu:
-            pass
-        else:
-            return
-        #
-        
-        if self._gpu.type==0:
-            self._gpu.copy(self._gpu_weight, self._weight_matrix)
-        elif self._gpu.type==1:
-            self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
-        #
-        
-    def propagate(self, array_in, debug=0):
-        if self._gpu:
-            pass
-        else:
-            return
-        #
-        
-        # activation mode
-        # 0 : none
-        # 1 : normal
-        # 2 : 0.000001
-        # 3 : y/20
-        a_mode = 1
-        if self._gpu.type==0: # OpenCL
-            self._gpu.conv_5_roll_batch(self._batch_size, self._out_w, self._out_h,
-                                        array_in, self._gpu_weight, self._gpu_output,
-                                        self._w, self._h,
-                                        self._ch, self._filter,
-                                        self._filter_len, self._stride)
-            if debug:
-                print(self._index, "conv ret")
-                self._gpu.copy(self._output_array, self._gpu_output)
-                print((self._output_array[0][0]))
-            #
-            size = self._out_w * self._out_h * self._filter
-            # normalize
-            self._gpu.get_sum(self._batch_size, self._gpu_output, self._gpu_sum, size)
-            self._gpu.copy(self._sum_array, self._gpu_sum)
-            mean = self._sum_array.sum() / float(self._batch_size*size)
-            self._gpu.get_dsum(self._batch_size, self._gpu_output, self._gpu_sum, size, mean)
-            self._gpu.copy(self._sum_array, self._gpu_sum)
-            div2 = self._sum_array.sum() / float(self._batch_size*size)
-            div = np.sqrt(div2) +  0.0000001;
-            self._gpu.get_std(self._batch_size, self._gpu_output, size, mean, div)
-            
-            # relu
-            self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, a_mode)
-            if debug:
-                print(self._index, "conv, scale")
-                self._gpu.copy(self._output_array, self._gpu_output)
-                print((self._output_array[0][0]))
-                #
-                for i in range(self._filter):
-                    name = "debug_%d" % (i)
-                    self.save_png(name, self._output_array[0][i])
-                #
-            #
-        elif self._gpu.type==1: # GDX
-            pass
-        #
-        
-    def save_png(self, name, data_array):
-        #size = self._w * self._h
-        max = np.max(data_array)
-        min = np.min(data_array)
-        print(("max=%f, min=%f" % (max, min)))
-        
-        img = Image.new("L", (self._out_w, self._out_h), 0)
-        pix = img.load()
-        for y in range(self._out_h):
-            for x in range(self._out_w):
-                v = data_array[self._out_w*y + x]
-                if max>0.0:
-                    v1 = int(v*255/max)
-                    pix[x,y] = v1
-                else:
-                    pix[x,y] = 0
-                #
-            #
-        #
-        spath = "./debug/%s.png" % (name)
-        print(spath)
-        img.save(spath)
-
-class FCNN_Layer(Layer):
-    def __init__(self, i, w, h, ch, filter, pre, gpu=None, type=LAYER_TYPE_FCNN, padding=0):
-        print("Fixed CNN Layer::__init__()")
-        self.padding = padding
-        self.cache = 0
-        self.ksize = 3 # kernel size
-        stride = 1
-        self._w = w
-        self._h = h
-        if self.padding==1:
-            self._w = self._w + 2
-            self._h = self._h + 2
-        #
-        self._ch = ch # number of input channels
-        self._filter = filter # node / number of output channels
-        self._filter_size = self.ksize * self.ksize * ch
-        self._stride = stride
-        #self._out_w = self._w - (self.ksize - self._stride)
-        #self._out_h = self._h - (self.ksize - self._stride)
-        self._out_w = w - (self.ksize - self._stride)
-        self._out_h = h - (self.ksize - self._stride)
-        #
-        num_node = self._filter
-        num_input = self._filter_size
-        super(FCNN_Layer, self).__init__(i, type, num_input, num_node, pre, gpu)
-        
-        # mems for weights
-        self._weight_index_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.int32)
-        self._weight_matrix = np.zeros( (self._filter, self._filter_size), dtype=np.float16)
-        if self._gpu:
-            if self._gpu.type==0:
-                self._gpu_weight = self._gpu.dev_malloc(self._weight_matrix)
-            elif self._gpu.type==1:
-                self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
-            #
-        else:
-            print("error")
-        #
-        
-    def reset(self):
-        self.cache = 0
-        
-    def prepare(self, batch_size):
-        print(("FCNN_Layer::prepare(%d)" %(batch_size)))
-        
-        self._batch_size = batch_size
-        # intermidiate
-        self._sum_array = np.zeros((self._batch_size), dtype=np.float16)
-        self._dsum_array = np.zeros((self._batch_size), dtype=np.float16)
-        # output
-        self._output_array = np.zeros((self._batch_size, self._filter, self._out_w*self._out_h), dtype=np.float16)
-        
-        if self.padding==1:
-            isize = self._w*self._h * self._ch
-            self._padded_array = np.zeros((self._batch_size, isize), dtype=np.float16)
-        #
-        
-        if self._gpu:
-            if self._gpu.type==0:
-                self._gpu_output = self._gpu.dev_malloc(self._output_array)
-                self._gpu_sum = self._gpu.dev_malloc(self._sum_array)
-                if self.padding==1:
-                    self._gpu_padded = self._gpu.dev_malloc(self._padded_array)
-                #
-            elif self._gpu.type==1:
-                self._gpu_output = self._gpu.allocateArray(self._output_array)
-                self._gpu_sum = self._gpu.allocateArray(self._sum_array)
-                self._gpu_dsum = self._gpu.allocateArray(self._dsum_array)
-                if self.padding==1:
-                    self._gpu_padded = self._gpu.allocateArray(self._padded_array)
-                #
-            #
-        else:
-            print("error")
-        #
-    
-    def update_weight(self):
-        if self._gpu:
-            pass
-        else:
-            return
-        #
-        
-        if self._gpu.type==0:
-            self._gpu.copy(self._gpu_weight, self._weight_matrix)
-        elif self._gpu.type==1:
-            self._gpu_weight = self._gpu.allocateArray(self._weight_matrix)
-        #
-        
-    def set_filter(self, index, farray, size):
-        for i in range(size):
-            self._filter[index][i] = farray[i]
-        #
-        if self._gpu:
-            self._gpu.copy(self._gpu_weight, self._weight_matrix)
-        #
-        
-    def propagate(self, array_in, debug=0):
-        if self._gpu:
-            pass
-        else:
-            print("FCNN_Layer::propagate() = error, no gpu")
-            return
-        #
-        
-        if self.cache:
-            return
-        #
-        
-        a_mode = 1
-        if self._gpu.type==0: # OpenCL
-            if self.padding==0:
-                self._gpu.conv_5_roll_batch(self._batch_size,
-                                            self._out_w,
-                                            self._out_h,
-                                            array_in,
-                                            self._gpu_weight,
-                                            self._gpu_output,
-                                            self._w,
-                                            self._h,
-                                            self._ch,
-                                            self._filter,
-                                            self.ksize,
-                                            self._stride)
-            else:
-                self._gpu.conv_4_pad_batch(array_in,
-                                            self._gpu_padded,
-                                            self._w-2, self._h-2,
-                                            self._ch,
-                                            self._batch_size)
-                self._gpu.conv_5_roll_batch(self._batch_size,
-                                            self._out_w,
-                                            self._out_h,
-                                            self._gpu_padded,
-                                            self._gpu_weight,
-                                            self._gpu_output,
-                                            self._w,
-                                            self._h,
-                                            self._ch,
-                                            self._filter,
-                                            self.ksize,
-                                            self._stride)
-            #
-            if debug:
-                #if self._index==1:
-                    #self._pre.debug()
-                    #temp = np.zeros(3072, dtype=np.float16)
-                    #self._gpu.copy(temp, array_in)
-                    #print(temp)
-                #    print(self._weight_index_matrix)
-                #    print(self._weight_matrix)
-                #
-                print(self._index, "FCNN")
-                self._gpu.copy(self._output_array, self._gpu_output)
-                print(self._output_array.shape)
-                print(self._output_array[0][0])
-            #
-            
-            # normalize
-            #size = self._out_w * self._out_h * self._filter
-            #self._gpu.get_sum(self._batch_size, self._gpu_output, self._gpu_sum, size)
-            #self._gpu.copy(self._sum_array, self._gpu_sum)
-            #mean = self._sum_array.sum() / float(self._batch_size*size)
-            #self._gpu.get_dsum(self._batch_size, self._gpu_output, self._gpu_sum, size, mean)
-            #self._gpu.copy(self._sum_array, self._gpu_sum)
-            #div2 = self._sum_array.sum() / float(self._batch_size*size)
-            #div = np.sqrt(div2) +  0.0000001;
-            #self._gpu.get_std(self._batch_size, self._gpu_output, size, mean, div)
-            
-            # relu
-            # activation mode
-            # 0 : none
-            # 1 : normal
-            # 2 : 0.000001
-            # 3 : y/20
-            size = self._out_w * self._out_h
-            self._gpu.relu(self._gpu_output, self._batch_size, self._filter, size, a_mode)
-            if debug:
-                print(self._index, "FCNN, reru(),", self._batch_size, self._filter, size)
-                print(self._out_w, self._out_h, self._filter)
-                self._gpu.copy(self._output_array, self._gpu_output)
-                print(self._output_array.shape)
-                print(self._output_array[0][0])
-                #
-                #for i in range(self._filter):
-                #    name = "debug_%d" % (i)
-                #    self.save_png(name, self._output_array[0][i])
-                #
-            #
-        elif self._gpu.type==1: # GDX
-            pass
-        #
-        self.cache = 1
         
 class Roster:
     def __init__(self):
@@ -2611,14 +2267,19 @@ class Roster:
         
     def set_path(self, path):
         self._path = path
+
+    def bias_path(self, path):
+        return path + ".bias.csv"
         
     def save(self, mode=0):
         #print("Roster::save(%s, %d)" % (self._path, mode))
         self.export_weight(self._path, mode)
+        self.export_bias(self.bias_path(self._path))
         
     def save_as(self, path, mode=0):
         print("Roster::save(%s, %d)" % (path, mode))
         self.export_weight(path, mode)
+        self.export_bias(self.bias_path(path))
     
     def load(self, path=None, mode=-1):
         print("Roster::load(%s, %d)" % (path, mode))
@@ -2633,10 +2294,16 @@ class Roster:
         
         if os.path.isfile(path):
             self.import_weight(path, mode)
+            bpath = self.bias_path(path)
+            if os.path.isfile(bpath):
+                self.import_bias(bpath)
+            else:
+                print("Roster::load(): bias file not found, bias is kept at initialized value: %s" % bpath)
         else:
             value = 0
             self.init_weight(mode, value)
             self.export_weight(path, mode)
+            self.export_bias(self.bias_path(path))
         #
 
     def set_evaluate_mode(self, mode):
@@ -3060,6 +2727,44 @@ class Roster:
                     #print(len(data))
                     writer.writerows(data)
                 #
+            # for
+        # with
+
+    def export_bias(self, path):
+        print("Roster : export_bias(%s)" % path)
+        with open(path, "w") as f:
+            writer = csv.writer(f, lineterminator='\n')
+            c = self.count_layers()
+            for i in range(1, c):
+                layer = self.get_layer_at(i)
+                type = layer.get_type()
+                if type==LAYER_TYPE_INPUT or type==LAYER_TYPE_MAX:
+                    continue
+                #
+                data = layer.export_bias_value()
+                if data is not None:
+                    writer.writerow(data)
+                #
+            # for
+        # with
+
+    def import_bias(self, path):
+        print("Roster::import_bias(%s)" % path)
+        with open(path, "r") as f:
+            reader = csv.reader(f)
+            lc = self.count_layers()
+            for i in range(1, lc):
+                layer = self.get_layer_at(i)
+                type = layer.get_type()
+                if type==LAYER_TYPE_INPUT or type==LAYER_TYPE_MAX:
+                    continue
+                #
+                try:
+                    row = next(reader)
+                except StopIteration:
+                    raise RuntimeError("import_bias(): missing bias row for layer %d" % i)
+                #
+                layer.import_bias_value(row)
             # for
         # with
         

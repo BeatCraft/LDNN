@@ -55,6 +55,37 @@ kernel void calc_mac_relu(
     }
 }
 
+kernel void calc_mac_relu_bias(
+    device const float* x [[buffer(0)]],
+    device const float* w [[buffer(1)]],
+    device const float* bias [[buffer(2)]],
+    device float* y [[buffer(3)]],
+    constant Params_mac& P [[buffer(4)]],
+    uint2 gid [[thread_position_in_grid]])
+{
+    uint bi = gid.x;
+    uint xi = gid.y;
+
+    uint x_start = P.wsize * bi;
+    uint w_start = P.wsize * xi;
+    uint y_start = (P.xsize * bi) + xi;
+    float temp = bias[xi];
+
+    for (uint i=0;i<P.wsize;i++){
+        temp += (x[x_start+i] * w[w_start+i]);
+    }
+
+    if (P.act==0){
+        y[y_start] = (float)temp;
+    } else {
+        if (temp>=0){
+            y[y_start] = (float)temp;
+        }else{
+            y[y_start] = (float)0.0;
+        }
+    }
+}
+
 struct Params_scale {
     uint  size;
     float  scale;
@@ -314,6 +345,61 @@ kernel void conv_float(
 
         // activation
         if (p.activation != 0) { // relu
+            sum = max(sum, 0.0f);
+        }
+
+        output[out_b_stride * bi + (p.w * p.h) * fi + out_yx] = sum;
+    }
+}
+
+
+kernel void conv_float_bias(
+    device const float* input   [[buffer(0)]],
+    device const float* weight  [[buffer(1)]],
+    device const float* bias    [[buffer(2)]],
+    device float*       output  [[buffer(3)]],
+    constant ConvParams& p      [[buffer(4)]],
+    uint3 gid                   [[thread_position_in_grid]]
+)
+{
+    int bi = (int)gid.x;
+    int xi = (int)gid.y;
+    int yi = (int)gid.z;
+
+    if (xi >= p.w || yi >= p.h) return;
+
+    int in_w = p.w + 2;
+    int ch_stride = in_w * (p.h + 2);
+    int b_stride  = ch_stride * p.ch;
+    int y_stride  = yi * in_w;
+    int i_start = b_stride * bi + y_stride;
+    int out_b_stride = p.w * p.h * p.filter;
+    int out_yx = yi * p.w + xi;
+
+    for (int fi = 0; fi < p.filter; fi++) {
+        float sum = bias[fi];
+        int f_start = 3 * 3 * fi * p.ch;
+
+        for (int ci = 0; ci < p.ch; ci++) {
+            int start   = i_start + ch_stride * ci;
+            int w_start = f_start + ci * 3 * 3;
+
+            sum += input[start + xi + 0] * weight[w_start + 0];
+            sum += input[start + xi + 1] * weight[w_start + 1];
+            sum += input[start + xi + 2] * weight[w_start + 2];
+
+            int r1 = start + in_w;
+            sum += input[r1 + xi + 0] * weight[w_start + 3];
+            sum += input[r1 + xi + 1] * weight[w_start + 4];
+            sum += input[r1 + xi + 2] * weight[w_start + 5];
+
+            int r2 = start + in_w * 2;
+            sum += input[r2 + xi + 0] * weight[w_start + 6];
+            sum += input[r2 + xi + 1] * weight[w_start + 7];
+            sum += input[r2 + xi + 2] * weight[w_start + 8];
+        }
+
+        if (p.activation != 0) {
             sum = max(sum, 0.0f);
         }
 
@@ -748,11 +834,13 @@ class LMetal(gpu.Gpu):
 
     def prepare(self):
         self.init_calc_mac_relu()
+        self.init_calc_mac_relu_bias()
         self.init_scale_layer()
         self.init_softmax()
         self.init_cross_entropy()
         self.init_padding_float()
         self.init_conv_float()
+        self.init_conv_float_bias()
         self.init_max_float()
         self.init_max_bp_float()
         self.init_conv4_back_input()
@@ -926,6 +1014,13 @@ class LMetal(gpu.Gpu):
             raise RuntimeError(err)
         #
         #self.params_buf_mac = self.device.newBufferWithLength_options_(32, self.opts)
+
+    def init_calc_mac_relu_bias(self):
+        fn = self.lib.newFunctionWithName_("calc_mac_relu_bias")
+        self.pipe_calc_mac_relu_bias, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+        #
         
     def calc_mac_relu(self, batch_size, mbuf0, mbuf1, mbuf2, xsize, wsize, act):
         params = np.zeros(1, dtype=np.dtype([
@@ -954,6 +1049,36 @@ class LMetal(gpu.Gpu):
         tpg  = Metal.MTLSize(min(self.pipe_calc_mac_relu.maxTotalThreadsPerThreadgroup(), 256), 1, 1)
         enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
         
+        enc.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()
+
+    def calc_mac_relu_bias(self, batch_size, mbuf_x, mbuf_w, mbuf_bias, mbuf_y, xsize, wsize, act):
+        params = np.zeros(1, dtype=np.dtype([
+            ("xsize", np.uint32),
+            ("wsize", np.uint32),
+            ("act", np.uint32),
+            ], align=True))
+        params["xsize"] = xsize
+        params["wsize"] = wsize
+        params["act"] = act
+
+        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
+        mv[:params.nbytes] = memoryview(params).tobytes()
+
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+        enc.setComputePipelineState_(self.pipe_calc_mac_relu_bias)
+        enc.setBuffer_offset_atIndex_(mbuf_x, 0, 0)
+        enc.setBuffer_offset_atIndex_(mbuf_w, 0, 1)
+        enc.setBuffer_offset_atIndex_(mbuf_bias, 0, 2)
+        enc.setBuffer_offset_atIndex_(mbuf_y, 0, 3)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 4)
+
+        grid = Metal.MTLSize(batch_size, xsize, 1)
+        tpg = Metal.MTLSize(min(self.pipe_calc_mac_relu_bias.maxTotalThreadsPerThreadgroup(), 256), 1, 1)
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+
         enc.endEncoding()
         cmd.commit()
         cmd.waitUntilCompleted()
@@ -1164,6 +1289,13 @@ class LMetal(gpu.Gpu):
         if err:
             raise RuntimeError(err)
         #
+
+    def init_conv_float_bias(self):
+        fn = self.lib.newFunctionWithName_("conv_float_bias")
+        self.pipe_conv_float_bias, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
+        if err:
+            raise RuntimeError(err)
+        #
         
     def conv_float(self, batch_size, mbuf_in, mbuf_w, mbuf_out, w, h, ch, filter, activation):
         # params (uint32 x5), align=True to match MSL struct layout
@@ -1213,6 +1345,48 @@ class LMetal(gpu.Gpu):
         cmd.commit()
         cmd.waitUntilCompleted()
         
+    def conv_float_bias(self, batch_size, mbuf_in, mbuf_w, mbuf_bias, mbuf_out, w, h, ch, filter, activation):
+        params = np.zeros(1, dtype=np.dtype([
+            ("w", np.uint32),
+            ("h", np.uint32),
+            ("ch", np.uint32),
+            ("filter", np.uint32),
+            ("activation", np.uint32),
+        ], align=True))
+        params["w"] = w
+        params["h"] = h
+        params["ch"] = ch
+        params["filter"] = filter
+        params["activation"] = activation
+
+        mv = self.params_buf.contents().as_buffer(self.params_buf.length())
+        mv[:params.nbytes] = memoryview(params).tobytes()
+
+        cmd = self.queue.commandBuffer()
+        enc = cmd.computeCommandEncoder()
+        enc.setComputePipelineState_(self.pipe_conv_float_bias)
+        enc.setBuffer_offset_atIndex_(mbuf_in, 0, 0)
+        enc.setBuffer_offset_atIndex_(mbuf_w, 0, 1)
+        enc.setBuffer_offset_atIndex_(mbuf_bias, 0, 2)
+        enc.setBuffer_offset_atIndex_(mbuf_out, 0, 3)
+        enc.setBuffer_offset_atIndex_(self.params_buf, 0, 4)
+
+        grid = Metal.MTLSize(batch_size, w, h)
+        max_t = int(self.pipe_conv_float_bias.maxTotalThreadsPerThreadgroup())
+        tx, ty, tz = 1, 16, 16
+        while tx * ty * tz > max_t:
+            if tz > 1:
+                tz //= 2
+            elif ty > 1:
+                ty //= 2
+            else:
+                break
+        tpg = Metal.MTLSize(tx, min(ty, w if w > 0 else 1), min(tz, h if h > 0 else 1))
+        enc.dispatchThreads_threadsPerThreadgroup_(grid, tpg)
+        enc.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()
+
     def init_max_float(self):
         fn = self.lib.newFunctionWithName_("max_float")
         self.pipe_max_float, err = self.device.newComputePipelineStateWithFunction_error_(fn, None)
